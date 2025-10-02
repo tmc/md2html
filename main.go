@@ -43,6 +43,7 @@ var (
 	flagVersionPattern    = flags.String("version-pattern", "*", "git tag pattern to match for versions (e.g., 'v*', 'release-*')")
 	flagVersionBranches   = flags.Bool("version-branches", false, "include branches as versions alongside tags")
 	flagVersionDefault    = flags.String("version-default", "", "default version to show (empty = current/latest)")
+	flagSearch            = flags.Bool("search", false, "enable search functionality (generates search index)")
 )
 
 type Config struct {
@@ -65,6 +66,7 @@ type Config struct {
 	VersionPattern    string
 	VersionBranches   bool
 	VersionDefault    string
+	Search            bool
 }
 
 // configFromFlags creates a Config from current global flag values
@@ -88,6 +90,7 @@ func configFromFlags(fs *flag.FlagSet) Config {
 		VersionPattern:    fs.Lookup("version-pattern").Value.String(),
 		VersionBranches:   fs.Lookup("version-branches").Value.String() == "true",
 		VersionDefault:    fs.Lookup("version-default").Value.String(),
+		Search:            fs.Lookup("search").Value.String() == "true",
 	}
 }
 
@@ -375,6 +378,7 @@ func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload
 		Frontmatter map[string]interface{}
 		Version     string
 		Versions    []GitVersion
+		Search      bool
 	}{
 		Title:       title,
 		Content:     template.HTML(htmlContent),
@@ -386,6 +390,7 @@ func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload
 		Frontmatter: frontmatter,
 		Version:     "",
 		Versions:    nil,
+		Search:      cfg.Search,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -470,6 +475,41 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			logger.Error("Error generating TOC index", "error", err)
 		} else {
 			logger.Debug("Generated TOC index")
+		}
+	}
+
+	// Generate search index if enabled
+	if cfg.Search {
+		logger.Info("Generating search index")
+		if err := generateSearchIndex(sourceDir, outputDir, cfg); err != nil {
+			logger.Error("Error generating search index", "error", err)
+			return fmt.Errorf("failed to generate search index: %w", err)
+		}
+
+		// Copy static search files
+		staticDir := filepath.Join("static", "js")
+		if _, err := os.Stat(staticDir); err == nil {
+			destDir := filepath.Join(outputDir, "js")
+			if err := os.MkdirAll(destDir, 0755); err != nil {
+				logger.Error("Error creating js directory", "error", err)
+			} else {
+				// Copy minisearch.min.js
+				if err := copyFile(
+					filepath.Join(staticDir, "minisearch.min.js"),
+					filepath.Join(destDir, "minisearch.min.js"),
+				); err != nil {
+					logger.Error("Error copying minisearch.min.js", "error", err)
+				}
+				// Copy search.js
+				if err := copyFile(
+					filepath.Join(staticDir, "search.js"),
+					filepath.Join(destDir, "search.js"),
+				); err != nil {
+					logger.Error("Error copying search.js", "error", err)
+				} else {
+					logger.Debug("Copied search static files")
+				}
+			}
 		}
 	}
 
@@ -658,6 +698,21 @@ func generateVersionedStaticHTML(ctx context.Context, cfg Config, logger *slog.L
 		}
 	}
 
+	// Generate search index if enabled (for each version)
+	if cfg.Search {
+		logger.Info("Generating search indexes for all versions")
+		for _, version := range versions {
+			versionOutputDir := filepath.Join(outputDir, "v", version.Name)
+			logger.Debug("Generating search index for version", "version", version.Name)
+
+			// For versioned docs, we need to get files from git
+			// For now, generate search index from the already generated HTML/content
+			if err := generateSearchIndex(sourceDir, versionOutputDir, cfg); err != nil {
+				logger.Error("Error generating search index for version", "version", version.Name, "error", err)
+			}
+		}
+	}
+
 	logger.Info("Versioned static HTML generation completed", "versions", len(versions))
 	return nil
 }
@@ -736,6 +791,7 @@ func renderTemplateWithVersions(cfg Config, htmlContent, title, customCSS string
 		Frontmatter map[string]interface{}
 		Version     string
 		Versions    []GitVersion
+		Search      bool
 	}{
 		Title:       title,
 		Content:     template.HTML(htmlContent),
@@ -747,6 +803,7 @@ func renderTemplateWithVersions(cfg Config, htmlContent, title, customCSS string
 		Frontmatter: frontmatter,
 		Version:     currentVersion,
 		Versions:    versions,
+		Search:      cfg.Search,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -754,4 +811,22 @@ func renderTemplateWithVersions(cfg Config, htmlContent, title, customCSS string
 		return fmt.Sprintf("<p>Template execution error: %v</p>", err)
 	}
 	return buf.String()
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	return err
 }

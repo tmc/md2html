@@ -6,6 +6,7 @@
     <title>{{.Title}}</title>
 
     {{block "styles" .}}
+    {{if .Search}}{{template "search-styles" .}}{{end}}
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -111,11 +112,15 @@
     {{if .LiveReload}}<div id="status" class="connection-status">Connected</div>{{end}}
     {{end}}
 
+    {{if .Search}}{{template "search-modal" .}}{{end}}
+
     {{block "content" .}}
     {{.Content}}
     {{end}}
 
     {{block "scripts" .}}
+    {{if .Search}}{{template "search-scripts" .}}{{end}}
+
     <!-- MathJax support -->
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>
