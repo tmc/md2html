@@ -24,7 +24,7 @@ import (
 	"go.abhg.dev/goldmark/toc"
 )
 
-//go:embed templates
+//go:embed templates/*
 var templates embed.FS
 
 func generateChromaCSS() string {

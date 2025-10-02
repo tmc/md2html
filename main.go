@@ -410,6 +410,11 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
 
+	// Check if versioning is enabled
+	if cfg.Versions {
+		return generateVersionedStaticHTML(ctx, cfg, logger, sourceDir, outputDir)
+	}
+
 	// Load JSON data if provided
 	if cfg.DataJSON != "" {
 		_, err := loadJSONFile(cfg.DataJSON)
@@ -574,4 +579,179 @@ func generateTOCIndex(sourceDir, outputDir string, files []markdownFile, cssCont
 	// Write index.html
 	indexOutputPath := filepath.Join(outputDir, "index.html")
 	return os.WriteFile(indexOutputPath, []byte(finalHTML), 0644)
+}
+
+func generateVersionedStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger, sourceDir, outputDir string) error {
+	versionMgr := NewGitVersionManager(sourceDir)
+	if !versionMgr.IsGitRepo() {
+		logger.Warn("Versions enabled but not in a git repository")
+		return fmt.Errorf("not in a git repository")
+	}
+
+	versions, err := versionMgr.ListVersions(cfg.VersionBranches, cfg.VersionPattern)
+	if err != nil {
+		return fmt.Errorf("failed to list versions: %w", err)
+	}
+
+	logger.Info("Loaded versions for static generation", "count", len(versions))
+
+	// Load CSS if provided
+	var cssContent string
+	if cfg.CSS != "" {
+		css, err := os.ReadFile(cfg.CSS)
+		if err != nil {
+			logger.Error("Error reading CSS file", "error", err, "file", cfg.CSS)
+		} else {
+			cssContent = string(css)
+			logger.Debug("Loaded CSS content", "file", cfg.CSS)
+		}
+	}
+
+	// Determine default version
+	defaultVersion := cfg.VersionDefault
+	if defaultVersion == "" && len(versions) > 0 {
+		defaultVersion = versions[0].Name
+	}
+
+	// Generate HTML for each version
+	for _, version := range versions {
+		logger.Info("Generating static HTML for version", "version", version.Name)
+
+		files, err := versionMgr.ListFiles(version.Name, "*.md")
+		if err != nil {
+			logger.Error("Error listing files for version", "version", version.Name, "error", err)
+			continue
+		}
+
+		versionOutputDir := filepath.Join(outputDir, "v", version.Name)
+		if err := os.MkdirAll(versionOutputDir, 0755); err != nil {
+			logger.Error("Error creating version output directory", "version", version.Name, "error", err)
+			continue
+		}
+
+		for _, filePath := range files {
+			if err := generateVersionedFile(filePath, version.Name, versionMgr, versionOutputDir, cssContent, cfg, versions); err != nil {
+				logger.Error("Error processing versioned file", "version", version.Name, "file", filePath, "error", err)
+				continue
+			}
+			logger.Debug("Generated versioned file", "version", version.Name, "file", filePath)
+		}
+	}
+
+	// Generate redirect index
+	if defaultVersion != "" {
+		indexHTML := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="0; url=./v/%s/">
+    <title>Redirecting...</title>
+</head>
+<body>
+    <p>Redirecting to <a href="./v/%s/">version %s</a>...</p>
+</body>
+</html>`, defaultVersion, defaultVersion, defaultVersion)
+
+		indexPath := filepath.Join(outputDir, "index.html")
+		if err := os.WriteFile(indexPath, []byte(indexHTML), 0644); err != nil {
+			logger.Error("Error generating version redirect index", "error", err)
+		}
+	}
+
+	logger.Info("Versioned static HTML generation completed", "versions", len(versions))
+	return nil
+}
+
+func generateVersionedFile(filePath, version string, versionMgr *GitVersionManager, outputDir, cssContent string, cfg Config, versions []GitVersion) error {
+	content, err := versionMgr.GetFileContent(version, filePath)
+	if err != nil {
+		return err
+	}
+
+	doc, err := parseFrontmatter(string(content))
+	if err != nil {
+		log.Printf("Error parsing frontmatter in %s@%s: %v", filePath, version, err)
+		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
+	}
+
+	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, filePath)
+
+	baseName := strings.TrimSuffix(filePath, filepath.Ext(filePath))
+	outputPath := baseName
+	if cfg.HTMLExt != "" {
+		outputPath = baseName + "." + cfg.HTMLExt
+	}
+	outputPath = filepath.Join(outputDir, outputPath)
+
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return err
+	}
+
+	title := cfg.Title
+	if docTitle, ok := doc.Frontmatter["title"].(string); ok && docTitle != "" {
+		title = docTitle
+	} else {
+		title = strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
+	}
+
+	finalHTML := renderTemplateWithVersions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, version, versions)
+	return os.WriteFile(outputPath, []byte(finalHTML), 0644)
+}
+
+func renderTemplateWithVersions(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]interface{}, currentVersion string, versions []GitVersion) string {
+	tmpl, err := loadAllTemplates(cfg)
+	if err != nil {
+		log.Printf("Error loading templates: %v", err)
+		return fmt.Sprintf("<p>Template loading error: %v</p>", err)
+	}
+
+	name := "layout"
+	if tmpl.Lookup(name) == nil {
+		for _, n := range []string{"docs.html", "page.html", "live-reload.html", "base"} {
+			if tmpl.Lookup(n) != nil {
+				name = n
+				break
+			}
+		}
+	}
+
+	if tmpl.Lookup(name) == nil {
+		return "<p>No template found. Expected 'layout' template"
+	}
+
+	var buf bytes.Buffer
+	htmlExt := ""
+	if cfg.HTMLExt != "" {
+		htmlExt = "." + cfg.HTMLExt
+	}
+
+	data := struct {
+		Title       string
+		Content     template.HTML
+		CustomCSS   template.CSS
+		ChromaCSS   template.CSS
+		Verbose     bool
+		LiveReload  bool
+		HTMLExt     string
+		Frontmatter map[string]interface{}
+		Version     string
+		Versions    []GitVersion
+	}{
+		Title:       title,
+		Content:     template.HTML(htmlContent),
+		CustomCSS:   template.CSS(customCSS),
+		ChromaCSS:   template.CSS(generateChromaCSS()),
+		Verbose:     cfg.Verbose,
+		LiveReload:  liveReload,
+		HTMLExt:     htmlExt,
+		Frontmatter: frontmatter,
+		Version:     currentVersion,
+		Versions:    versions,
+	}
+
+	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
+		log.Printf("Error executing template: %v", err)
+		return fmt.Sprintf("<p>Template execution error: %v</p>", err)
+	}
+	return buf.String()
 }
