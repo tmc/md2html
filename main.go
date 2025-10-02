@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"io/fs"
 	"log"
 	"log/slog"
 	"os"
@@ -44,7 +43,6 @@ var (
 	flagVersionPattern    = flags.String("version-pattern", "*", "git tag pattern to match for versions (e.g., 'v*', 'release-*')")
 	flagVersionBranches   = flags.Bool("version-branches", false, "include branches as versions alongside tags")
 	flagVersionDefault    = flags.String("version-default", "", "default version to show (empty = current/latest)")
-	flagSearch            = flags.Bool("search", false, "enable search functionality (generates search index)")
 )
 
 type Config struct {
@@ -67,7 +65,6 @@ type Config struct {
 	VersionPattern    string
 	VersionBranches   bool
 	VersionDefault    string
-	Search            bool
 }
 
 // configFromFlags creates a Config from current global flag values
@@ -91,7 +88,6 @@ func configFromFlags(fs *flag.FlagSet) Config {
 		VersionPattern:    fs.Lookup("version-pattern").Value.String(),
 		VersionBranches:   fs.Lookup("version-branches").Value.String() == "true",
 		VersionDefault:    fs.Lookup("version-default").Value.String(),
-		Search:            fs.Lookup("search").Value.String() == "true",
 	}
 }
 
@@ -128,18 +124,14 @@ func run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		logger = slog.New(handler)
 	}
 
-	// Mode selection priority:
-	// 1. Static HTML generation (-html flag)
-	// 2. HTTP server mode (-http flag)
-	// 3. Pipe mode (source file or stdin -> stdout)
-	// 4. Show usage if no mode specified
+	// TODO: clean up handling stdin and choosing between modes
 
-	// Mode 1: Static HTML generation
+	// If -html flag is provided, generate static HTML
 	if cfg.HTML != "" {
 		return generateStaticHTML(ctx, cfg, logger)
 	}
 
-	// Mode 2: HTTP server
+	// If -http flag is provided, run server
 	if cfg.HTTP != "" {
 		logger.Info("Starting server", "address", cfg.HTTP)
 		err := runServer(ctx, cfg, logger)
@@ -150,40 +142,27 @@ func run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		return err
 	}
 
-	// Mode 3: Pipe mode - convert markdown to HTML and output to stdout
-	// Handles both file input and stdin (when source is "-")
+	// If source is provided but no mode specified, convert to HTML and output to stdout
 	if cfg.Source != "" && cfg.Source != "." {
-		var content []byte
-		var err error
-		var sourceName string
-
-		if cfg.Source == "-" {
-			// Read from stdin
-			content, err = io.ReadAll(os.Stdin)
-			sourceName = "stdin"
-		} else {
-			// Read from file
-			content, err = os.ReadFile(cfg.Source)
-			sourceName = cfg.Source
-		}
-
+		// Read the markdown file
+		content, err := os.ReadFile(cfg.Source)
 		if err != nil {
-			return fmt.Errorf("error reading %s: %w", sourceName, err)
+			return fmt.Errorf("error reading file: %w", err)
 		}
 
 		// Convert to HTML
 		doc, err := parseFrontmatter(string(content))
 		if err != nil {
-			logger.Error("Error parsing frontmatter", "error", err, "source", sourceName)
+			logger.Error("Error parsing frontmatter", "error", err)
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
 		}
 
-		html := markdownToHTMLWithContext(cfg, doc.Content, sourceName)
+		html := markdownToHTMLWithContext(cfg, doc.Content, cfg.Source)
 		fmt.Fprint(out, html)
 		return nil
 	}
 
-	// Mode 4: No mode specified, show usage
+	// Neither -html nor -http provided and no source, show usage
 	flag.Usage()
 	return flag.ErrHelp
 }
@@ -320,8 +299,7 @@ func renderDocument(cfg Config, doc DocumentData, title, customCSS, filePath str
 }
 
 func loadAllTemplates(cfg Config) (*template.Template, error) {
-	// Create template with functions first
-	tmpl := template.New("root").Funcs(template.FuncMap{
+	tmpl, err := template.New("root").Funcs(template.FuncMap{
 		"default": func(def, val interface{}) interface{} {
 			if val == nil {
 				return def
@@ -340,76 +318,19 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 			return data
 		},
 		"replace": strings.ReplaceAll,
-	})
+	}).ParseFS(templates, "templates/*.html", "templates/*/*.html")
 
-	// Collect all template content to parse in a single operation
-	// This allows template definitions to see each other and enables proper inheritance
-	var templateContents []string
-	var templateNames []string
-
-	// Load all embedded templates first as base definitions
-	// Walk through the embedded templates directory to find all .html files
-	err := fs.WalkDir(templates, "templates", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		// Only process .html files
-		if !d.IsDir() && strings.HasSuffix(path, ".html") {
-			content, err := templates.ReadFile(path)
-			if err == nil {
-				templateContents = append(templateContents, string(content))
-				templateNames = append(templateNames, path)
-				if cfg.Verbose {
-					log.Printf("Found embedded template: %s", path)
-				}
-			} else if cfg.Verbose {
-				log.Printf("Error reading embedded template %s: %v", path, err)
-			}
-		}
-		return nil
-	})
-	if err != nil && cfg.Verbose {
-		log.Printf("Error walking embedded templates: %v", err)
+	if err != nil {
+		log.Printf("Error parsing embedded templates: %v", err)
+		tmpl = template.New("root")
 	}
 
-	// Load custom templates last (they override embedded templates)
-	// When parsing templates in a single operation, later definitions override earlier ones
 	if cfg.TemplateDir != "" {
 		for _, pattern := range []string{"*.html", "*/*.html"} {
-			globPattern := filepath.Join(cfg.TemplateDir, pattern)
-			matches, err := filepath.Glob(globPattern)
-			if err == nil && len(matches) > 0 {
-				for _, match := range matches {
-					content, err := os.ReadFile(match)
-					if err == nil {
-						templateContents = append(templateContents, string(content))
-						templateNames = append(templateNames, match)
-						if cfg.Verbose {
-							log.Printf("Found custom template: %s", match)
-						}
-					}
-				}
+			if t, err := tmpl.ParseGlob(filepath.Join(cfg.TemplateDir, pattern)); err == nil {
+				tmpl = t
 			}
 		}
-	}
-
-	// Parse all templates together in a single operation
-	// This allows {{define}} blocks to see each other and enables proper template inheritance
-	for i, content := range templateContents {
-		var err error
-		if i == 0 {
-			tmpl, err = tmpl.Parse(content)
-		} else {
-			_, err = tmpl.Parse(content)
-		}
-		if err != nil {
-			log.Printf("Error parsing template %s: %v", templateNames[i], err)
-			return nil, err
-		}
-	}
-
-	if cfg.Verbose {
-		log.Printf("Successfully loaded %d templates in single parse operation", len(templateContents))
 	}
 
 	return tmpl, nil
@@ -454,7 +375,6 @@ func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload
 		Frontmatter map[string]interface{}
 		Version     string
 		Versions    []GitVersion
-		Search      bool
 	}{
 		Title:       title,
 		Content:     template.HTML(htmlContent),
@@ -466,7 +386,6 @@ func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload
 		Frontmatter: frontmatter,
 		Version:     "",
 		Versions:    nil,
-		Search:      cfg.Search,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -489,11 +408,6 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	// Create output directory
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %v", err)
-	}
-
-	// Check if versioning is enabled
-	if cfg.Versions {
-		return generateVersionedStaticHTML(ctx, cfg, logger, sourceDir, outputDir)
 	}
 
 	// Load JSON data if provided
@@ -551,41 +465,6 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			logger.Error("Error generating TOC index", "error", err)
 		} else {
 			logger.Debug("Generated TOC index")
-		}
-	}
-
-	// Generate search index if enabled
-	if cfg.Search {
-		logger.Info("Generating search index")
-		if err := generateSearchIndex(sourceDir, outputDir, cfg); err != nil {
-			logger.Error("Error generating search index", "error", err)
-			return fmt.Errorf("failed to generate search index: %w", err)
-		}
-
-		// Copy static search files
-		staticDir := filepath.Join("static", "js")
-		if _, err := os.Stat(staticDir); err == nil {
-			destDir := filepath.Join(outputDir, "js")
-			if err := os.MkdirAll(destDir, 0755); err != nil {
-				logger.Error("Error creating js directory", "error", err)
-			} else {
-				// Copy minisearch.min.js
-				if err := copyFile(
-					filepath.Join(staticDir, "minisearch.min.js"),
-					filepath.Join(destDir, "minisearch.min.js"),
-				); err != nil {
-					logger.Error("Error copying minisearch.min.js", "error", err)
-				}
-				// Copy search.js
-				if err := copyFile(
-					filepath.Join(staticDir, "search.js"),
-					filepath.Join(destDir, "search.js"),
-				); err != nil {
-					logger.Error("Error copying search.js", "error", err)
-				} else {
-					logger.Debug("Copied search static files")
-				}
-			}
 		}
 	}
 
@@ -695,214 +574,4 @@ func generateTOCIndex(sourceDir, outputDir string, files []markdownFile, cssCont
 	// Write index.html
 	indexOutputPath := filepath.Join(outputDir, "index.html")
 	return os.WriteFile(indexOutputPath, []byte(finalHTML), 0644)
-}
-
-func generateVersionedStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger, sourceDir, outputDir string) error {
-	versionMgr := NewGitVersionManager(sourceDir)
-	if !versionMgr.IsGitRepo() {
-		logger.Warn("Versions enabled but not in a git repository")
-		return fmt.Errorf("not in a git repository")
-	}
-
-	versions, err := versionMgr.ListVersions(cfg.VersionBranches, cfg.VersionPattern)
-	if err != nil {
-		return fmt.Errorf("failed to list versions: %w", err)
-	}
-
-	logger.Info("Loaded versions for static generation", "count", len(versions))
-
-	// Load CSS if provided
-	var cssContent string
-	if cfg.CSS != "" {
-		css, err := os.ReadFile(cfg.CSS)
-		if err != nil {
-			logger.Error("Error reading CSS file", "error", err, "file", cfg.CSS)
-		} else {
-			cssContent = string(css)
-			logger.Debug("Loaded CSS content", "file", cfg.CSS)
-		}
-	}
-
-	// Determine default version
-	defaultVersion := cfg.VersionDefault
-	if defaultVersion == "" && len(versions) > 0 {
-		defaultVersion = versions[0].Name
-	}
-
-	// Generate HTML for each version
-	for _, version := range versions {
-		logger.Info("Generating static HTML for version", "version", version.Name)
-
-		files, err := versionMgr.ListFiles(version.Name, "*.md")
-		if err != nil {
-			logger.Error("Error listing files for version", "version", version.Name, "error", err)
-			continue
-		}
-
-		versionOutputDir := filepath.Join(outputDir, "v", version.Name)
-		if err := os.MkdirAll(versionOutputDir, 0755); err != nil {
-			logger.Error("Error creating version output directory", "version", version.Name, "error", err)
-			continue
-		}
-
-		for _, filePath := range files {
-			if err := generateVersionedFile(filePath, version.Name, versionMgr, versionOutputDir, cssContent, cfg, versions); err != nil {
-				logger.Error("Error processing versioned file", "version", version.Name, "file", filePath, "error", err)
-				continue
-			}
-			logger.Debug("Generated versioned file", "version", version.Name, "file", filePath)
-		}
-	}
-
-	// Generate redirect index
-	if defaultVersion != "" {
-		indexHTML := fmt.Sprintf(`<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0; url=./v/%s/">
-    <title>Redirecting...</title>
-</head>
-<body>
-    <p>Redirecting to <a href="./v/%s/">version %s</a>...</p>
-</body>
-</html>`, defaultVersion, defaultVersion, defaultVersion)
-
-		indexPath := filepath.Join(outputDir, "index.html")
-		if err := os.WriteFile(indexPath, []byte(indexHTML), 0644); err != nil {
-			logger.Error("Error generating version redirect index", "error", err)
-		}
-	}
-
-	// Generate search index if enabled (for each version)
-	if cfg.Search {
-		logger.Info("Generating search indexes for all versions")
-		for _, version := range versions {
-			versionOutputDir := filepath.Join(outputDir, "v", version.Name)
-			logger.Debug("Generating search index for version", "version", version.Name)
-
-			// For versioned docs, we need to get files from git
-			// For now, generate search index from the already generated HTML/content
-			if err := generateSearchIndex(sourceDir, versionOutputDir, cfg); err != nil {
-				logger.Error("Error generating search index for version", "version", version.Name, "error", err)
-			}
-		}
-	}
-
-	logger.Info("Versioned static HTML generation completed", "versions", len(versions))
-	return nil
-}
-
-func generateVersionedFile(filePath, version string, versionMgr *GitVersionManager, outputDir, cssContent string, cfg Config, versions []GitVersion) error {
-	content, err := versionMgr.GetFileContent(version, filePath)
-	if err != nil {
-		return err
-	}
-
-	doc, err := parseFrontmatter(string(content))
-	if err != nil {
-		log.Printf("Error parsing frontmatter in %s@%s: %v", filePath, version, err)
-		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
-	}
-
-	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, filePath)
-
-	baseName := strings.TrimSuffix(filePath, filepath.Ext(filePath))
-	outputPath := baseName
-	if cfg.HTMLExt != "" {
-		outputPath = baseName + "." + cfg.HTMLExt
-	}
-	outputPath = filepath.Join(outputDir, outputPath)
-
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
-		return err
-	}
-
-	title := cfg.Title
-	if docTitle, ok := doc.Frontmatter["title"].(string); ok && docTitle != "" {
-		title = docTitle
-	} else {
-		title = strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
-	}
-
-	finalHTML := renderTemplateWithVersions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, version, versions)
-	return os.WriteFile(outputPath, []byte(finalHTML), 0644)
-}
-
-func renderTemplateWithVersions(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]interface{}, currentVersion string, versions []GitVersion) string {
-	tmpl, err := loadAllTemplates(cfg)
-	if err != nil {
-		log.Printf("Error loading templates: %v", err)
-		return fmt.Sprintf("<p>Template loading error: %v</p>", err)
-	}
-
-	name := "layout"
-	if tmpl.Lookup(name) == nil {
-		for _, n := range []string{"docs.html", "page.html", "live-reload.html", "base"} {
-			if tmpl.Lookup(n) != nil {
-				name = n
-				break
-			}
-		}
-	}
-
-	if tmpl.Lookup(name) == nil {
-		return "<p>No template found. Expected 'layout' template"
-	}
-
-	var buf bytes.Buffer
-	htmlExt := ""
-	if cfg.HTMLExt != "" {
-		htmlExt = "." + cfg.HTMLExt
-	}
-
-	data := struct {
-		Title       string
-		Content     template.HTML
-		CustomCSS   template.CSS
-		ChromaCSS   template.CSS
-		Verbose     bool
-		LiveReload  bool
-		HTMLExt     string
-		Frontmatter map[string]interface{}
-		Version     string
-		Versions    []GitVersion
-		Search      bool
-	}{
-		Title:       title,
-		Content:     template.HTML(htmlContent),
-		CustomCSS:   template.CSS(customCSS),
-		ChromaCSS:   template.CSS(generateChromaCSS()),
-		Verbose:     cfg.Verbose,
-		LiveReload:  liveReload,
-		HTMLExt:     htmlExt,
-		Frontmatter: frontmatter,
-		Version:     currentVersion,
-		Versions:    versions,
-		Search:      cfg.Search,
-	}
-
-	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
-		log.Printf("Error executing template: %v", err)
-		return fmt.Sprintf("<p>Template execution error: %v</p>", err)
-	}
-	return buf.String()
-}
-
-// copyFile copies a file from src to dst
-func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer sourceFile.Close()
-
-	destFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, sourceFile)
-	return err
 }
