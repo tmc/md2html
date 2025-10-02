@@ -12,7 +12,7 @@
 </head>
 <body>
     {{template "header" .}}
-    {{template "body-content" .}}
+    {{block "body-content" .}}{{.Content}}{{end}}
     {{template "scripts" .}}
 </body>
 </html>{{end}}
@@ -493,21 +493,6 @@
             };
         })();
     </script>
-    {{end}}
-{{end}}
-
-{{define "body-content"}}
-    {{if .EnableSidebar}}
-    <div class="docs-layout">
-        <nav class="sidebar" id="sidebar">
-            {{template "sidebar-content" .}}
-        </nav>
-        <main class="main-content">
-            {{.Content}}
-        </main>
-    </div>
-    {{else}}
-    {{.Content}}
     {{end}}
 {{end}}
 

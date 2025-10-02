@@ -302,7 +302,8 @@ func renderDocument(cfg Config, doc DocumentData, title, customCSS, filePath str
 }
 
 func loadAllTemplates(cfg Config) (*template.Template, error) {
-	tmpl, err := template.New("root").Funcs(template.FuncMap{
+	// Create template with functions first
+	tmpl := template.New("root").Funcs(template.FuncMap{
 		"default": func(def, val interface{}) interface{} {
 			if val == nil {
 				return def
@@ -321,19 +322,68 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 			return data
 		},
 		"replace": strings.ReplaceAll,
-	}).ParseFS(templates, "templates/*.html", "templates/*/*.html")
+	})
 
-	if err != nil {
-		log.Printf("Error parsing embedded templates: %v", err)
-		tmpl = template.New("root")
+	// Collect all template content to parse in a single operation
+	// This allows template definitions to see each other and enables proper inheritance
+	var templateContents []string
+	var templateNames []string
+
+	// Load embedded templates first as base definitions
+	embeddedFiles := []string{
+		"templates/base.html",
+		"templates/live-reload.html",
+		"templates/search.html",
 	}
-
-	if cfg.TemplateDir != "" {
-		for _, pattern := range []string{"*.html", "*/*.html"} {
-			if t, err := tmpl.ParseGlob(filepath.Join(cfg.TemplateDir, pattern)); err == nil {
-				tmpl = t
+	for _, path := range embeddedFiles {
+		content, err := templates.ReadFile(path)
+		if err == nil {
+			templateContents = append(templateContents, string(content))
+			templateNames = append(templateNames, path)
+			if cfg.Verbose {
+				log.Printf("Found embedded template: %s", path)
 			}
 		}
+	}
+
+	// Load custom templates last (they override embedded templates)
+	// When parsing templates in a single operation, later definitions override earlier ones
+	if cfg.TemplateDir != "" {
+		for _, pattern := range []string{"*.html", "*/*.html"} {
+			globPattern := filepath.Join(cfg.TemplateDir, pattern)
+			matches, err := filepath.Glob(globPattern)
+			if err == nil && len(matches) > 0 {
+				for _, match := range matches {
+					content, err := os.ReadFile(match)
+					if err == nil {
+						templateContents = append(templateContents, string(content))
+						templateNames = append(templateNames, match)
+						if cfg.Verbose {
+							log.Printf("Found custom template: %s", match)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Parse all templates together in a single operation
+	// This allows {{define}} blocks to see each other and enables proper template inheritance
+	for i, content := range templateContents {
+		var err error
+		if i == 0 {
+			tmpl, err = tmpl.Parse(content)
+		} else {
+			_, err = tmpl.Parse(content)
+		}
+		if err != nil {
+			log.Printf("Error parsing template %s: %v", templateNames[i], err)
+			return nil, err
+		}
+	}
+
+	if cfg.Verbose {
+		log.Printf("Successfully loaded %d templates in single parse operation", len(templateContents))
 	}
 
 	return tmpl, nil
