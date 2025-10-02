@@ -2,6 +2,7 @@
 {{template "mathjax-script" .}}
 {{template "mermaid-script" .}}
 {{if .LiveReload}}{{template "livereload-script" .}}{{end}}
+{{if .Versions}}{{template "version-switcher-script" .}}{{end}}
 {{end}}
 
 {{define "mathjax-script"}}
@@ -86,5 +87,25 @@
             }
         };
     })();
+</script>
+{{end}}
+
+{{define "version-switcher-script"}}
+<!-- Version switcher functionality -->
+<script>
+    function switchVersion(version) {
+        const currentPath = window.location.pathname;
+
+        // Remove any existing version prefix from the path
+        let basePath = currentPath;
+        const versionPattern = /^\/v\/[^\/]+\//;
+        if (versionPattern.test(basePath)) {
+            basePath = basePath.replace(versionPattern, '/');
+        }
+
+        // Construct new path with version
+        const newPath = '/v/' + version + basePath;
+        window.location.href = newPath;
+    }
 </script>
 {{end}}

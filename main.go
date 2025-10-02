@@ -39,6 +39,10 @@ var (
 	flagRenderFrontmatter = flags.Bool("render-frontmatter", false, "render YAML frontmatter as part of the document content")
 	flagIndex             = flags.String("index", "", "default file to serve for root path (e.g., README.md, index.md)")
 	flagHTMLExt           = flags.String("html-ext", "", "file extension for generated HTML files (e.g., 'html' for .html, empty for no extension except index.html)")
+	flagVersions          = flags.Bool("versions", false, "enable versioned documentation using git tags/refs")
+	flagVersionPattern    = flags.String("version-pattern", "*", "git tag pattern to match for versions (e.g., 'v*', 'release-*')")
+	flagVersionBranches   = flags.Bool("version-branches", false, "include branches as versions alongside tags")
+	flagVersionDefault    = flags.String("version-default", "", "default version to show (empty = current/latest)")
 )
 
 type Config struct {
@@ -57,6 +61,10 @@ type Config struct {
 	RenderFrontmatter bool
 	Index             string
 	HTMLExt           string
+	Versions          bool
+	VersionPattern    string
+	VersionBranches   bool
+	VersionDefault    string
 }
 
 // configFromFlags creates a Config from current global flag values
@@ -76,6 +84,10 @@ func configFromFlags(fs *flag.FlagSet) Config {
 		RenderFrontmatter: fs.Lookup("render-frontmatter").Value.String() == "true",
 		Index:             fs.Lookup("index").Value.String(),
 		HTMLExt:           fs.Lookup("html-ext").Value.String(),
+		Versions:          fs.Lookup("versions").Value.String() == "true",
+		VersionPattern:    fs.Lookup("version-pattern").Value.String(),
+		VersionBranches:   fs.Lookup("version-branches").Value.String() == "true",
+		VersionDefault:    fs.Lookup("version-default").Value.String(),
 	}
 }
 

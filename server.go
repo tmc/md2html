@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"html/template"
 	"log"
 	"log/slog"
 	"net/http"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"gopkg.in/yaml.v2"
 )
 
 func newServer(cfg Config, logger *slog.Logger) *server {
@@ -22,6 +25,27 @@ func newServer(cfg Config, logger *slog.Logger) *server {
 		clients:    make(map[chan string]bool),
 		inputPath:  cfg.Source,
 		shutdownCh: make(chan struct{}),
+	}
+
+	// Initialize version management if enabled
+	if cfg.Versions {
+		wd, err := os.Getwd()
+		if err != nil {
+			logger.Error("Error getting working directory", "error", err)
+		} else {
+			s.versionMgr = NewGitVersionManager(wd)
+			if s.versionMgr.IsGitRepo() {
+				versions, err := s.versionMgr.ListVersions(cfg.VersionBranches, cfg.VersionPattern)
+				if err != nil {
+					logger.Error("Error listing versions", "error", err)
+				} else {
+					s.versions = versions
+					logger.Info("Loaded versions", "count", len(versions))
+				}
+			} else {
+				logger.Warn("Versions enabled but not in a git repository")
+			}
+		}
 	}
 
 	// Load JSON data if provided
@@ -78,6 +102,10 @@ type server struct {
 	reloadPending bool
 	reloadTimer   *time.Timer
 	reloadTimerMu sync.Mutex
+
+	// Version management
+	versionMgr *GitVersionManager
+	versions   []GitVersion
 }
 
 func (s *server) watchFiles() {
@@ -166,15 +194,46 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	css := s.cssContent
 	s.mu.RUnlock()
 
+	// Extract version from URL if versioning is enabled
+	var requestedVersion string
+	var filePath string
+	if s.config.Versions && len(s.versions) > 0 {
+		// URL format: /v/{version}/{path} or /{path}
+		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")
+		if len(parts) > 1 && parts[0] == "v" {
+			requestedVersion = parts[1]
+			filePath = strings.Join(parts[2:], "/")
+		} else {
+			filePath = strings.Join(parts, "/")
+			// Use default version or current
+			if s.config.VersionDefault != "" {
+				requestedVersion = s.config.VersionDefault
+			} else if len(s.versions) > 0 {
+				requestedVersion = s.versions[0].Name
+			}
+		}
+	} else {
+		filePath = strings.TrimPrefix(r.URL.Path, "/")
+	}
+
 	// Check if root path and index file is specified
-	if r.URL.Path == "/" && s.config.Index != "" {
-		if fileContent, err := os.ReadFile(s.config.Index); err == nil {
+	if (filePath == "" || filePath == "/") && s.config.Index != "" {
+		var fileContent []byte
+		var err error
+
+		if requestedVersion != "" && s.versionMgr != nil {
+			fileContent, err = s.versionMgr.GetFileContent(requestedVersion, s.config.Index)
+		} else {
+			fileContent, err = os.ReadFile(s.config.Index)
+		}
+
+		if err == nil {
 			doc, err := parseFrontmatter(string(fileContent))
 			if err != nil {
 				log.Printf("Error parsing frontmatter in %s: %v", s.config.Index, err)
 				doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]interface{})}
 			}
-			html := renderDocument(s.config, doc, s.config.Index, css, s.config.Index)
+			html := s.renderDocumentWithVersion(doc, s.config.Index, css, s.config.Index, requestedVersion)
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Write([]byte(html))
 			return
@@ -184,9 +243,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if a specific file is requested via clean URL path
-	if r.URL.Path != "/" {
-		filePath := strings.TrimPrefix(r.URL.Path, "/")
-
+	if filePath != "" && filePath != "/" {
 		// Try the path as-is if it ends with .md
 		var candidates []string
 		if strings.HasSuffix(filePath, ".md") || strings.HasSuffix(filePath, ".markdown") {
@@ -198,13 +255,22 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for _, candidate := range candidates {
-			if fileContent, err := os.ReadFile(candidate); err == nil {
+			var fileContent []byte
+			var err error
+
+			if requestedVersion != "" && s.versionMgr != nil {
+				fileContent, err = s.versionMgr.GetFileContent(requestedVersion, candidate)
+			} else {
+				fileContent, err = os.ReadFile(candidate)
+			}
+
+			if err == nil {
 				doc, err := parseFrontmatter(string(fileContent))
 				if err != nil {
 					log.Printf("Error parsing frontmatter in %s: %v", candidate, err)
 					doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]interface{})}
 				}
-				html := renderDocument(s.config, doc, candidate, css, candidate)
+				html := s.renderDocumentWithVersion(doc, candidate, css, candidate, requestedVersion)
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				w.Write([]byte(html))
 				return
@@ -261,9 +327,78 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error parsing frontmatter: %v", err)
 		doc = DocumentData{Content: content, Frontmatter: make(map[string]interface{})}
 	}
-	html := renderDocument(s.config, doc, s.config.Title, css, "")
+	html := s.renderDocumentWithVersion(doc, s.config.Title, css, "", "")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html))
+}
+
+// renderDocumentWithVersion renders a document with version information
+func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, filePath, version string) string {
+	content := doc.Content
+	if s.config.RenderFrontmatter && len(doc.Frontmatter) > 0 {
+		if frontmatterYAML, err := yaml.Marshal(doc.Frontmatter); err == nil {
+			content = "```yaml\n" + string(frontmatterYAML) + "```\n\n" + content
+		}
+	}
+
+	html := markdownToHTMLWithContext(s.config, content, filePath)
+
+	// Create version-aware template data
+	tmpl, err := loadAllTemplates(s.config)
+	if err != nil {
+		log.Printf("Error loading templates: %v", err)
+		return fmt.Sprintf("<p>Template loading error: %v</p>", err)
+	}
+
+	name := "layout"
+	if tmpl.Lookup(name) == nil {
+		for _, n := range []string{"docs.html", "page.html", "live-reload.html", "base"} {
+			if tmpl.Lookup(n) != nil {
+				name = n
+				break
+			}
+		}
+	}
+
+	if tmpl.Lookup(name) == nil {
+		return "<p>No template found. Expected 'layout' template"
+	}
+
+	var buf bytes.Buffer
+	htmlExt := ""
+	if s.config.HTMLExt != "" {
+		htmlExt = "." + s.config.HTMLExt
+	}
+
+	data := struct {
+		Title       string
+		Content     template.HTML
+		CustomCSS   template.CSS
+		ChromaCSS   template.CSS
+		Verbose     bool
+		LiveReload  bool
+		HTMLExt     string
+		Frontmatter map[string]interface{}
+		Version     string
+		Versions    []GitVersion
+	}{
+		Title:       title,
+		Content:     template.HTML(html),
+		CustomCSS:   template.CSS(customCSS),
+		ChromaCSS:   template.CSS(generateChromaCSS()),
+		Verbose:     s.config.Verbose,
+		LiveReload:  true,
+		HTMLExt:     htmlExt,
+		Frontmatter: doc.Frontmatter,
+		Version:     version,
+		Versions:    s.versions,
+	}
+
+	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
+		log.Printf("Error executing template: %v", err)
+		return fmt.Sprintf("<p>Template execution error: %v</p>", err)
+	}
+	return buf.String()
 }
 
 func (s *server) handleRaw(w http.ResponseWriter, r *http.Request) {
@@ -432,6 +567,7 @@ func (s *server) Run(ctx context.Context) error {
 	mux.HandleFunc("/", s.handleIndex)
 	mux.HandleFunc("/events", s.handleSSE)
 	mux.HandleFunc("/raw", s.handleRaw)
+	mux.HandleFunc("/api/versions", s.handleVersionsAPI)
 
 	srv := &http.Server{
 		Addr:    s.config.HTTP,

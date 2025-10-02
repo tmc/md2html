@@ -1,3 +1,17 @@
 {{define "header"}}
-{{if .LiveReload}}<div id="status" class="connection-status">Connected</div>{{end}}
+<div class="header-bar">
+    {{if .LiveReload}}<div id="status" class="connection-status">Connected</div>{{end}}
+    {{if .Versions}}
+    <div class="version-selector">
+        <label for="version-select">Version:</label>
+        <select id="version-select" onchange="switchVersion(this.value)">
+            {{range .Versions}}
+            <option value="{{.Name}}" {{if eq $.Version .Name}}selected{{end}}>
+                {{.Name}}{{if .IsTag}} (tag){{else}} (branch){{end}}
+            </option>
+            {{end}}
+        </select>
+    </div>
+    {{end}}
+</div>
 {{end}}
