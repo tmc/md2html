@@ -373,6 +373,8 @@ func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload
 		LiveReload  bool
 		HTMLExt     string
 		Frontmatter map[string]interface{}
+		Version     string
+		Versions    []GitVersion
 	}{
 		Title:       title,
 		Content:     template.HTML(htmlContent),
@@ -382,6 +384,8 @@ func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload
 		LiveReload:  liveReload,
 		HTMLExt:     htmlExt,
 		Frontmatter: frontmatter,
+		Version:     "",
+		Versions:    nil,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
