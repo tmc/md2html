@@ -1,5 +1,10 @@
 {{define "styles"}}
 <style>
+    /* Enable View Transitions API for smooth page navigation */
+    @view-transition {
+        navigation: auto;
+    }
+
     /* Minimal GitHub-style CSS with light/dark mode support */
     :root {
         /* Core colors - Light mode */
@@ -273,6 +278,30 @@
     .version-selector select:focus {
         outline: 2px solid var(--accent);
         outline-offset: 2px;
+    }
+
+    /* View Transition animations */
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation-duration: 0.3s;
+    }
+
+    ::view-transition-old(root) {
+        animation-name: fade-out;
+    }
+
+    ::view-transition-new(root) {
+        animation-name: fade-in;
+    }
+
+    @keyframes fade-out {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+
+    @keyframes fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
     }
 
     {{.CustomCSS}}

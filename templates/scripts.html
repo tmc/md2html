@@ -96,16 +96,44 @@
     function switchVersion(version) {
         const currentPath = window.location.pathname;
 
-        // Remove any existing version prefix from the path
-        let basePath = currentPath;
-        const versionPattern = /^\/v\/[^\/]+\//;
-        if (versionPattern.test(basePath)) {
-            basePath = basePath.replace(versionPattern, '/');
+        // For static sites, calculate relative path to version directory
+        // Current path format: /v/{version}/{path} or /{path}
+        let filePath = currentPath;
+        let versionPrefix = '';
+
+        // Extract the file path without version prefix
+        const versionPattern = /^\/v\/([^\/]+)\//;
+        const match = currentPath.match(versionPattern);
+        if (match) {
+            // Currently in a versioned path
+            filePath = currentPath.replace(versionPattern, '/');
         }
 
-        // Construct new path with version
-        const newPath = '/v/' + version + basePath;
-        window.location.href = newPath;
+        // Construct new path with selected version
+        // For static sites: /v/{version}/{path}
+        const newPath = '/v/' + version + filePath;
+
+        // Use View Transitions API if available for smooth navigation
+        if (document.startViewTransition) {
+            document.startViewTransition(() => {
+                window.location.href = newPath;
+            });
+        } else {
+            window.location.href = newPath;
+        }
     }
+
+    // Highlight current version in selector on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const select = document.getElementById('version-select');
+        if (select) {
+            const currentPath = window.location.pathname;
+            const versionPattern = /^\/v\/([^\/]+)\//;
+            const match = currentPath.match(versionPattern);
+            if (match && match[1]) {
+                select.value = match[1];
+            }
+        }
+    });
 </script>
 {{end}}
