@@ -381,6 +381,7 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 		Frontmatter map[string]interface{}
 		Version     string
 		Versions    []GitVersion
+		Search      bool
 	}{
 		Title:       title,
 		Content:     template.HTML(html),
@@ -392,6 +393,7 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 		Frontmatter: doc.Frontmatter,
 		Version:     version,
 		Versions:    s.versions,
+		Search:      s.config.Search,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"io/fs"
 	"log"
 	"log/slog"
 	"os"
@@ -329,21 +330,29 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 	var templateContents []string
 	var templateNames []string
 
-	// Load embedded templates first as base definitions
-	embeddedFiles := []string{
-		"templates/base.html",
-		"templates/live-reload.html",
-		"templates/search.html",
-	}
-	for _, path := range embeddedFiles {
-		content, err := templates.ReadFile(path)
-		if err == nil {
-			templateContents = append(templateContents, string(content))
-			templateNames = append(templateNames, path)
-			if cfg.Verbose {
-				log.Printf("Found embedded template: %s", path)
+	// Load all embedded templates first as base definitions
+	// Walk through the embedded templates directory to find all .html files
+	err := fs.WalkDir(templates, "templates", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		// Only process .html files
+		if !d.IsDir() && strings.HasSuffix(path, ".html") {
+			content, err := templates.ReadFile(path)
+			if err == nil {
+				templateContents = append(templateContents, string(content))
+				templateNames = append(templateNames, path)
+				if cfg.Verbose {
+					log.Printf("Found embedded template: %s", path)
+				}
+			} else if cfg.Verbose {
+				log.Printf("Error reading embedded template %s: %v", path, err)
 			}
 		}
+		return nil
+	})
+	if err != nil && cfg.Verbose {
+		log.Printf("Error walking embedded templates: %v", err)
 	}
 
 	// Load custom templates last (they override embedded templates)
