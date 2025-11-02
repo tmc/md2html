@@ -128,14 +128,18 @@ func run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		logger = slog.New(handler)
 	}
 
-	// TODO: clean up handling stdin and choosing between modes
+	// Mode selection priority:
+	// 1. Static HTML generation (-html flag)
+	// 2. HTTP server mode (-http flag)
+	// 3. Pipe mode (source file or stdin -> stdout)
+	// 4. Show usage if no mode specified
 
-	// If -html flag is provided, generate static HTML
+	// Mode 1: Static HTML generation
 	if cfg.HTML != "" {
 		return generateStaticHTML(ctx, cfg, logger)
 	}
 
-	// If -http flag is provided, run server
+	// Mode 2: HTTP server
 	if cfg.HTTP != "" {
 		logger.Info("Starting server", "address", cfg.HTTP)
 		err := runServer(ctx, cfg, logger)
@@ -146,27 +150,40 @@ func run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		return err
 	}
 
-	// If source is provided but no mode specified, convert to HTML and output to stdout
+	// Mode 3: Pipe mode - convert markdown to HTML and output to stdout
+	// Handles both file input and stdin (when source is "-")
 	if cfg.Source != "" && cfg.Source != "." {
-		// Read the markdown file
-		content, err := os.ReadFile(cfg.Source)
+		var content []byte
+		var err error
+		var sourceName string
+
+		if cfg.Source == "-" {
+			// Read from stdin
+			content, err = io.ReadAll(os.Stdin)
+			sourceName = "stdin"
+		} else {
+			// Read from file
+			content, err = os.ReadFile(cfg.Source)
+			sourceName = cfg.Source
+		}
+
 		if err != nil {
-			return fmt.Errorf("error reading file: %w", err)
+			return fmt.Errorf("error reading %s: %w", sourceName, err)
 		}
 
 		// Convert to HTML
 		doc, err := parseFrontmatter(string(content))
 		if err != nil {
-			logger.Error("Error parsing frontmatter", "error", err)
+			logger.Error("Error parsing frontmatter", "error", err, "source", sourceName)
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
 		}
 
-		html := markdownToHTMLWithContext(cfg, doc.Content, cfg.Source)
+		html := markdownToHTMLWithContext(cfg, doc.Content, sourceName)
 		fmt.Fprint(out, html)
 		return nil
 	}
 
-	// Neither -html nor -http provided and no source, show usage
+	// Mode 4: No mode specified, show usage
 	flag.Usage()
 	return flag.ErrHelp
 }
