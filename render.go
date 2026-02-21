@@ -205,12 +205,15 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 				return ast.WalkContinue, nil
 			}
 			if ext := filepath.Ext(href); ext == ".md" || ext == ".markdown" {
-				base := strings.TrimSuffix(filepath.Base(href), ext)
-				// Add extension based on flag setting
+				// Resolve relative to the directory of the current file
+				dir := filepath.Dir(filePath)
+				resolved := filepath.Join(dir, href)
+				resolved = strings.TrimSuffix(resolved, ext)
+				resolved = filepath.Clean(resolved)
 				if cfg.HTMLExt != "" {
-					link.Destination = []byte("/" + base + "." + cfg.HTMLExt)
+					link.Destination = []byte("/" + resolved + "." + cfg.HTMLExt)
 				} else {
-					link.Destination = []byte("/" + base)
+					link.Destination = []byte("/" + resolved)
 				}
 			}
 			return ast.WalkContinue, nil

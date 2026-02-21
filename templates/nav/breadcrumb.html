@@ -1,0 +1,14 @@
+{{define "nav-breadcrumb"}}
+{{if and .Nav .Nav.HasNav .Nav.Breadcrumb}}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <ol>
+    {{range .Nav.Breadcrumb}}
+    <li><a href="{{.URL}}">{{.Title}}</a></li>
+    {{end}}
+    {{if .Nav.Current}}
+    <li aria-current="page">{{.Nav.Current.Title}}</li>
+    {{end}}
+  </ol>
+</nav>
+{{end}}
+{{end}}

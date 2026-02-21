@@ -43,6 +43,7 @@ var (
 	flagVersionPattern    = flags.String("version-pattern", "*", "git tag pattern to match for versions (e.g., 'v*', 'release-*')")
 	flagVersionBranches   = flags.Bool("version-branches", false, "include branches as versions alongside tags")
 	flagVersionDefault    = flags.String("version-default", "", "default version to show (empty = current/latest)")
+	flagSearch            = flags.Bool("search", false, "enable client-side search")
 )
 
 type Config struct {
@@ -65,6 +66,7 @@ type Config struct {
 	VersionPattern    string
 	VersionBranches   bool
 	VersionDefault    string
+	Search            bool
 }
 
 // configFromFlags creates a Config from current global flag values
@@ -88,6 +90,7 @@ func configFromFlags(fs *flag.FlagSet) Config {
 		VersionPattern:    fs.Lookup("version-pattern").Value.String(),
 		VersionBranches:   fs.Lookup("version-branches").Value.String() == "true",
 		VersionDefault:    fs.Lookup("version-default").Value.String(),
+		Search:            fs.Lookup("search").Value.String() == "true",
 	}
 }
 
@@ -318,6 +321,21 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 			return data
 		},
 		"replace": strings.ReplaceAll,
+		// dict creates a map from key-value pairs for passing to templates
+		"dict": func(values ...interface{}) map[string]interface{} {
+			if len(values)%2 != 0 {
+				return nil
+			}
+			dict := make(map[string]interface{}, len(values)/2)
+			for i := 0; i < len(values); i += 2 {
+				key, ok := values[i].(string)
+				if !ok {
+					continue
+				}
+				dict[key] = values[i+1]
+			}
+			return dict
+		},
 	}).ParseFS(templates, "templates/*.html", "templates/*/*.html")
 
 	if err != nil {
@@ -336,14 +354,30 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 	return tmpl, nil
 }
 
+// RenderOptions contains optional parameters for rendering.
+type RenderOptions struct {
+	Nav       *NavContext
+	SiteTitle string
+}
+
 func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]interface{}) string {
+	return renderTemplateWithOptions(cfg, htmlContent, title, customCSS, liveReload, frontmatter, RenderOptions{})
+}
+
+func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]interface{}, opts RenderOptions) string {
 	tmpl, err := loadAllTemplates(cfg)
 	if err != nil {
 		log.Printf("Error loading templates: %v", err)
 		return fmt.Sprintf("<p>Template loading error: %v</p>", err)
 	}
 
+	// Choose template based on whether we have navigation
 	name := "layout"
+	if opts.Nav != nil && opts.Nav.HasNav {
+		if tmpl.Lookup("docs-layout") != nil {
+			name = "docs-layout"
+		}
+	}
 	if tmpl.Lookup(name) == nil {
 		for _, n := range []string{"docs.html", "page.html", "live-reload.html", "base"} {
 			if tmpl.Lookup(n) != nil {
@@ -375,6 +409,9 @@ func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload
 		Frontmatter map[string]interface{}
 		Version     string
 		Versions    []GitVersion
+		Search      bool
+		Nav         *NavContext
+		SiteTitle   string
 	}{
 		Title:       title,
 		Content:     template.HTML(htmlContent),
@@ -386,6 +423,9 @@ func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload
 		Frontmatter: frontmatter,
 		Version:     "",
 		Versions:    nil,
+		Search:      cfg.Search,
+		Nav:         opts.Nav,
+		SiteTitle:   opts.SiteTitle,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -440,9 +480,19 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 
 	logger.Info("Found markdown files to process", "count", len(files))
 
+	// Load navigation from SUMMARY.md if present
+	htmlExt := ""
+	if cfg.HTMLExt != "" {
+		htmlExt = "." + cfg.HTMLExt
+	}
+	nav := LoadNavigationFromDir(sourceDir, htmlExt)
+	if nav != nil {
+		logger.Info("Loaded navigation from SUMMARY.md", "pages", len(nav.Flat))
+	}
+
 	// Process each markdown file
 	for _, file := range files {
-		if err := processMarkdownFile(file, sourceDir, outputDir, cssContent, cfg); err != nil {
+		if err := processMarkdownFileWithNav(file, sourceDir, outputDir, cssContent, cfg, nav); err != nil {
 			logger.Error("Error processing file", "error", err, "file", file.RelPath)
 			continue
 		}
@@ -474,6 +524,10 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 }
 
 func processMarkdownFile(file markdownFile, sourceDir, outputDir, cssContent string, cfg Config) error {
+	return processMarkdownFileWithNav(file, sourceDir, outputDir, cssContent, cfg, nil)
+}
+
+func processMarkdownFileWithNav(file markdownFile, sourceDir, outputDir, cssContent string, cfg Config, nav *Navigation) error {
 	sourcePath := filepath.Join(sourceDir, file.RelPath)
 
 	// Read and parse the markdown file
@@ -514,7 +568,18 @@ func processMarkdownFile(file markdownFile, sourceDir, outputDir, cssContent str
 		title = strings.TrimSuffix(filepath.Base(file.RelPath), filepath.Ext(file.RelPath))
 	}
 
-	finalHTML := renderTemplate(cfg, htmlContent, title, cssContent, false, doc.Frontmatter)
+	// Get navigation context for this page
+	var navCtx *NavContext
+	if nav != nil {
+		navCtx = nav.ForPage(file.RelPath)
+	}
+
+	opts := RenderOptions{
+		Nav:       navCtx,
+		SiteTitle: cfg.Title,
+	}
+
+	finalHTML := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
 
 	// Write output file
 	return os.WriteFile(outputPath, []byte(finalHTML), 0644)

@@ -1,0 +1,28 @@
+{{define "nav-sidebar"}}
+{{if and .Nav .Nav.HasNav}}
+<nav class="site-nav" aria-label="Site navigation">
+  {{template "nav-items" (dict "Items" .Nav.Items "Current" .Nav.Current)}}
+</nav>
+{{end}}
+{{end}}
+
+{{define "nav-items"}}
+<ul class="nav-list">
+{{range .Items}}
+  {{if .IsGroup}}
+    <li class="nav-group">{{.Title}}</li>
+  {{else if .IsSep}}
+    <li class="nav-sep"><hr></li>
+  {{else}}
+    <li class="nav-item level-{{.Level}}">
+      <a href="{{.URL}}"{{if and $.Current (eq .Path $.Current.Path)}} class="active" aria-current="page"{{end}}>
+        {{.Title}}
+      </a>
+      {{if .Children}}
+        {{template "nav-items" (dict "Items" .Children "Current" $.Current)}}
+      {{end}}
+    </li>
+  {{end}}
+{{end}}
+</ul>
+{{end}}

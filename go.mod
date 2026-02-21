@@ -12,6 +12,7 @@ require (
 	go.abhg.dev/goldmark/toc v0.12.0
 	golang.org/x/tools v0.37.0
 	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1
 	rsc.io/script v0.0.2
 )
 

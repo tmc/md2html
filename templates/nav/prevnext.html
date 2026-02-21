@@ -1,0 +1,20 @@
+{{define "nav-prevnext"}}
+{{if and .Nav .Nav.HasNav}}
+<nav class="page-nav" aria-label="Page navigation">
+  {{with .Nav.Prev}}
+  <a href="{{.URL}}" class="nav-prev" rel="prev">
+    <span class="nav-label">Previous</span>
+    <span class="nav-title">{{.Title}}</span>
+  </a>
+  {{else}}
+  <span class="nav-prev-empty"></span>
+  {{end}}
+  {{with .Nav.Next}}
+  <a href="{{.URL}}" class="nav-next" rel="next">
+    <span class="nav-label">Next</span>
+    <span class="nav-title">{{.Title}}</span>
+  </a>
+  {{end}}
+</nav>
+{{end}}
+{{end}}
