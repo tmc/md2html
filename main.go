@@ -358,6 +358,62 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 type RenderOptions struct {
 	Nav       *NavContext
 	SiteTitle string
+	Data      interface{} // from -data-json
+}
+
+func firstFrontmatterString(frontmatter map[string]interface{}, keys ...string) string {
+	for _, key := range keys {
+		value, ok := frontmatter[key]
+		if !ok {
+			continue
+		}
+		s, ok := value.(string)
+		if !ok {
+			continue
+		}
+		s = strings.TrimSpace(s)
+		if s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+func resolveMermaidThemes(frontmatter map[string]interface{}) (theme, darkTheme string, auto bool) {
+	theme = "default"
+	darkTheme = "dark"
+	auto = true
+
+	userTheme := firstFrontmatterString(frontmatter,
+		"mermaid_theme",
+		"mermaid-theme",
+		"mermaidTheme",
+	)
+	userDarkTheme := firstFrontmatterString(frontmatter,
+		"mermaid_dark_theme",
+		"mermaid-dark-theme",
+		"mermaidDarkTheme",
+		"mermaid_theme_dark",
+		"mermaid-theme-dark",
+		"mermaidThemeDark",
+	)
+
+	if userTheme != "" {
+		if strings.EqualFold(userTheme, "auto") {
+			auto = true
+		} else {
+			theme = userTheme
+			darkTheme = userTheme
+			auto = false
+		}
+	}
+
+	if userDarkTheme != "" {
+		darkTheme = userDarkTheme
+		auto = true
+	}
+
+	return theme, darkTheme, auto
 }
 
 func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]interface{}) string {
@@ -397,35 +453,44 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 	if cfg.HTMLExt != "" {
 		htmlExt = "." + cfg.HTMLExt
 	}
+	mermaidTheme, mermaidDarkTheme, mermaidAutoTheme := resolveMermaidThemes(frontmatter)
 
 	data := struct {
-		Title       string
-		Content     template.HTML
-		CustomCSS   template.CSS
-		ChromaCSS   template.CSS
-		Verbose     bool
-		LiveReload  bool
-		HTMLExt     string
-		Frontmatter map[string]interface{}
-		Version     string
-		Versions    []GitVersion
-		Search      bool
-		Nav         *NavContext
-		SiteTitle   string
+		Title            string
+		Content          template.HTML
+		CustomCSS        template.CSS
+		ChromaCSS        template.CSS
+		Verbose          bool
+		LiveReload       bool
+		HTMLExt          string
+		Frontmatter      map[string]interface{}
+		Version          string
+		Versions         []GitVersion
+		Search           bool
+		Nav              *NavContext
+		SiteTitle        string
+		Data             interface{}
+		MermaidTheme     string
+		MermaidDarkTheme string
+		MermaidAutoTheme bool
 	}{
-		Title:       title,
-		Content:     template.HTML(htmlContent),
-		CustomCSS:   template.CSS(customCSS),
-		ChromaCSS:   template.CSS(generateChromaCSS()),
-		Verbose:     cfg.Verbose,
-		LiveReload:  liveReload,
-		HTMLExt:     htmlExt,
-		Frontmatter: frontmatter,
-		Version:     "",
-		Versions:    nil,
-		Search:      cfg.Search,
-		Nav:         opts.Nav,
-		SiteTitle:   opts.SiteTitle,
+		Title:            title,
+		Content:          template.HTML(htmlContent),
+		CustomCSS:        template.CSS(customCSS),
+		ChromaCSS:        template.CSS(generateChromaCSS()),
+		Verbose:          cfg.Verbose,
+		LiveReload:       liveReload,
+		HTMLExt:          htmlExt,
+		Frontmatter:      frontmatter,
+		Version:          "",
+		Versions:         nil,
+		Search:           cfg.Search,
+		Nav:              opts.Nav,
+		SiteTitle:        opts.SiteTitle,
+		Data:             opts.Data,
+		MermaidTheme:     mermaidTheme,
+		MermaidDarkTheme: mermaidDarkTheme,
+		MermaidAutoTheme: mermaidAutoTheme,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -451,8 +516,10 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	}
 
 	// Load JSON data if provided
+	var jsonData interface{}
 	if cfg.DataJSON != "" {
-		_, err := loadJSONFile(cfg.DataJSON)
+		var err error
+		jsonData, err = loadJSONFile(cfg.DataJSON)
 		if err != nil {
 			logger.Error("Error loading JSON data file", "error", err, "file", cfg.DataJSON)
 		} else {
@@ -492,7 +559,16 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 
 	// Process each markdown file
 	for _, file := range files {
-		if err := processMarkdownFileWithNav(file, sourceDir, outputDir, cssContent, cfg, nav); err != nil {
+		// Check for draft frontmatter and skip
+		if isDraft(filepath.Join(sourceDir, file.RelPath)) {
+			logger.Debug("Skipping draft", "file", file.RelPath)
+			continue
+		}
+		opts := RenderOptions{SiteTitle: cfg.Title, Data: jsonData}
+		if nav != nil {
+			opts.Nav = nav.ForPage(file.RelPath)
+		}
+		if err := processMarkdownFileWithOpts(file, sourceDir, outputDir, cssContent, cfg, opts); err != nil {
 			logger.Error("Error processing file", "error", err, "file", file.RelPath)
 			continue
 		}
@@ -503,7 +579,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	if cfg.Index != "" {
 		indexFile := filepath.Join(sourceDir, cfg.Index)
 		if _, err := os.Stat(indexFile); err == nil {
-			if err := processIndexFile(indexFile, outputDir, cssContent, cfg); err != nil {
+			if err := processIndexFileWithOpts(indexFile, outputDir, cssContent, cfg, RenderOptions{SiteTitle: cfg.Title, Data: jsonData}); err != nil {
 				logger.Error("Error processing index file", "error", err, "file", indexFile)
 			} else {
 				logger.Debug("Processed index file", "file", indexFile)
@@ -523,8 +599,62 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	return nil
 }
 
+// isDraft returns true if the file's frontmatter has draft: true.
+func isDraft(path string) bool {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	doc, err := parseFrontmatter(string(content))
+	if err != nil {
+		return false
+	}
+	if draft, ok := doc.Frontmatter["draft"].(bool); ok {
+		return draft
+	}
+	return false
+}
+
 func processMarkdownFile(file markdownFile, sourceDir, outputDir, cssContent string, cfg Config) error {
 	return processMarkdownFileWithNav(file, sourceDir, outputDir, cssContent, cfg, nil)
+}
+
+func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssContent string, cfg Config, opts RenderOptions) error {
+	sourcePath := filepath.Join(sourceDir, file.RelPath)
+
+	content, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return err
+	}
+
+	doc, err := parseFrontmatter(string(content))
+	if err != nil {
+		log.Printf("Error parsing frontmatter in %s: %v", file.RelPath, err)
+		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
+	}
+
+	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, file.RelPath)
+
+	baseName := strings.TrimSuffix(file.RelPath, filepath.Ext(file.RelPath))
+	outputPath := baseName
+	if cfg.HTMLExt != "" {
+		outputPath = baseName + "." + cfg.HTMLExt
+	}
+	outputPath = filepath.Join(outputDir, outputPath)
+
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return err
+	}
+
+	title := cfg.Title
+	if docTitle, ok := doc.Frontmatter["title"].(string); ok && docTitle != "" {
+		title = docTitle
+	} else {
+		title = strings.TrimSuffix(filepath.Base(file.RelPath), filepath.Ext(file.RelPath))
+	}
+
+	finalHTML := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
+	return os.WriteFile(outputPath, []byte(finalHTML), 0644)
 }
 
 func processMarkdownFileWithNav(file markdownFile, sourceDir, outputDir, cssContent string, cfg Config, nav *Navigation) error {
@@ -583,6 +713,31 @@ func processMarkdownFileWithNav(file markdownFile, sourceDir, outputDir, cssCont
 
 	// Write output file
 	return os.WriteFile(outputPath, []byte(finalHTML), 0644)
+}
+
+func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Config, opts RenderOptions) error {
+	content, err := os.ReadFile(indexPath)
+	if err != nil {
+		return err
+	}
+
+	doc, err := parseFrontmatter(string(content))
+	if err != nil {
+		log.Printf("Error parsing frontmatter in index file: %v", err)
+		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
+	}
+
+	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, filepath.Base(indexPath))
+
+	title := cfg.Title
+	if docTitle, ok := doc.Frontmatter["title"].(string); ok && docTitle != "" {
+		title = docTitle
+	}
+
+	finalHTML := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
+
+	indexOutputPath := filepath.Join(outputDir, "index.html")
+	return os.WriteFile(indexOutputPath, []byte(finalHTML), 0644)
 }
 
 func processIndexFile(indexPath, outputDir, cssContent string, cfg Config) error {
