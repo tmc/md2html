@@ -489,7 +489,7 @@
 </ul>
 <h1 id="installation">Installation</h1>
 <p>To install md2html, run:</p>
-<pre class="chroma"><code><span class="line"><span class="cl">go install github.com/tmc/misc/md2html@latest
+<pre class="chroma"><code><span class="line"><span class="cl">go install github.com/tmc/md2html@latest
 </span></span></code></pre><p>Verify installation:</p>
 <pre class="chroma"><code><span class="line"><span class="cl">md2html --help
 </span></span></code></pre>

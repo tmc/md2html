@@ -3,7 +3,7 @@
 To install md2html, run:
 
 ```bash
-go install github.com/tmc/misc/md2html@latest
+go install github.com/tmc/md2html@latest
 ```
 
 Verify installation:
