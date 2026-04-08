@@ -43,7 +43,7 @@ package main
 
 import (
     "testing"
-    "github.com/tmc/misc/md2html/internal/scripttestutil"
+    "github.com/tmc/md2html/internal/scripttestutil"
     "rsc.io/script"
     "rsc.io/script/scripttest"
 )

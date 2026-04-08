@@ -1,4 +1,4 @@
-package main
+package md2html
 
 import (
 	"encoding/json"
@@ -11,9 +11,9 @@ func TestLoaderParseMD(t *testing.T) {
 	loader := NewLoader(".", ".html")
 
 	tests := []struct {
-		name     string
-		content  string
-		wantTitle string
+		name         string
+		content      string
+		wantTitle    string
 		wantHeadings int
 		wantLinks    int
 	}{

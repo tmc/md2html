@@ -1,4 +1,4 @@
-package main
+package md2html
 
 import (
 	"os"
@@ -20,9 +20,9 @@ type NavItem struct {
 
 // Navigation represents the full navigation tree parsed from SUMMARY.md.
 type Navigation struct {
-	Items  []*NavItem          `json:"items"`  // Top-level items
-	ByPath map[string]*NavItem `json:"-"`      // Quick lookup by path
-	Flat   []*NavItem          `json:"-"`      // Flattened for prev/next (excludes groups/seps)
+	Items  []*NavItem          `json:"items"` // Top-level items
+	ByPath map[string]*NavItem `json:"-"`     // Quick lookup by path
+	Flat   []*NavItem          `json:"-"`     // Flattened for prev/next (excludes groups/seps)
 }
 
 // NavContext provides navigation state for a specific page.

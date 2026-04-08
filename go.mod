@@ -1,4 +1,4 @@
-module github.com/tmc/misc/md2html
+module github.com/tmc/md2html
 
 go 1.25.0
 

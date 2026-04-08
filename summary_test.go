@@ -1,4 +1,4 @@
-package main
+package md2html
 
 import (
 	"testing"
@@ -191,7 +191,7 @@ func TestPathToURL(t *testing.T) {
 		htmlExt string
 		want    string
 	}{
-		{"README.md", ".html", "."},      // Root README stays as "."
+		{"README.md", ".html", "."}, // Root README stays as "."
 		{"README.md", "", "."},
 		{"page.md", ".html", "page.html"},
 		{"page.md", "", "page"},

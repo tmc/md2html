@@ -1,4 +1,4 @@
-package main
+package md2html
 
 import (
 	"bytes"
@@ -20,30 +20,6 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v2"
-)
-
-var (
-	flags = flag.NewFlagSet("md2html", flag.ExitOnError)
-
-	flagHTTP              = flags.String("http", "", "HTTP server bind address")
-	flagHTML              = flags.String("html", "", "output directory for static HTML generation (disables server mode)")
-	flagOpen              = flags.Bool("open", false, "automatically open browser")
-	flagVerbose           = flags.Bool("v", false, "verbose logging")
-	flagTitle             = flags.String("title", "Markdown Preview", "HTML title")
-	flagCSS               = flags.String("css", "", "path to custom CSS file")
-	flagDepth             = flags.Int("depth", 2, "directory traversal depth for listings (minimum 2)")
-	flagTOC               = flags.Bool("toc", false, "generate table of contents")
-	flagAllowUnsafe       = flags.Bool("allow-unsafe", false, "allow unsafe HTML in markdown (use with caution)")
-	flagTemplateDir       = flags.String("templates", "", "path to custom template directory (overrides embedded templates)")
-	flagDataJSON          = flags.String("data-json", "", "path to JSON file to load as template data (available as .Data)")
-	flagRenderFrontmatter = flags.Bool("render-frontmatter", false, "render YAML frontmatter as part of the document content")
-	flagIndex             = flags.String("index", "", "default file to serve for root path (e.g., README.md, index.md)")
-	flagHTMLExt           = flags.String("html-ext", "", "file extension for generated HTML files (e.g., 'html' for .html, empty for no extension except index.html)")
-	flagVersions          = flags.Bool("versions", false, "enable versioned documentation using git tags/refs")
-	flagVersionPattern    = flags.String("version-pattern", "*", "git tag pattern to match for versions (e.g., 'v*', 'release-*')")
-	flagVersionBranches   = flags.Bool("version-branches", false, "include branches as versions alongside tags")
-	flagVersionDefault    = flags.String("version-default", "", "default version to show (empty = current/latest)")
-	flagSearch            = flags.Bool("search", false, "enable client-side search")
 )
 
 type Config struct {
@@ -69,8 +45,33 @@ type Config struct {
 	Search            bool
 }
 
-// configFromFlags creates a Config from current global flag values
-func configFromFlags(fs *flag.FlagSet) Config {
+// NewFlagSet returns a FlagSet configured for the md2html CLI.
+func NewFlagSet(name string) *flag.FlagSet {
+	fs := flag.NewFlagSet(name, flag.ExitOnError)
+	fs.String("http", "", "HTTP server bind address")
+	fs.String("html", "", "output directory for static HTML generation (disables server mode)")
+	fs.Bool("open", false, "automatically open browser")
+	fs.Bool("v", false, "verbose logging")
+	fs.String("title", "Markdown Preview", "HTML title")
+	fs.String("css", "", "path to custom CSS file")
+	fs.Int("depth", 2, "directory traversal depth for listings (minimum 2)")
+	fs.Bool("toc", false, "generate table of contents")
+	fs.Bool("allow-unsafe", false, "allow unsafe HTML in markdown (use with caution)")
+	fs.String("templates", "", "path to custom template directory (overrides embedded templates)")
+	fs.String("data-json", "", "path to JSON file to load as template data (available as .Data)")
+	fs.Bool("render-frontmatter", false, "render YAML frontmatter as part of the document content")
+	fs.String("index", "", "default file to serve for root path (e.g., README.md, index.md)")
+	fs.String("html-ext", "", "file extension for generated HTML files (e.g., 'html' for .html, empty for no extension except index.html)")
+	fs.Bool("versions", false, "enable versioned documentation using git tags/refs")
+	fs.String("version-pattern", "*", "git tag pattern to match for versions (e.g., 'v*', 'release-*')")
+	fs.Bool("version-branches", false, "include branches as versions alongside tags")
+	fs.String("version-default", "", "default version to show (empty = current/latest)")
+	fs.Bool("search", false, "enable client-side search")
+	return fs
+}
+
+// ConfigFromFlags creates a Config from an initialized FlagSet.
+func ConfigFromFlags(fs *flag.FlagSet) Config {
 	return Config{
 		HTTP:              fs.Lookup("http").Value.String(),
 		HTML:              fs.Lookup("html").Value.String(),
@@ -94,17 +95,7 @@ func configFromFlags(fs *flag.FlagSet) Config {
 	}
 }
 
-func main() {
-	flags.Parse(os.Args[1:])
-	ctx := context.Background()
-	logger := slog.Default()
-	cfg := configFromFlags(flags)
-	if err := run(ctx, cfg, logger, os.Stdout, flags.Args()); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, args []string) error {
+func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, args []string) error {
 	// Set up signal handling
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -166,7 +157,9 @@ func run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	}
 
 	// Neither -html nor -http provided and no source, show usage
-	flag.Usage()
+	if fs := NewFlagSet("md2html"); fs != nil {
+		fs.Usage()
+	}
 	return flag.ErrHelp
 }
 
