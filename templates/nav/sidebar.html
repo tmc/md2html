@@ -1,7 +1,7 @@
 {{define "nav-sidebar"}}
 {{if and .Nav .Nav.HasNav}}
 <nav class="site-nav" aria-label="Site navigation">
-  {{template "nav-items" (dict "Items" .Nav.Items "Current" .Nav.Current)}}
+  {{template "nav-items" (dict "Items" .Nav.Items "Current" .Nav.Current "FilePath" .FilePath "HTMLExt" .HTMLExt "IndexFile" .IndexFile)}}
 </nav>
 {{end}}
 {{end}}
@@ -15,11 +15,11 @@
     <li class="nav-sep"><hr></li>
   {{else}}
     <li class="nav-item level-{{.Level}}">
-      <a href="{{.URL}}"{{if and $.Current (eq .Path $.Current.Path)}} class="active" aria-current="page"{{end}}>
+      <a href="{{navHref $.FilePath .Path $.HTMLExt $.IndexFile}}"{{if and $.Current (eq .Path $.Current.Path)}} class="active" aria-current="page"{{end}}>
         {{.Title}}
       </a>
       {{if .Children}}
-        {{template "nav-items" (dict "Items" .Children "Current" $.Current)}}
+        {{template "nav-items" (dict "Items" .Children "Current" $.Current "FilePath" $.FilePath "HTMLExt" $.HTMLExt "IndexFile" $.IndexFile)}}
       {{end}}
     </li>
   {{end}}

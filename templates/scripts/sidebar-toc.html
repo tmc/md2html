@@ -6,7 +6,7 @@
                 const headings = document.querySelectorAll('.main-content h1, .main-content h2, .main-content h3');
                 const tocContainer = document.getElementById('sidebar-toc');
 
-                if (headings.length === 0) {
+                if (headings.length < 3) {
                     tocContainer.style.display = 'none';
                     return;
                 }

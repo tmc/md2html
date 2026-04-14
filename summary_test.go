@@ -54,9 +54,9 @@ func TestParseSummary(t *testing.T) {
 	if nav.Items[0].Title != "Introduction" {
 		t.Errorf("First item title = %q, want 'Introduction'", nav.Items[0].Title)
 	}
-	// README.md -> "." (root)
-	if nav.Items[0].URL != "." {
-		t.Errorf("First item URL = %q, want '.'", nav.Items[0].URL)
+	// README.md keeps its rendered file path.
+	if nav.Items[0].URL != "README.html" {
+		t.Errorf("First item URL = %q, want 'README.html'", nav.Items[0].URL)
 	}
 
 	// Check group
@@ -191,12 +191,12 @@ func TestPathToURL(t *testing.T) {
 		htmlExt string
 		want    string
 	}{
-		{"README.md", ".html", "."}, // Root README stays as "."
-		{"README.md", "", "."},
+		{"README.md", ".html", "README.html"},
+		{"README.md", "", "README"},
 		{"page.md", ".html", "page.html"},
 		{"page.md", "", "page"},
-		{"dir/README.md", ".html", "dir.html"}, // Dir README becomes dir.html
-		{"dir/README.md", "", "dir"},
+		{"dir/README.md", ".html", "dir/README.html"},
+		{"dir/README.md", "", "dir/README"},
 		{"dir/page.md", ".html", "dir/page.html"},
 		{"getting-started/installation.md", ".html", "getting-started/installation.html"},
 	}

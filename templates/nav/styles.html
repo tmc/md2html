@@ -1,5 +1,45 @@
 {{define "nav-styles"}}
 <style>
+    /* Top navigation bar */
+    .top-nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 24px;
+        background: var(--bg-subtle);
+        border-bottom: 1px solid var(--border);
+        font-size: 14px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+
+    .top-nav-left {
+        display: flex;
+        gap: 4px;
+    }
+
+    .top-nav-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .top-nav-link {
+        padding: 6px 12px;
+        color: var(--fg-muted);
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: color 0.15s ease, background 0.15s ease;
+    }
+
+    .top-nav-link:hover {
+        color: var(--fg);
+        background: var(--border);
+        text-decoration: none;
+    }
+
     /* Docs Layout with Sidebar */
     .docs-layout {
         display: flex;
@@ -13,8 +53,8 @@
         background: var(--bg-subtle);
         border-right: 1px solid var(--border);
         position: sticky;
-        top: 0;
-        height: 100vh;
+        top: 41px;
+        height: calc(100vh - 41px);
         overflow-y: auto;
         padding: 24px 16px;
     }
@@ -102,7 +142,6 @@
         flex: 1;
         min-width: 0;
         padding: 45px;
-        max-width: calc(100% - 280px);
     }
 
     /* Breadcrumb */
@@ -202,7 +241,89 @@
         white-space: nowrap;
     }
 
+    /* Edit on GitHub link */
+    .edit-link {
+        margin-top: 32px;
+        font-size: 13px;
+    }
+
+    .edit-link a {
+        color: var(--fg-muted);
+    }
+
+    .edit-link a:hover {
+        color: var(--accent);
+    }
+
+    /* Right sidebar "On this page" ToC */
+    .sidebar-toc {
+        width: 220px;
+        min-width: 220px;
+        position: sticky;
+        top: 41px;
+        height: calc(100vh - 41px);
+        overflow-y: auto;
+        padding: 24px 16px;
+        font-size: 13px;
+        border-left: 1px solid var(--border);
+    }
+
+    .sidebar-toc-header {
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--fg-muted);
+        margin-bottom: 12px;
+    }
+
+    .sidebar-toc ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .sidebar-toc li {
+        margin: 0;
+    }
+
+    .sidebar-toc a {
+        display: block;
+        padding: 4px 0;
+        color: var(--fg-muted);
+        text-decoration: none;
+        border-left: 2px solid transparent;
+        padding-left: 12px;
+        transition: color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .sidebar-toc a:hover {
+        color: var(--fg);
+        text-decoration: none;
+    }
+
+    .sidebar-toc a.active {
+        color: var(--accent);
+        border-left-color: var(--accent);
+    }
+
+    .sidebar-toc a.level-1 { padding-left: 12px; }
+    .sidebar-toc a.level-2 { padding-left: 12px; }
+    .sidebar-toc a.level-3 { padding-left: 24px; }
+
+    /* Hide inline ToC when sidebar navigation is active */
+    .docs-layout .main-content #toc-title,
+    .docs-layout .main-content #toc {
+        display: none;
+    }
+
     /* Responsive */
+    @media (max-width: 1280px) {
+        .sidebar-toc {
+            display: none;
+        }
+    }
+
     @media (max-width: 1024px) {
         .docs-layout {
             flex-direction: column;

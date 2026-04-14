@@ -3,7 +3,7 @@
 <nav class="breadcrumb" aria-label="Breadcrumb">
   <ol>
     {{range .Nav.Breadcrumb}}
-    <li><a href="{{.URL}}">{{.Title}}</a></li>
+    <li><a href="{{navHref $.FilePath .Path $.HTMLExt $.IndexFile}}">{{.Title}}</a></li>
     {{end}}
     {{if .Nav.Current}}
     <li aria-current="page">{{.Nav.Current.Title}}</li>

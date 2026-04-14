@@ -6,7 +6,7 @@ sleep 1s
 
 # Should include table of contents
 curl -s http://localhost:9014/
-stdout 'id="table-of-contents"'
+stdout 'id="toc-title"'
 
 # Test frontmatter rendering
 md2html -render-frontmatter -http :9015 doc_with_frontmatter.md &

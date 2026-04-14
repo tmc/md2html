@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+	"regexp"
 	"strings"
 
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
@@ -24,8 +24,10 @@ import (
 	"go.abhg.dev/goldmark/toc"
 )
 
-//go:embed templates/*
+//go:embed all:templates
 var templates embed.FS
+
+var htmlLinkAttrPattern = regexp.MustCompile(`(?i)\b(href|src)\s*=\s*(?:"([^"<>]+)"|'([^'<>]+)')`)
 
 func generateChromaCSS() string {
 	lightStyle := styles.Get("github")
@@ -147,6 +149,7 @@ func preprocessHTMLBlocks(markdown string) string {
 func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 	markdown = convertGitHubAlerts(markdown)
 	if cfg.AllowUnsafe {
+		markdown = rewriteLocalHTMLAttributes(markdown, filePath, cfg.HTMLExt, cfg.Index)
 		markdown = preprocessHTMLBlocks(markdown)
 	}
 
@@ -167,6 +170,8 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 		extensions = append(extensions, &toc.Extender{
 			MinDepth: 1,
 			MaxDepth: 6,
+			ListID:   "toc",
+			TitleID:  "toc-title",
 		})
 	}
 
@@ -199,22 +204,8 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 				return ast.WalkContinue, nil
 			}
 			href := string(link.Destination)
-			if strings.Contains(href, "://") || strings.HasPrefix(href, "#") ||
-				strings.HasPrefix(href, "mailto:") || strings.HasPrefix(href, "tel:") ||
-				strings.HasPrefix(href, "/") {
-				return ast.WalkContinue, nil
-			}
-			if ext := filepath.Ext(href); ext == ".md" || ext == ".markdown" {
-				// Resolve relative to the directory of the current file
-				dir := filepath.Dir(filePath)
-				resolved := filepath.Join(dir, href)
-				resolved = strings.TrimSuffix(resolved, ext)
-				resolved = filepath.Clean(resolved)
-				if cfg.HTMLExt != "" {
-					link.Destination = []byte("/" + resolved + "." + cfg.HTMLExt)
-				} else {
-					link.Destination = []byte("/" + resolved)
-				}
+			if rewritten, ok := rewriteLocalMarkdownReference(filePath, href, cfg.HTMLExt, cfg.Index); ok {
+				link.Destination = []byte(rewritten)
 			}
 			return ast.WalkContinue, nil
 		})
@@ -230,6 +221,30 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 		return fmt.Sprintf("<p>Error: %v</p>", err)
 	}
 	return buf.String()
+}
+
+func rewriteLocalHTMLAttributes(content, filePath, htmlExt, indexFile string) string {
+	if filePath == "" {
+		return content
+	}
+
+	return htmlLinkAttrPattern.ReplaceAllStringFunc(content, func(attr string) string {
+		match := htmlLinkAttrPattern.FindStringSubmatch(attr)
+		if len(match) != 4 {
+			return attr
+		}
+		raw := match[2]
+		quote := `"`
+		if raw == "" {
+			raw = match[3]
+			quote = `'`
+		}
+		rewritten, ok := rewriteLocalMarkdownReference(filePath, raw, htmlExt, indexFile)
+		if !ok {
+			return attr
+		}
+		return match[1] + "=" + quote + rewritten + quote
+	})
 }
 
 type DocumentData struct {

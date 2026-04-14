@@ -1,10 +1,8 @@
 package md2html
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"html/template"
 	"log"
 	"log/slog"
 	"net/http"
@@ -59,6 +57,21 @@ func newServer(cfg Config, logger *slog.Logger) *server {
 		}
 	}
 
+	// Load navigation from SUMMARY.md if present
+	{
+		root, err := sourceRoot(cfg.Source)
+		if err == nil {
+			htmlExt := ""
+			if cfg.HTMLExt != "" {
+				htmlExt = "." + cfg.HTMLExt
+			}
+			if nav := LoadNavigationFromDir(root, htmlExt); nav != nil {
+				s.nav = nav
+				logger.Info("Loaded navigation from SUMMARY.md", "pages", len(nav.Flat))
+			}
+		}
+	}
+
 	// Load initial content
 	if cfg.Source != "" && cfg.Source != "-" {
 		content, err := os.ReadFile(cfg.Source)
@@ -106,6 +119,9 @@ type server struct {
 	// Version management
 	versionMgr *GitVersionManager
 	versions   []GitVersion
+
+	// Navigation from SUMMARY.md
+	nav *Navigation
 }
 
 func (s *server) watchFiles() {
@@ -194,6 +210,12 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	css := s.cssContent
 	s.mu.RUnlock()
 
+	root, err := sourceRoot(s.inputPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error resolving source root: %v", err), http.StatusInternalServerError)
+		return
+	}
+
 	// Extract version from URL if versioning is enabled
 	var requestedVersion string
 	var filePath string
@@ -244,14 +266,20 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	// Check if a specific file is requested via clean URL path
 	if filePath != "" && filePath != "/" {
+		cleanPath, err := secureURLPath(filePath)
+		if err != nil {
+			http.Error(w, "invalid path", http.StatusBadRequest)
+			return
+		}
+
 		// Try the path as-is if it ends with .md
 		var candidates []string
-		if strings.HasSuffix(filePath, ".md") || strings.HasSuffix(filePath, ".markdown") {
-			candidates = append(candidates, filePath)
+		if strings.HasSuffix(cleanPath, ".md") || strings.HasSuffix(cleanPath, ".markdown") {
+			candidates = append(candidates, cleanPath)
 		} else {
 			// Try adding .md extension
-			candidates = append(candidates, filePath+".md")
-			candidates = append(candidates, filePath+".markdown")
+			candidates = append(candidates, cleanPath+".md")
+			candidates = append(candidates, cleanPath+".markdown")
 		}
 
 		for _, candidate := range candidates {
@@ -261,7 +289,12 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			if requestedVersion != "" && s.versionMgr != nil {
 				fileContent, err = s.versionMgr.GetFileContent(requestedVersion, candidate)
 			} else {
-				fileContent, err = os.ReadFile(candidate)
+				fullPath, joinErr := secureJoin(root, filepath.FromSlash(candidate))
+				if joinErr != nil {
+					http.Error(w, "invalid path", http.StatusBadRequest)
+					return
+				}
+				fileContent, err = os.ReadFile(fullPath)
 			}
 
 			if err == nil {
@@ -284,7 +317,17 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	// Check if a specific file is requested via query parameter (for backward compatibility)
 	if file := r.URL.Query().Get("file"); file != "" {
-		content, err := os.ReadFile(file)
+		cleanPath, err := secureURLPath(file)
+		if err != nil {
+			http.Error(w, "invalid path", http.StatusBadRequest)
+			return
+		}
+		fullPath, err := secureJoin(root, filepath.FromSlash(cleanPath))
+		if err != nil {
+			http.Error(w, "invalid path", http.StatusBadRequest)
+			return
+		}
+		content, err := os.ReadFile(fullPath)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error reading file %s: %v", file, err), http.StatusNotFound)
 			return
@@ -343,64 +386,16 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 
 	html := markdownToHTMLWithContext(s.config, content, filePath)
 
-	// Create version-aware template data
-	tmpl, err := loadAllTemplates(s.config)
-	if err != nil {
-		log.Printf("Error loading templates: %v", err)
-		return fmt.Sprintf("<p>Template loading error: %v</p>", err)
+	opts := RenderOptions{
+		SiteTitle: s.config.Title,
+		Data:      s.jsonData,
+		FilePath:  filePath,
+	}
+	if s.nav != nil {
+		opts.Nav = s.nav.ForPage(filePath)
 	}
 
-	name := "layout"
-	if tmpl.Lookup(name) == nil {
-		for _, n := range []string{"docs.html", "page.html", "live-reload.html", "base"} {
-			if tmpl.Lookup(n) != nil {
-				name = n
-				break
-			}
-		}
-	}
-
-	if tmpl.Lookup(name) == nil {
-		return "<p>No template found. Expected 'layout' template"
-	}
-
-	var buf bytes.Buffer
-	htmlExt := ""
-	if s.config.HTMLExt != "" {
-		htmlExt = "." + s.config.HTMLExt
-	}
-
-	data := struct {
-		Title       string
-		Content     template.HTML
-		CustomCSS   template.CSS
-		ChromaCSS   template.CSS
-		Verbose     bool
-		LiveReload  bool
-		HTMLExt     string
-		Frontmatter map[string]interface{}
-		Version     string
-		Versions    []GitVersion
-		Search      bool
-	}{
-		Title:       title,
-		Content:     template.HTML(html),
-		CustomCSS:   template.CSS(customCSS),
-		ChromaCSS:   template.CSS(generateChromaCSS()),
-		Verbose:     s.config.Verbose,
-		LiveReload:  true,
-		HTMLExt:     htmlExt,
-		Frontmatter: doc.Frontmatter,
-		Version:     version,
-		Versions:    s.versions,
-		Search:      s.config.Search,
-	}
-
-	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
-		log.Printf("Error executing template: %v", err)
-		return fmt.Sprintf("<p>Template execution error: %v</p>", err)
-	}
-	return buf.String()
+	return renderTemplateWithOptions(s.config, html, title, customCSS, true, doc.Frontmatter, opts)
 }
 
 func (s *server) handleRaw(w http.ResponseWriter, r *http.Request) {

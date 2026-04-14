@@ -1,4 +1,28 @@
 {{define "header"}}
+{{if and .Nav .Nav.HasNav}}
+<nav class="top-nav">
+    <div class="top-nav-left">
+        {{range .Nav.Items}}{{if .IsGroup}}
+        <a class="top-nav-link" href="#section-{{.Title}}">{{.Title}}</a>
+        {{end}}{{end}}
+    </div>
+    <div class="top-nav-right">
+        {{if .LiveReload}}<div id="status" class="connection-status">Connected</div>{{end}}
+        {{if .Versions}}
+        <div class="version-selector">
+            <label for="version-select">Version:</label>
+            <select id="version-select" onchange="switchVersion(this.value)">
+                {{range .Versions}}
+                <option value="{{.Name}}" {{if eq $.Version .Name}}selected{{end}}>
+                    {{.Name}}{{if .IsTag}} (tag){{else}} (branch){{end}}
+                </option>
+                {{end}}
+            </select>
+        </div>
+        {{end}}
+    </div>
+</nav>
+{{else}}
 <div class="header-bar">
     {{if .LiveReload}}<div id="status" class="connection-status">Connected</div>{{end}}
     {{if .Versions}}
@@ -14,4 +38,5 @@
     </div>
     {{end}}
 </div>
+{{end}}
 {{end}}

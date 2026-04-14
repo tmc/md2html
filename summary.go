@@ -137,26 +137,7 @@ func countIndent(line string) int {
 
 // pathToURL converts a markdown path to a URL.
 func pathToURL(path, htmlExt string) string {
-	// Remove .md extension and add htmlExt
-	url := strings.TrimSuffix(path, ".md")
-	url = strings.TrimSuffix(url, ".markdown")
-
-	// Handle README -> index or directory
-	if strings.HasSuffix(url, "/README") {
-		url = strings.TrimSuffix(url, "/README")
-		if url == "" {
-			url = "."
-		}
-	} else if url == "README" {
-		url = "."
-	}
-
-	// Add extension if specified
-	if htmlExt != "" && url != "." {
-		url += htmlExt
-	}
-
-	return url
+	return renderedPathForSource(path, htmlExt, "")
 }
 
 // buildNavTree converts a flat list of items into a nested tree.

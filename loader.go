@@ -3,6 +3,7 @@ package md2html
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"os"
 	"path/filepath"
@@ -302,9 +303,12 @@ func toAnchorID(text string) string {
 
 // readFile reads a file relative to the loader's base directory.
 func (l *Loader) readFile(path string) ([]byte, error) {
-	fullPath := path
-	if !filepath.IsAbs(path) {
-		fullPath = filepath.Join(l.baseDir, path)
+	if filepath.IsAbs(path) {
+		return nil, fmt.Errorf("absolute paths are not allowed")
+	}
+	fullPath, err := secureJoin(l.baseDir, path)
+	if err != nil {
+		return nil, err
 	}
 	return os.ReadFile(fullPath)
 }

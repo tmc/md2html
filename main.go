@@ -202,12 +202,7 @@ func generateDirectoryListing(cfg Config, dir string) (string, error) {
 	}
 
 	for _, f := range files {
-		url := "/" + f.RelPath
-		url = strings.TrimSuffix(url, ".md")
-		url = strings.TrimSuffix(url, ".markdown")
-		if cfg.HTMLExt != "" {
-			url += "." + cfg.HTMLExt
-		}
+		url := renderedPathForSource(f.RelPath, cfg.HTMLExt, cfg.Index)
 		buf.WriteString(fmt.Sprintf("- [%s](%s) (%d bytes, %s)\n",
 			f.RelPath, url, f.Size, f.ModTime.Format("2006-01-02 15:04")))
 	}
@@ -329,6 +324,9 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 			}
 			return dict
 		},
+		"navHref": func(currentFile, targetFile, htmlExt, indexFile string) string {
+			return relativeRenderedLink(currentFile, targetFile, htmlExt, indexFile)
+		},
 	}).ParseFS(templates, "templates/*.html", "templates/*/*.html")
 
 	if err != nil {
@@ -352,6 +350,7 @@ type RenderOptions struct {
 	Nav       *NavContext
 	SiteTitle string
 	Data      interface{} // from -data-json
+	FilePath  string      // source file path (for edit links)
 }
 
 func firstFrontmatterString(frontmatter map[string]interface{}, keys ...string) string {
@@ -425,6 +424,8 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 	if opts.Nav != nil && opts.Nav.HasNav {
 		if tmpl.Lookup("docs-layout") != nil {
 			name = "docs-layout"
+		} else {
+			log.Printf("Warning: SUMMARY.md navigation loaded but docs-layout template not found, falling back to layout")
 		}
 	}
 	if tmpl.Lookup(name) == nil {
@@ -441,11 +442,6 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 	}
 
 	var buf bytes.Buffer
-	// Prepare extension with dot prefix for template use
-	htmlExt := ""
-	if cfg.HTMLExt != "" {
-		htmlExt = "." + cfg.HTMLExt
-	}
 	mermaidTheme, mermaidDarkTheme, mermaidAutoTheme := resolveMermaidThemes(frontmatter)
 
 	data := struct {
@@ -463,9 +459,11 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		Nav              *NavContext
 		SiteTitle        string
 		Data             interface{}
+		IndexFile        string
 		MermaidTheme     string
 		MermaidDarkTheme string
 		MermaidAutoTheme bool
+		FilePath         string
 	}{
 		Title:            title,
 		Content:          template.HTML(htmlContent),
@@ -473,7 +471,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		ChromaCSS:        template.CSS(generateChromaCSS()),
 		Verbose:          cfg.Verbose,
 		LiveReload:       liveReload,
-		HTMLExt:          htmlExt,
+		HTMLExt:          cfg.HTMLExt,
 		Frontmatter:      frontmatter,
 		Version:          "",
 		Versions:         nil,
@@ -481,9 +479,11 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		Nav:              opts.Nav,
 		SiteTitle:        opts.SiteTitle,
 		Data:             opts.Data,
+		IndexFile:        cfg.Index,
 		MermaidTheme:     mermaidTheme,
 		MermaidDarkTheme: mermaidDarkTheme,
 		MermaidAutoTheme: mermaidAutoTheme,
+		FilePath:         opts.FilePath,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -557,7 +557,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			logger.Debug("Skipping draft", "file", file.RelPath)
 			continue
 		}
-		opts := RenderOptions{SiteTitle: cfg.Title, Data: jsonData}
+		opts := RenderOptions{SiteTitle: cfg.Title, Data: jsonData, FilePath: file.RelPath}
 		if nav != nil {
 			opts.Nav = nav.ForPage(file.RelPath)
 		}
@@ -572,7 +572,11 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	if cfg.Index != "" {
 		indexFile := filepath.Join(sourceDir, cfg.Index)
 		if _, err := os.Stat(indexFile); err == nil {
-			if err := processIndexFileWithOpts(indexFile, outputDir, cssContent, cfg, RenderOptions{SiteTitle: cfg.Title, Data: jsonData}); err != nil {
+			indexOpts := RenderOptions{SiteTitle: cfg.Title, Data: jsonData, FilePath: cfg.Index}
+			if nav != nil {
+				indexOpts.Nav = nav.ForPage(cfg.Index)
+			}
+			if err := processIndexFileWithOpts(indexFile, outputDir, cssContent, cfg, indexOpts); err != nil {
 				logger.Error("Error processing index file", "error", err, "file", indexFile)
 			} else {
 				logger.Debug("Processed index file", "file", indexFile)
@@ -720,7 +724,11 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
 	}
 
-	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, filepath.Base(indexPath))
+	htmlPath := opts.FilePath
+	if htmlPath == "" {
+		htmlPath = filepath.Base(indexPath)
+	}
+	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, htmlPath)
 
 	title := cfg.Title
 	if docTitle, ok := doc.Frontmatter["title"].(string); ok && docTitle != "" {
@@ -767,11 +775,7 @@ func generateTOCIndex(sourceDir, outputDir string, files []markdownFile, cssCont
 		buf.WriteString("*No markdown files found.*\n")
 	} else {
 		for _, f := range files {
-			// Generate URL with optional extension based on config
-			url := "/" + strings.TrimSuffix(f.RelPath, filepath.Ext(f.RelPath))
-			if cfg.HTMLExt != "" {
-				url += "." + cfg.HTMLExt
-			}
+			url := renderedPathForSource(f.RelPath, cfg.HTMLExt, cfg.Index)
 			buf.WriteString(fmt.Sprintf("- [%s](%s) (%d bytes, %s)\n",
 				f.RelPath, url, f.Size, f.ModTime.Format("2006-01-02 15:04")))
 		}
