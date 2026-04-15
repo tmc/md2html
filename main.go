@@ -122,6 +122,11 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 
 	// If -html flag is provided, generate static HTML
 	if cfg.HTML != "" {
+		// Default to .html extension for static builds so files are
+		// served with the correct Content-Type by standard HTTP servers.
+		if cfg.HTMLExt == "" {
+			cfg.HTMLExt = "html"
+		}
 		return generateStaticHTML(ctx, cfg, logger)
 	}
 
@@ -218,29 +223,66 @@ type markdownFile struct {
 
 func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 	var files []markdownFile
+	seen := make(map[string]bool) // track real paths to avoid symlink cycles
 
-	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
+	// walkDir walks a directory rooted at realDir, mapping discovered paths
+	// to appear under apparentDir relative to rootDir.
+	var walkDir func(realDir, apparentDir string) error
+	walkDir = func(realDir, apparentDir string) error {
+		entries, err := os.ReadDir(realDir)
 		if err != nil {
 			return err
 		}
+		for _, entry := range entries {
+			realPath := filepath.Join(realDir, entry.Name())
+			apparentPath := filepath.Join(apparentDir, entry.Name())
 
-		// Calculate relative path and depth
-		relPath, err := filepath.Rel(rootDir, path)
-		if err != nil {
-			return err
-		}
-
-		// Skip if we've exceeded max depth
-		depth := strings.Count(relPath, string(filepath.Separator))
-		if depth >= maxDepth {
-			if info.IsDir() {
-				return filepath.SkipDir
+			info, err := entry.Info()
+			if err != nil {
+				continue
 			}
-			return nil
-		}
 
-		// Check if it's a markdown file
-		if !info.IsDir() {
+			// Follow symlinks
+			if info.Mode()&os.ModeSymlink != 0 {
+				resolved, err := filepath.EvalSymlinks(realPath)
+				if err != nil {
+					continue // skip broken symlinks
+				}
+				info, err = os.Stat(resolved)
+				if err != nil {
+					continue
+				}
+				realPath = resolved
+			}
+
+			relPath, err := filepath.Rel(rootDir, apparentPath)
+			if err != nil {
+				continue
+			}
+			depth := strings.Count(relPath, string(filepath.Separator))
+
+			if info.IsDir() {
+				if depth >= maxDepth {
+					continue
+				}
+				real, err := filepath.EvalSymlinks(apparentPath)
+				if err != nil {
+					real = realPath
+				}
+				if seen[real] {
+					continue // avoid cycles
+				}
+				seen[real] = true
+				if err := walkDir(realPath, apparentPath); err != nil {
+					return err
+				}
+				continue
+			}
+
+			if depth >= maxDepth {
+				continue
+			}
+
 			name := strings.ToLower(info.Name())
 			if strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".markdown") {
 				files = append(files, markdownFile{
@@ -250,9 +292,16 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 				})
 			}
 		}
-
 		return nil
-	})
+	}
+
+	absRoot, err := filepath.Abs(rootDir)
+	if err != nil {
+		return nil, err
+	}
+	rootDir = absRoot
+	seen[absRoot] = true
+	err = walkDir(rootDir, rootDir)
 
 	return files, err
 }
