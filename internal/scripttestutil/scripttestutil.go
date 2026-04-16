@@ -5,9 +5,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
@@ -18,6 +21,8 @@ import (
 	"rsc.io/script"
 	"rsc.io/script/scripttest"
 )
+
+var scriptPortPattern = regexp.MustCompile(`(localhost:|127\.0\.0\.1:|:)([1-9]\d{3,4})\b`)
 
 // BackgroundCmd returns a command that runs prog in the background
 // with graceful shutdown support via SIGTERM instead of SIGKILL.
@@ -35,9 +40,9 @@ import (
 //
 // Differences from script.Program:
 //   - Default cancellation sends SIGTERM instead of SIGKILL, allowing:
-//     * Graceful shutdown with cleanup
-//     * Coverage data to be written
-//     * Exit code 0 on clean shutdown
+//   - Graceful shutdown with cleanup
+//   - Coverage data to be written
+//   - Exit code 0 on clean shutdown
 //   - Context cancellation with exit code 0 is treated as success, not error
 //   - Ensures GOCOVERDIR environment variable is preserved for coverage
 //
@@ -85,7 +90,7 @@ func BackgroundCmd(prog string, cancel func(*exec.Cmd) error, waitDelay time.Dur
 // and exit successfully when the test ends.
 func startBackgroundCommand(s *script.State, name, path string, args []string, cancel func(*exec.Cmd) error, waitDelay time.Duration) (script.WaitFunc, error) {
 	var (
-		cmd                  *exec.Cmd
+		cmd            *exec.Cmd
 		stdout, stderr strings.Builder
 	)
 
@@ -234,8 +239,13 @@ func Test(t *testing.T, ctx context.Context, engine *script.Engine, env []string
 			work, _ := s.LookupEnv("WORK")
 			t.Logf("$WORK=%s", work)
 
+			scriptText, err := rewriteScriptPorts(string(a.Comment))
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			// Use scripttest.Run to execute the test
-			scripttest.Run(t, engine, s, file, bytes.NewReader(a.Comment))
+			scripttest.Run(t, engine, s, file, bytes.NewReader([]byte(scriptText)))
 		})
 	}
 }
@@ -265,6 +275,52 @@ func tempEnvName() string {
 	default:
 		return "TMPDIR"
 	}
+}
+
+func rewriteScriptPorts(script string) (string, error) {
+	portMap := make(map[string]string)
+
+	rewritten := scriptPortPattern.ReplaceAllStringFunc(script, func(match string) string {
+		parts := scriptPortPattern.FindStringSubmatch(match)
+		if len(parts) != 3 {
+			return match
+		}
+
+		oldPort := parts[2]
+		newPort, ok := portMap[oldPort]
+		if !ok {
+			var err error
+			newPort, err = reserveTestPort()
+			if err != nil {
+				// ReplaceAllStringFunc does not surface errors. Encode the
+				// failure inline and reject it after the rewrite pass.
+				newPort = "ERROR:" + err.Error()
+			}
+			portMap[oldPort] = newPort
+		}
+		return parts[1] + newPort
+	})
+
+	for _, newPort := range portMap {
+		if strings.HasPrefix(newPort, "ERROR:") {
+			return "", errors.New(strings.TrimPrefix(newPort, "ERROR:"))
+		}
+	}
+	return rewritten, nil
+}
+
+func reserveTestPort() (string, error) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", err
+	}
+	defer ln.Close()
+
+	addr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		return "", fmt.Errorf("unexpected listener addr type %T", ln.Addr())
+	}
+	return fmt.Sprintf("%d", addr.Port), nil
 }
 
 // isETXTBSY reports whether err is a "text file busy" error (ETXTBSY).
