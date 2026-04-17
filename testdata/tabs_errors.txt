@@ -1,0 +1,31 @@
+# Malformed tabs fences should log warn, not abort, and leave the
+# surrounding document intact.
+
+md2html -html output -html-ext html testsite
+exists output/README.html
+
+# Rendering finishes: the surrounding prose still lands in the page.
+grep 'later content' output/README.html
+
+# Malformed blocks are skipped: no tab group markup for the fence.
+! grep 'class="md-tabs"' output/README.html
+! grep 'role="tabpanel"' output/README.html
+
+# Warnings surface with file + line metadata.
+stderr 'tabs: parse error'
+stderr 'line=3'
+stderr 'file=README.md'
+stderr 'requires a group id'
+
+rm -rf testsite output
+
+-- testsite/README.md --
+# Heading
+
+::: tabs
+::: tab Ubuntu
+hello
+:::
+:::
+
+later content

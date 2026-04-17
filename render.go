@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/styles"
 	admonitions "github.com/stefanfritsch/goldmark-admonitions"
+	"github.com/tmc/md2html/internal/tabs"
 	"github.com/yuin/goldmark"
 	highlighting "github.com/yuin/goldmark-highlighting/v2"
 	meta "github.com/yuin/goldmark-meta"
@@ -165,6 +167,7 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 			),
 		),
 		&admonitions.Extender{},
+		tabs.Extender{},
 	}
 	if cfg.TOC {
 		extensions = append(extensions, &toc.Extender{
@@ -192,9 +195,10 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 	)
 
 	source := []byte(markdown)
+	pc := parser.NewContext()
 
 	if filePath != "" {
-		doc := md.Parser().Parse(text.NewReader(source))
+		doc := md.Parser().Parse(text.NewReader(source), parser.WithContext(pc))
 		ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 			if !entering {
 				return ast.WalkContinue, nil
@@ -213,14 +217,36 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 		if err := md.Renderer().Render(&buf, source, doc); err != nil {
 			return fmt.Sprintf("<p>Error: %v</p>", err)
 		}
+		logTabsErrors(pc, filePath)
 		return buf.String()
 	}
 
+	doc := md.Parser().Parse(text.NewReader(source), parser.WithContext(pc))
 	var buf bytes.Buffer
-	if err := md.Convert(source, &buf); err != nil {
+	if err := md.Renderer().Render(&buf, source, doc); err != nil {
 		return fmt.Sprintf("<p>Error: %v</p>", err)
 	}
+	logTabsErrors(pc, filePath)
 	return buf.String()
+}
+
+// logTabsErrors surfaces parse diagnostics recorded by the tabs
+// extension. Tab parse errors never abort rendering; they log at warn
+// level so misformed fences are visible without breaking the build.
+func logTabsErrors(pc parser.Context, filePath string) {
+	errs := tabs.Errors(pc)
+	if len(errs) == 0 {
+		return
+	}
+	logger := slog.Default()
+	for _, e := range errs {
+		attrs := []any{"line", e.Line}
+		if filePath != "" {
+			attrs = append(attrs, "file", filePath)
+		}
+		attrs = append(attrs, "msg", e.Msg)
+		logger.Warn("tabs: parse error", attrs...)
+	}
 }
 
 func rewriteLocalHTMLAttributes(content, filePath, htmlExt, indexFile string) string {

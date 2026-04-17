@@ -1,0 +1,52 @@
+# Test tabbed code blocks via ::: fences
+
+md2html -html output -html-ext html testsite
+exists output/README.html
+
+# Tab group markup
+grep 'class="md-tabs"' output/README.html
+grep 'role="tablist"' output/README.html
+grep 'data-tab-group="install"' output/README.html
+
+# Tab buttons with ARIA wiring
+grep 'role="tab"' output/README.html
+grep 'id="install-ubuntu-tab"' output/README.html
+grep 'aria-controls="install-ubuntu"' output/README.html
+grep 'aria-controls="install-debian"' output/README.html
+grep 'aria-selected="true"' output/README.html
+
+# Tab panels with stable ids for deep linking
+grep 'id="install-ubuntu"' output/README.html
+grep 'id="install-debian"' output/README.html
+grep 'aria-labelledby="install-ubuntu-tab"' output/README.html
+
+# Code blocks inside tabs render through goldmark
+grep 'cove up --linux --distro ubuntu' output/README.html
+grep 'cove up --linux --distro debian' output/README.html
+
+# JS + CSS partial wired in
+grep 'activateFromHash' output/README.html
+grep '\.md-tabs ' output/README.html
+
+# Progressive enhancement: no panel is hidden at render time. JS
+# collapses non-selected panels on DOMContentLoaded; no-JS readers
+# see all content stacked.
+! grep 'tabpanel.* hidden' output/README.html
+
+rm -rf testsite output
+
+-- testsite/README.md --
+# Install
+
+::: tabs install
+::: tab Ubuntu
+```bash
+cove up --linux --distro ubuntu
+```
+:::
+::: tab Debian
+```bash
+cove up --linux --distro debian
+```
+:::
+:::

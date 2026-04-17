@@ -2,6 +2,7 @@
 {{template "mathjax-script" .}}
 {{template "mermaid-script" .}}
 {{template "copy-code-script" .}}
+{{template "tabs-script" .}}
 {{if .LiveReload}}{{template "livereload-script" .}}{{end}}
 {{if .Versions}}{{template "version-switcher-script" .}}{{end}}
 {{end}}
@@ -129,6 +130,102 @@
         };
     })();
 </script>
+{{end}}
+
+{{define "tabs-script"}}
+<script>
+    (function() {
+        function activate(group, btn) {
+            var slug = btn.getAttribute('data-tab-slug');
+            group.querySelectorAll('[role="tab"]').forEach(function(b) {
+                var active = b === btn;
+                b.setAttribute('aria-selected', active ? 'true' : 'false');
+                b.tabIndex = active ? 0 : -1;
+            });
+            group.querySelectorAll('.md-tab-panel').forEach(function(p) {
+                if (p.id === slug) { p.removeAttribute('hidden'); }
+                else { p.setAttribute('hidden', ''); }
+            });
+        }
+        function activateFromHash() {
+            var id = window.location.hash.slice(1);
+            if (!id) return;
+            var btn = document.querySelector('.md-tabs [data-tab-slug="' + CSS.escape(id) + '"]');
+            if (!btn) return;
+            var group = btn.closest('.md-tabs');
+            activate(group, btn);
+            var panel = document.getElementById(id);
+            if (panel && panel.scrollIntoView) {
+                panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.md-tabs [role="tab"]');
+            if (!btn) return;
+            var group = btn.closest('.md-tabs');
+            activate(group, btn);
+        });
+        document.addEventListener('keydown', function(e) {
+            var btn = e.target.closest && e.target.closest('.md-tabs [role="tab"]');
+            if (!btn) return;
+            var tabs = Array.prototype.slice.call(btn.closest('.md-tabs').querySelectorAll('[role="tab"]'));
+            var i = tabs.indexOf(btn);
+            var next = null;
+            if (e.key === 'ArrowRight') next = tabs[(i + 1) % tabs.length];
+            else if (e.key === 'ArrowLeft') next = tabs[(i - 1 + tabs.length) % tabs.length];
+            else if (e.key === 'Home') next = tabs[0];
+            else if (e.key === 'End') next = tabs[tabs.length - 1];
+            if (next) { e.preventDefault(); next.focus(); activate(btn.closest('.md-tabs'), next); }
+        });
+        function initTabs() {
+            // Render emits all panels visible so no-JS readers see
+            // full content. On load, collapse non-selected panels so
+            // tabs behave as tabs once JS is live.
+            document.querySelectorAll('.md-tabs').forEach(function(group) {
+                var selected = group.querySelector('[role="tab"][aria-selected="true"]')
+                    || group.querySelector('[role="tab"]');
+                if (selected) activate(group, selected);
+            });
+            activateFromHash();
+        }
+        document.addEventListener('DOMContentLoaded', initTabs);
+        window.addEventListener('hashchange', activateFromHash);
+    })();
+</script>
+<style>
+    .md-tabs {
+        margin: 1em 0;
+        border: 1px solid var(--border, #d0d7de);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .md-tabs [role="tab"] {
+        background: transparent;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        padding: 8px 14px;
+        font: inherit;
+        color: var(--fg-muted, #656d76);
+        cursor: pointer;
+    }
+    .md-tabs [role="tab"][aria-selected="true"] {
+        color: var(--fg, #1f2328);
+        border-bottom-color: var(--accent, #0969da);
+    }
+    .md-tabs [role="tab"]:focus-visible {
+        outline: 2px solid var(--accent, #0969da);
+        outline-offset: -2px;
+    }
+    .md-tab-panel {
+        padding: 12px 14px;
+        border-top: 1px solid var(--border, #d0d7de);
+    }
+    .md-tab-panel[hidden] { display: none; }
+    .md-tab-panel > pre:first-child,
+    .md-tab-panel > p:first-child { margin-top: 0; }
+    .md-tab-panel > pre:last-child,
+    .md-tab-panel > p:last-child { margin-bottom: 0; }
+</style>
 {{end}}
 
 {{define "version-switcher-script"}}
