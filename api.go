@@ -3,6 +3,7 @@ package md2html
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 // handleVersionsAPI returns the list of available versions as JSON
@@ -35,4 +36,23 @@ func (s *server) handleVersionsAPI(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("Error encoding versions JSON", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
+}
+
+// handleJSONSpecSchemas returns the loaded schema bundle as JSON. It
+// serves the same payload embedded in each page's
+// <script id="md-jsonspec-schemas"> tag, so tools or lazy-loading JS
+// can fetch it without scraping HTML.
+func (s *server) handleJSONSpecSchemas(w http.ResponseWriter, r *http.Request) {
+	if strings.TrimSpace(s.config.JSONSpecSchemas) == "" {
+		http.Error(w, "jsonspec schemas not configured", http.StatusNotFound)
+		return
+	}
+	payload := jsonSpecBundleJSON(s.config)
+	if payload == "" {
+		http.Error(w, "schema bundle unavailable", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write([]byte(payload))
 }

@@ -565,6 +565,7 @@ func (s *server) Run(ctx context.Context) error {
 	mux.HandleFunc("/events", s.handleSSE)
 	mux.HandleFunc("/raw", s.handleRaw)
 	mux.HandleFunc("/api/versions", s.handleVersionsAPI)
+	mux.HandleFunc("/_jsonspec/schemas.json", s.handleJSONSpecSchemas)
 
 	srv := &http.Server{
 		Addr:    s.config.HTTP,

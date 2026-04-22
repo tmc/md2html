@@ -1,0 +1,51 @@
+# Test that a configured schema directory produces an inline bundle
+# payload the client script can consume for tooltips.
+
+md2html -html output -html-ext html -jsonspec-prefixes ascf/ -jsonspec-badge-url 'schemas.html#%s' -jsonspec-schemas testsite/schema testsite
+exists output/README.html
+
+# Bundle is embedded as an inline JSON payload.
+grep 'id="md-jsonspec-schemas"' output/README.html
+grep '"hypothesis"' output/README.html
+grep '"strategy_tag"' output/README.html
+
+# Field metadata survives the bundle projection: enum values and the
+# required flag both reach the client.
+grep '"local_search"' output/README.html
+grep '"required":true' output/README.html
+
+# Client script is wired in.
+grep 'enrichBlock' output/README.html
+
+# Wrapper div still present so the script has something to find.
+grep 'class="md-jsonspec" data-schema-type="hypothesis"' output/README.html
+
+rm -rf testsite output
+
+-- testsite/README.md --
+# ASCF Hypothesis
+
+```json
+{
+  "type": "ascf/hypothesis",
+  "id": "h1",
+  "strategy_tag": "local_search"
+}
+```
+
+-- testsite/schema/hypothesis.schema.json --
+{
+  "$id": "https://ascf.dev/schema/0.2/hypothesis.schema.json",
+  "title": "Hypothesis",
+  "description": "A structured proposal for what an island will try next.",
+  "required": ["type", "id", "strategy_tag"],
+  "properties": {
+    "type": {"const": "ascf/hypothesis"},
+    "id": {"type": "string", "description": "Unique identifier."},
+    "strategy_tag": {
+      "type": "string",
+      "description": "The search strategy family.",
+      "enum": ["local_search", "crossover", "mutation"]
+    }
+  }
+}

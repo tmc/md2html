@@ -1,0 +1,60 @@
+# Test JSON discriminator detection and badge rendering.
+
+md2html -html output -html-ext html -jsonspec-prefixes ascf/ -jsonspec-badge-url 'schemas.html#%s' -jsonspec-badge-label '%s schema' testsite
+exists output/README.html
+
+# Discriminator block gets wrapping div with data-schema-type.
+grep 'class="md-jsonspec" data-schema-type="hypothesis"' output/README.html
+
+# Badge anchor links to the schema page using the URL template.
+grep 'class="md-jsonspec-badge" href="schemas.html#hypothesis"' output/README.html
+grep 'hypothesis schema</a>' output/README.html
+
+# Plain JSON (no discriminator) stays untouched.
+! grep 'data-schema-type="plain"' output/README.html
+
+# Non-JSON fence with a matching value is not enriched.
+! grep 'data-schema-type="go"' output/README.html
+
+# Different prefix is ignored.
+! grep 'data-schema-type="foo"' output/README.html
+
+# Chroma highlighting still runs; the outer div wraps chroma's <pre>.
+grep 'class="chroma"' output/README.html
+
+rm -rf testsite output
+
+-- testsite/README.md --
+# ASCF Examples
+
+Hypothesis example:
+
+```json
+{
+  "type": "ascf/hypothesis",
+  "id": "h1",
+  "iteration": 1
+}
+```
+
+Plain JSON, no discriminator:
+
+```json
+{
+  "id": "plain"
+}
+```
+
+Go block with a red-herring type field:
+
+```go
+m := map[string]string{"type": "ascf/hypothesis"}
+```
+
+Different prefix, not enabled:
+
+```json
+{
+  "type": "example/foo"
+}
+```

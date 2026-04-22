@@ -43,6 +43,25 @@ type Config struct {
 	VersionBranches   bool
 	VersionDefault    string
 	Search            bool
+
+	// JSONSpecPrefixes is a comma-separated list of type-discriminator
+	// prefixes (for example "ascf/") that mark fenced JSON blocks for
+	// schema-badge enrichment. When empty, the jsonspec extension is a
+	// no-op.
+	JSONSpecPrefixes string
+	// JSONSpecBadgeURL is a printf-style URL template used to link each
+	// badge to its schema documentation page. %s is replaced with the
+	// discriminator suffix (for example "hypothesis" from "ascf/hypothesis").
+	JSONSpecBadgeURL string
+	// JSONSpecBadgeLabel is a printf-style template for the badge label
+	// text. %s is replaced with the discriminator suffix. Defaults to
+	// a clipboard icon plus the suffix when empty.
+	JSONSpecBadgeLabel string
+	// JSONSpecSchemas is a directory of *.schema.json files. When set,
+	// the server loads each schema into a bundle (keyed by filename
+	// stem) and exposes it to the rendered page so client-side code can
+	// attach tooltips to fields in tagged JSON blocks.
+	JSONSpecSchemas string
 }
 
 // NewFlagSet returns a FlagSet configured for the md2html CLI.
@@ -67,6 +86,10 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.Bool("version-branches", false, "include branches as versions alongside tags")
 	fs.String("version-default", "", "default version to show (empty = current/latest)")
 	fs.Bool("search", false, "enable client-side search")
+	fs.String("jsonspec-prefixes", "", "comma-separated JSON type-discriminator prefixes to enrich (e.g. 'ascf/')")
+	fs.String("jsonspec-badge-url", "", "URL template for schema badges; %s is the discriminator suffix (e.g. 'schemas.html#%s')")
+	fs.String("jsonspec-badge-label", "", "label template for schema badges; %s is the discriminator suffix")
+	fs.String("jsonspec-schemas", "", "directory of *.schema.json files; loads a bundle used by client-side tooltips")
 	return fs
 }
 
@@ -92,6 +115,11 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		VersionBranches:   fs.Lookup("version-branches").Value.String() == "true",
 		VersionDefault:    fs.Lookup("version-default").Value.String(),
 		Search:            fs.Lookup("search").Value.String() == "true",
+
+		JSONSpecPrefixes:   fs.Lookup("jsonspec-prefixes").Value.String(),
+		JSONSpecBadgeURL:   fs.Lookup("jsonspec-badge-url").Value.String(),
+		JSONSpecBadgeLabel: fs.Lookup("jsonspec-badge-label").Value.String(),
+		JSONSpecSchemas:    fs.Lookup("jsonspec-schemas").Value.String(),
 	}
 }
 
@@ -513,6 +541,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		MermaidDarkTheme string
 		MermaidAutoTheme bool
 		FilePath         string
+		JSONSpec         template.JS
 	}{
 		Title:            title,
 		Content:          template.HTML(htmlContent),
@@ -533,6 +562,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		MermaidDarkTheme: mermaidDarkTheme,
 		MermaidAutoTheme: mermaidAutoTheme,
 		FilePath:         opts.FilePath,
+		JSONSpec:         jsonSpecBundleJSON(cfg),
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
