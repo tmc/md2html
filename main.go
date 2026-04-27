@@ -44,6 +44,15 @@ type Config struct {
 	VersionDefault    string
 	Search            bool
 
+	// Vet enables non-blocking mdvet checks. When true, [Run] reports
+	// any diagnostics it finds to the logger (or stderr) at warn level
+	// before continuing. Diagnostics never cause Run to fail.
+	Vet bool
+	// VetChecks is a comma-separated list of mdvet check names to run
+	// when Vet is true. Empty means run every check. Unknown names are
+	// logged and skipped — vet must never block rendering.
+	VetChecks string
+
 	// JSONSpecPrefixes is a comma-separated list of type-discriminator
 	// prefixes (for example "ascf/") that mark fenced JSON blocks for
 	// schema-badge enrichment. When empty, the jsonspec extension is a
@@ -90,6 +99,8 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.String("jsonspec-badge-url", "", "URL template for schema badges; %s is the discriminator suffix (e.g. 'schemas.html#%s')")
 	fs.String("jsonspec-badge-label", "", "label template for schema badges; %s is the discriminator suffix")
 	fs.String("jsonspec-schemas", "", "directory of *.schema.json files; loads a bundle used by client-side tooltips")
+	fs.Bool("vet", false, "run mdvet checks on source markdown and report diagnostics (does not block rendering)")
+	fs.String("vet-checks", "", "comma-separated mdvet check names to run with -vet (default: all)")
 	return fs
 }
 
@@ -120,6 +131,9 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		JSONSpecBadgeURL:   fs.Lookup("jsonspec-badge-url").Value.String(),
 		JSONSpecBadgeLabel: fs.Lookup("jsonspec-badge-label").Value.String(),
 		JSONSpecSchemas:    fs.Lookup("jsonspec-schemas").Value.String(),
+
+		Vet:       fs.Lookup("vet").Value.String() == "true",
+		VetChecks: fs.Lookup("vet-checks").Value.String(),
 	}
 }
 
@@ -144,6 +158,12 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		}
 		handler := slog.NewTextHandler(os.Stderr, opts)
 		logger = slog.New(handler)
+	}
+
+	// Run mdvet checks before any rendering. Diagnostics are reported
+	// to the logger but never cause Run to fail.
+	if cfg.Vet {
+		runVet(cfg, logger)
 	}
 
 	// TODO: clean up handling stdin and choosing between modes
