@@ -310,6 +310,15 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Fall back to serving the path as a static asset relative to the source root.
+		fullPath, joinErr := secureJoin(root, filepath.FromSlash(cleanPath))
+		if joinErr == nil {
+			if info, statErr := os.Stat(fullPath); statErr == nil && !info.IsDir() {
+				http.ServeFile(w, r, fullPath)
+				return
+			}
+		}
+
 		// File not found
 		http.Error(w, fmt.Sprintf("File not found: %s", filePath), http.StatusNotFound)
 		return

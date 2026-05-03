@@ -50,3 +50,22 @@ func TestHandleIndexRejectsTraversalPaths(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleIndexServesStaticAssets(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "clip.mp4"), []byte("video"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := newServer(Config{Source: dir}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	req := httptest.NewRequest(http.MethodGet, "/clip.mp4", nil)
+	rec := httptest.NewRecorder()
+	s.handleIndex(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if body := rec.Body.String(); body != "video" {
+		t.Fatalf("body = %q, want %q", body, "video")
+	}
+}
