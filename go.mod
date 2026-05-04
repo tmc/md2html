@@ -11,7 +11,6 @@ require (
 	github.com/yuin/goldmark-meta v1.1.0
 	go.abhg.dev/goldmark/toc v0.12.0
 	golang.org/x/tools v0.37.0
-	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	rsc.io/script v0.0.2
 )
@@ -19,4 +18,5 @@ require (
 require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	golang.org/x/sys v0.36.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
