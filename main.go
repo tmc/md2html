@@ -448,6 +448,8 @@ type RenderOptions struct {
 	SiteTitle string
 	Data      interface{} // from -data-json
 	FilePath  string      // source file path (for edit links)
+	Version   string      // currently rendered version, when versioning is enabled
+	Versions  []GitVersion
 }
 
 func firstFrontmatterString(frontmatter map[string]interface{}, keys ...string) string {
@@ -572,8 +574,8 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		LiveReload:       liveReload,
 		HTMLExt:          cfg.HTMLExt,
 		Frontmatter:      frontmatter,
-		Version:          "",
-		Versions:         nil,
+		Version:          opts.Version,
+		Versions:         opts.Versions,
 		Search:           cfg.Search,
 		Nav:              opts.Nav,
 		SiteTitle:        opts.SiteTitle,

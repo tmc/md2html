@@ -399,6 +399,8 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 		SiteTitle: s.config.Title,
 		Data:      s.jsonData,
 		FilePath:  filePath,
+		Version:   version,
+		Versions:  s.versions,
 	}
 	if s.nav != nil {
 		opts.Nav = s.nav.ForPage(filePath)
