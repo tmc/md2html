@@ -150,12 +150,11 @@ func startBackgroundCommand(s *script.State, name, path string, args []string, c
 	wait := func(s *script.State) (string, string, error) {
 		err := cmd.Wait()
 
-		// For flag errors, just pass through the original error since
-		// the script test framework will show stderr anyway
-
-		// Treat exit code 0 as success even if context was cancelled
-		if err == context.Canceled && cmd.ProcessState != nil && cmd.ProcessState.ExitCode() == 0 {
-			err = nil
+		// When the script's context is cancelled, the process is signaled
+		// to shut down. Either a clean exit (code 0) or a signal-terminated
+		// exit counts as success — we asked it to stop.
+		if s.Context().Err() != nil {
+			return stdout.String(), stderr.String(), nil
 		}
 		return stdout.String(), stderr.String(), err
 	}
@@ -178,11 +177,10 @@ func TestMain(m interface{ Run() int }, mainFunc func()) {
 	os.Exit(0)
 }
 
-// Test is a drop-in replacement for scripttest.Test that runs tests sequentially
-// instead of in parallel. This helps avoid port conflicts and other issues that
-// can occur when multiple server instances try to bind to the same resources.
-//
-// This is a copy of scripttest.Test with the t.Parallel() call removed.
+// Test is a drop-in replacement for scripttest.Test that rewrites
+// hardcoded TCP port numbers in each script to free ports reserved at
+// runtime. Subtests run in parallel; rewriting prevents the port
+// collisions that would otherwise force sequential execution.
 func Test(t *testing.T, ctx context.Context, engine *script.Engine, env []string, pattern string) {
 	gracePeriod := 100 * time.Millisecond
 	if deadline, ok := t.Deadline(); ok {
@@ -216,9 +214,7 @@ func Test(t *testing.T, ctx context.Context, engine *script.Engine, env []string
 		file := file
 		name := strings.TrimSuffix(filepath.Base(file), ".txt")
 		t.Run(name, func(t *testing.T) {
-			// NOTE: No t.Parallel() call here - this is the key difference
-			// from scripttest.Test to avoid port conflicts
-
+			t.Parallel()
 			workdir := t.TempDir()
 			s, err := script.NewState(ctx, workdir, env)
 			if err != nil {

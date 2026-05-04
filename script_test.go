@@ -28,9 +28,8 @@ func TestScripts(t *testing.T) {
 	if gcd := os.Getenv("GOCOVERDIR"); gcd != "" {
 		env = append(env, "GOCOVERDIR="+gcd)
 	}
-	// Use TestWithOptions which respects the -scripttest-sequential flag
-	scripttestutil.TestWithOptions(t, context.Background(), engine, env, "testdata/*.txt")
+	scripttestutil.Test(t, context.Background(), engine, env, "testdata/*.txt")
 	if *borderline {
-		scripttestutil.TestWithOptions(t, context.Background(), engine, env, "testdata/borderline/*.txt")
+		scripttestutil.Test(t, context.Background(), engine, env, "testdata/borderline/*.txt")
 	}
 }
