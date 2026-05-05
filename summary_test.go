@@ -1,6 +1,8 @@
 package md2html
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -248,4 +250,182 @@ func TestNilNavigation(t *testing.T) {
 	if ctx.Current != nil {
 		t.Error("Current should be nil for nil navigation")
 	}
+}
+
+func TestAutoNavigationLabelDerivation(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "frontmatter.md", "---\ntitle: Frontmatter Title\n---\n# H1 Title\n")
+	writeTestFile(t, dir, "heading.md", "# Heading Title\n")
+	writeTestFile(t, dir, "plain-file_name.md", "body\n")
+
+	nav, err := AutoNavigationFromDir(dir)
+	if err != nil {
+		t.Fatalf("AutoNavigationFromDir() error = %v", err)
+	}
+	got := titles(nav.Flat)
+	want := []string{"Frontmatter Title", "Heading Title", "Plain File Name"}
+	if !sameStrings(got, want) {
+		t.Fatalf("titles = %v, want %v", got, want)
+	}
+}
+
+func TestAutoNavigationFilenameLabels(t *testing.T) {
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"01-getting-started.md", "Getting Started"},
+		{"intro_to_X.md", "Intro To X"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeTestFile(t, dir, tt.name, "body\n")
+			nav, err := AutoNavigationFromDir(dir)
+			if err != nil {
+				t.Fatalf("AutoNavigationFromDir() error = %v", err)
+			}
+			if got := nav.Flat[0].Title; got != tt.want {
+				t.Fatalf("title = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAutoNavigationSortOrder(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{
+			name: "weight",
+			files: map[string]string{
+				"a.md": "---\ntitle: A\nweight: 20\n---\n",
+				"b.md": "---\ntitle: B\nweight: 10\n---\n",
+			},
+			want: []string{"B", "A"},
+		},
+		{
+			name: "sidebar position",
+			files: map[string]string{
+				"a.md": "---\ntitle: A\nsidebar_position: 2\n---\n",
+				"b.md": "---\ntitle: B\nsidebar_position: 1\n---\n",
+			},
+			want: []string{"B", "A"},
+		},
+		{
+			name: "numeric prefix",
+			files: map[string]string{
+				"02-setup.md": "body\n",
+				"01-intro.md": "body\n",
+			},
+			want: []string{"Intro", "Setup"},
+		},
+		{
+			name: "lexicographic",
+			files: map[string]string{
+				"b.md": "body\n",
+				"a.md": "body\n",
+			},
+			want: []string{"A", "B"},
+		},
+		{
+			name: "combined",
+			files: map[string]string{
+				"z.md":       "---\ntitle: Weight\nweight: 1\n---\n",
+				"a.md":       "---\ntitle: Sidebar\nsidebar_position: 1\n---\n",
+				"02-two.md":  "body\n",
+				"01-one.md":  "body\n",
+				"plain-a.md": "body\n",
+				"plain-b.md": "body\n",
+			},
+			want: []string{"Weight", "Sidebar", "One", "Two", "Plain A", "Plain B"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			for name, content := range tt.files {
+				writeTestFile(t, dir, name, content)
+			}
+			nav, err := AutoNavigationFromDir(dir)
+			if err != nil {
+				t.Fatalf("AutoNavigationFromDir() error = %v", err)
+			}
+			if got := titles(nav.Flat); !sameStrings(got, tt.want) {
+				t.Fatalf("titles = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAutoNavigationLandingPages(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "guide/README.md", "# Guide\n")
+	writeTestFile(t, dir, "guide/01-install.md", "# Install\n")
+
+	nav, err := AutoNavigationFromDir(dir)
+	if err != nil {
+		t.Fatalf("AutoNavigationFromDir() error = %v", err)
+	}
+	if len(nav.Items) != 1 || !nav.Items[0].IsGroup {
+		t.Fatalf("items = %#v, want one group", nav.Items)
+	}
+	if got := nav.Items[0].Title; got != "Guide" {
+		t.Fatalf("group title = %q, want Guide", got)
+	}
+	if _, ok := nav.ByPath["guide/README.md"]; ok {
+		t.Fatalf("landing page listed in navigation")
+	}
+	if got := titles(nav.Flat); !sameStrings(got, []string{"Install"}) {
+		t.Fatalf("flat titles = %v, want Install", got)
+	}
+}
+
+func TestAutoNavigationSkipsHiddenAndOutput(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "visible.md", "# Visible\n")
+	writeTestFile(t, dir, ".hidden.md", "# Hidden\n")
+	writeTestFile(t, dir, ".private/page.md", "# Private\n")
+	writeTestFile(t, dir, "output/page.md", "# Output\n")
+
+	nav, err := AutoNavigationFromDir(dir)
+	if err != nil {
+		t.Fatalf("AutoNavigationFromDir() error = %v", err)
+	}
+	if got := titles(nav.Flat); !sameStrings(got, []string{"Visible"}) {
+		t.Fatalf("titles = %v, want Visible", got)
+	}
+}
+
+func writeTestFile(t *testing.T, root, name, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func titles(items []*NavItem) []string {
+	var out []string
+	for _, item := range items {
+		out = append(out, item.Title)
+	}
+	return out
+}
+
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

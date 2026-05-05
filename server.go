@@ -57,7 +57,7 @@ func newServer(cfg Config, logger *slog.Logger) *server {
 		}
 	}
 
-	// Load navigation from SUMMARY.md if present
+	// Load navigation from SUMMARY.md or build it from the markdown tree.
 	{
 		root, err := sourceRoot(cfg.Source)
 		if err == nil {
@@ -65,9 +65,12 @@ func newServer(cfg Config, logger *slog.Logger) *server {
 			if cfg.HTMLExt != "" {
 				htmlExt = "." + cfg.HTMLExt
 			}
-			if nav := LoadNavigationFromDir(root, htmlExt); nav != nil {
+			nav, err := LoadNavigationOrAutoFromDir(root, htmlExt)
+			if err != nil {
+				logger.Error("Error loading navigation", "error", err)
+			} else if nav != nil && len(nav.Items) > 0 {
 				s.nav = nav
-				logger.Info("Loaded navigation from SUMMARY.md", "pages", len(nav.Flat))
+				logger.Info("Loaded navigation", "pages", len(nav.Flat))
 			}
 		}
 	}

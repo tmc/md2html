@@ -1,10 +1,15 @@
 package md2html
 
 import (
+	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
+	"unicode"
 )
 
 // NavItem represents a single navigation entry from SUMMARY.md.
@@ -290,4 +295,294 @@ func LoadNavigationFromDir(dir, htmlExt string) *Navigation {
 		return nil
 	}
 	return nav
+}
+
+// AutoNavigationFromDir builds navigation from markdown files when no
+// SUMMARY.md is available.
+func AutoNavigationFromDir(sourceDir string) (*Navigation, error) {
+	return autoNavigationFromDir(sourceDir, "")
+}
+
+// LoadNavigationOrAutoFromDir loads SUMMARY.md when present, otherwise builds
+// navigation from the markdown tree.
+func LoadNavigationOrAutoFromDir(sourceDir, htmlExt string) (*Navigation, error) {
+	if nav := LoadNavigationFromDir(sourceDir, htmlExt); nav != nil && len(nav.Items) > 0 {
+		return nav, nil
+	}
+	return autoNavigationFromDir(sourceDir, htmlExt)
+}
+
+type autoNavFile struct {
+	relPath         string
+	dir             string
+	base            string
+	title           string
+	weight          int
+	hasWeight       bool
+	sidebarPosition int
+	hasSidebar      bool
+	prefix          int
+	hasPrefix       bool
+	isLanding       bool
+}
+
+func autoNavigationFromDir(sourceDir, htmlExt string) (*Navigation, error) {
+	var files []autoNavFile
+	err := filepath.WalkDir(sourceDir, func(name string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if name == sourceDir {
+			return nil
+		}
+		base := entry.Name()
+		if strings.HasPrefix(base, ".") {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.IsDir() {
+			if base == "output" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		ext := strings.ToLower(filepath.Ext(base))
+		if ext != ".md" && ext != ".markdown" {
+			return nil
+		}
+		rel, err := filepath.Rel(sourceDir, name)
+		if err != nil {
+			return fmt.Errorf("resolve path: %w", err)
+		}
+		if strings.EqualFold(filepath.ToSlash(rel), "SUMMARY.md") {
+			return nil
+		}
+		f, err := readAutoNavFile(name, filepath.ToSlash(rel))
+		if err != nil {
+			return err
+		}
+		files = append(files, f)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	nav := &Navigation{ByPath: make(map[string]*NavItem)}
+	nav.Items = buildAutoNavItems(files, htmlExt)
+	nav.buildIndexes()
+	return nav, nil
+}
+
+func readAutoNavFile(name, rel string) (autoNavFile, error) {
+	data, err := os.ReadFile(name)
+	if err != nil {
+		return autoNavFile{}, fmt.Errorf("read markdown: %w", err)
+	}
+	doc, err := parseFrontmatter(string(data))
+	if err != nil {
+		doc = DocumentData{Content: string(data), Frontmatter: map[string]interface{}{}}
+	}
+	base := path.Base(rel)
+	stem := strings.TrimSuffix(base, path.Ext(base))
+	prefix, hasPrefix, cleanStem := splitNumericPrefix(stem)
+	return autoNavFile{
+		relPath:         rel,
+		dir:             path.Dir(rel),
+		base:            base,
+		title:           autoNavTitle(cleanStem, doc),
+		weight:          frontmatterInt(doc.Frontmatter, "weight"),
+		hasWeight:       hasFrontmatterInt(doc.Frontmatter, "weight"),
+		sidebarPosition: frontmatterInt(doc.Frontmatter, "sidebar_position"),
+		hasSidebar:      hasFrontmatterInt(doc.Frontmatter, "sidebar_position"),
+		prefix:          prefix,
+		hasPrefix:       hasPrefix,
+		isLanding:       isLandingFile(base),
+	}, nil
+}
+
+func buildAutoNavItems(files []autoNavFile, htmlExt string) []*NavItem {
+	byDir := make(map[string][]autoNavFile)
+	landing := make(map[string]autoNavFile)
+	for _, f := range files {
+		if f.dir == "." {
+			f.dir = ""
+		}
+		if f.isLanding {
+			if old, ok := landing[f.dir]; !ok || landingLess(f, old) {
+				landing[f.dir] = f
+			}
+			continue
+		}
+		byDir[f.dir] = append(byDir[f.dir], f)
+	}
+
+	var dirs []string
+	for dir := range byDir {
+		dirs = append(dirs, dir)
+	}
+	sort.Strings(dirs)
+
+	var root []autoNavFile
+	var items []*NavItem
+	for _, dir := range dirs {
+		if dir == "" {
+			root = byDir[dir]
+			continue
+		}
+		pages := byDir[dir]
+		sortAutoNavFiles(pages)
+		group := &NavItem{Title: autoNavGroupTitle(dir, landing), IsGroup: true, Level: 0}
+		for _, f := range pages {
+			group.Children = append(group.Children, autoNavItem(f, htmlExt, 1))
+		}
+		items = append(items, group)
+	}
+	sortAutoNavItems(items)
+	sortAutoNavFiles(root)
+	for _, f := range root {
+		items = append(items, autoNavItem(f, htmlExt, 0))
+	}
+	return items
+}
+
+func autoNavItem(f autoNavFile, htmlExt string, level int) *NavItem {
+	return &NavItem{
+		Title: f.title,
+		Path:  f.relPath,
+		URL:   pathToURL(f.relPath, htmlExt),
+		Level: level,
+	}
+}
+
+func autoNavTitle(stem string, doc DocumentData) string {
+	if s := firstFrontmatterString(doc.Frontmatter, "title"); s != "" {
+		return s
+	}
+	if h := firstHeading(doc.Content); h != "" {
+		return h
+	}
+	return titleWords(stem)
+}
+
+func autoNavGroupTitle(dir string, landing map[string]autoNavFile) string {
+	if f, ok := landing[dir]; ok && f.title != "" {
+		return f.title
+	}
+	return titleWords(path.Base(dir))
+}
+
+func sortAutoNavFiles(files []autoNavFile) {
+	sort.Slice(files, func(i, j int) bool {
+		return autoNavLess(files[i], files[j])
+	})
+}
+
+func sortAutoNavItems(items []*NavItem) {
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Title < items[j].Title
+	})
+}
+
+func autoNavLess(a, b autoNavFile) bool {
+	if a.hasWeight != b.hasWeight {
+		return a.hasWeight
+	}
+	if a.hasWeight && a.weight != b.weight {
+		return a.weight < b.weight
+	}
+	if a.hasSidebar != b.hasSidebar {
+		return a.hasSidebar
+	}
+	if a.hasSidebar && a.sidebarPosition != b.sidebarPosition {
+		return a.sidebarPosition < b.sidebarPosition
+	}
+	if a.hasPrefix != b.hasPrefix {
+		return a.hasPrefix
+	}
+	if a.hasPrefix && a.prefix != b.prefix {
+		return a.prefix < b.prefix
+	}
+	return a.relPath < b.relPath
+}
+
+func landingLess(a, b autoNavFile) bool {
+	ra := landingRank(a.base)
+	rb := landingRank(b.base)
+	if ra != rb {
+		return ra < rb
+	}
+	return a.relPath < b.relPath
+}
+
+func landingRank(base string) int {
+	switch strings.ToLower(base) {
+	case "index.md", "index.markdown":
+		return 0
+	case "readme.md", "readme.markdown":
+		return 1
+	}
+	return 2
+}
+
+func isLandingFile(base string) bool {
+	return landingRank(base) < 2
+}
+
+func splitNumericPrefix(stem string) (int, bool, string) {
+	i := 0
+	for i < len(stem) && stem[i] >= '0' && stem[i] <= '9' {
+		i++
+	}
+	if i == 0 || i == len(stem) || (stem[i] != '-' && stem[i] != '_') {
+		return 0, false, stem
+	}
+	n, err := strconv.Atoi(stem[:i])
+	if err != nil {
+		return 0, false, stem
+	}
+	return n, true, stem[i+1:]
+}
+
+func titleWords(s string) string {
+	fields := strings.FieldsFunc(s, func(r rune) bool {
+		return r == '-' || r == '_' || unicode.IsSpace(r)
+	})
+	for i, f := range fields {
+		if f == "" {
+			continue
+		}
+		r := []rune(strings.ToLower(f))
+		r[0] = unicode.ToUpper(r[0])
+		fields[i] = string(r)
+	}
+	return strings.Join(fields, " ")
+}
+
+func hasFrontmatterInt(frontmatter map[string]interface{}, key string) bool {
+	_, ok := frontmatterIntValue(frontmatter, key)
+	return ok
+}
+
+func frontmatterInt(frontmatter map[string]interface{}, key string) int {
+	n, _ := frontmatterIntValue(frontmatter, key)
+	return n
+}
+
+func frontmatterIntValue(frontmatter map[string]interface{}, key string) (int, bool) {
+	switch v := frontmatter[key].(type) {
+	case int:
+		return v, true
+	case int64:
+		return int(v), true
+	case float64:
+		return int(v), true
+	case string:
+		n, err := strconv.Atoi(strings.TrimSpace(v))
+		return n, err == nil
+	default:
+		return 0, false
+	}
 }

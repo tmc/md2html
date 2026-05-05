@@ -649,14 +649,16 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 
 	logger.Info("Found markdown files to process", "count", len(files))
 
-	// Load navigation from SUMMARY.md if present
+	// Load navigation from SUMMARY.md or build it from the markdown tree.
 	htmlExt := ""
 	if cfg.HTMLExt != "" {
 		htmlExt = "." + cfg.HTMLExt
 	}
-	nav := LoadNavigationFromDir(sourceDir, htmlExt)
-	if nav != nil {
-		logger.Info("Loaded navigation from SUMMARY.md", "pages", len(nav.Flat))
+	nav, err := LoadNavigationOrAutoFromDir(sourceDir, htmlExt)
+	if err != nil {
+		logger.Error("Error loading navigation", "error", err)
+	} else if nav != nil && len(nav.Items) > 0 {
+		logger.Info("Loaded navigation", "pages", len(nav.Flat))
 	}
 
 	// Process each markdown file

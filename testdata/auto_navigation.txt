@@ -1,0 +1,36 @@
+# Test static docs layout with auto navigation and no SUMMARY.md.
+
+md2html -html out -html-ext html src
+
+exists out/index.html
+exists out/guide/README.html
+exists out/guide/install.html
+exists out/reference.html
+
+grep '<aside class="sidebar">' out/reference.html
+grep '<li class="nav-group">Guide</li>' out/reference.html
+grep 'href="guide/install.html"' out/reference.html
+grep 'Reference' out/reference.html
+
+-- src/index.md --
+# Home
+
+Root landing page.
+
+-- src/guide/README.md --
+# Guide
+
+Guide landing page.
+
+-- src/guide/install.md --
+---
+sidebar_position: 1
+---
+# Install
+
+Install instructions.
+
+-- src/reference.md --
+# Reference
+
+Reference page.
