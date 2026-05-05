@@ -44,6 +44,7 @@ type Config struct {
 	VersionDefault    string
 	Search            bool
 	LLMS              bool
+	SiteURL           string
 
 	// Vet enables non-blocking mdvet checks. When true, [Run] reports
 	// any diagnostics it finds to the logger (or stderr) at warn level
@@ -97,6 +98,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.String("version-default", "", "default version to show (empty = current/latest)")
 	fs.Bool("search", false, "enable client-side search")
 	fs.Bool("llms", false, "emit llms.txt, llms-full.txt, and raw markdown links in static output")
+	fs.String("site-url", "", "canonical base URL for generated pages")
 	fs.String("jsonspec-prefixes", "", "comma-separated JSON type-discriminator prefixes to enrich (e.g. 'ascf/')")
 	fs.String("jsonspec-badge-url", "", "URL template for schema badges; %s is the discriminator suffix (e.g. 'schemas.html#%s')")
 	fs.String("jsonspec-badge-label", "", "label template for schema badges; %s is the discriminator suffix")
@@ -129,6 +131,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		VersionDefault:    fs.Lookup("version-default").Value.String(),
 		Search:            fs.Lookup("search").Value.String() == "true",
 		LLMS:              fs.Lookup("llms").Value.String() == "true",
+		SiteURL:           fs.Lookup("site-url").Value.String(),
 
 		JSONSpecPrefixes:   fs.Lookup("jsonspec-prefixes").Value.String(),
 		JSONSpecBadgeURL:   fs.Lookup("jsonspec-badge-url").Value.String(),
@@ -386,7 +389,11 @@ func renderDocument(cfg Config, doc DocumentData, title, customCSS, filePath str
 	}
 
 	html := markdownToHTMLWithContext(cfg, content, filePath)
-	return renderTemplate(cfg, html, title, customCSS, true, doc.Frontmatter)
+	opts := RenderOptions{
+		FilePath:    filePath,
+		Description: llmsSummary(doc),
+	}
+	return renderTemplateWithOptions(cfg, html, title, customCSS, true, doc.Frontmatter, opts)
 }
 
 func loadAllTemplates(cfg Config) (*template.Template, error) {
@@ -447,13 +454,14 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 
 // RenderOptions contains optional parameters for rendering.
 type RenderOptions struct {
-	Nav       *NavContext
-	SiteTitle string
-	Data      interface{} // from -data-json
-	FilePath  string      // source file path (for edit links)
-	Version   string      // currently rendered version, when versioning is enabled
-	Versions  []GitVersion
-	RawMDURL  string
+	Nav         *NavContext
+	SiteTitle   string
+	Data        interface{} // from -data-json
+	FilePath    string      // source file path (for edit links)
+	Version     string      // currently rendered version, when versioning is enabled
+	Versions    []GitVersion
+	RawMDURL    string
+	Description string
 }
 
 func firstFrontmatterString(frontmatter map[string]interface{}, keys ...string) string {
@@ -546,6 +554,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 
 	var buf bytes.Buffer
 	mermaidTheme, mermaidDarkTheme, mermaidAutoTheme := resolveMermaidThemes(frontmatter)
+	meta := pageMetadata(cfg, title, frontmatter, opts)
 
 	data := struct {
 		Title            string
@@ -569,6 +578,10 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		FilePath         string
 		AssetBase        string
 		RawMDURL         string
+		Description      string
+		CanonicalURL     string
+		OpenGraphImage   string
+		LastUpdated      string
 		JSONSpec         template.JS
 	}{
 		Title:            title,
@@ -592,6 +605,10 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		FilePath:         opts.FilePath,
 		AssetBase:        assetBase(opts.FilePath),
 		RawMDURL:         opts.RawMDURL,
+		Description:      meta.Description,
+		CanonicalURL:     meta.CanonicalURL,
+		OpenGraphImage:   meta.OpenGraphImage,
+		LastUpdated:      meta.LastUpdated,
 		JSONSpec:         jsonSpecBundleJSON(cfg),
 	}
 
@@ -600,6 +617,37 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		return fmt.Sprintf("<p>Template execution error: %v</p>", err)
 	}
 	return buf.String()
+}
+
+type renderMetadata struct {
+	Description    string
+	CanonicalURL   string
+	OpenGraphImage string
+	LastUpdated    string
+}
+
+func pageMetadata(cfg Config, title string, frontmatter map[string]interface{}, opts RenderOptions) renderMetadata {
+	desc := firstFrontmatterString(frontmatter, "description")
+	if desc == "" {
+		desc = opts.Description
+	}
+	meta := renderMetadata{
+		Description:    desc,
+		OpenGraphImage: firstFrontmatterString(frontmatter, "og_image", "image"),
+	}
+	if cfg.SiteURL != "" && opts.FilePath != "" {
+		meta.CanonicalURL = joinSiteURL(cfg.SiteURL, renderedPathForSource(opts.FilePath, cfg.HTMLExt, cfg.Index))
+	}
+	return meta
+}
+
+func joinSiteURL(base, pagePath string) string {
+	base = strings.TrimRight(strings.TrimSpace(base), "/")
+	pagePath = strings.TrimLeft(filepath.ToSlash(pagePath), "/")
+	if base == "" || pagePath == "" {
+		return base
+	}
+	return base + "/" + pagePath
 }
 
 func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) error {
@@ -768,6 +816,7 @@ func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssCon
 	}
 
 	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, file.RelPath)
+	opts.Description = llmsSummary(doc)
 
 	baseName := strings.TrimSuffix(file.RelPath, filepath.Ext(file.RelPath))
 	outputPath := baseName
@@ -844,8 +893,10 @@ func processMarkdownFileWithNav(file markdownFile, sourceDir, outputDir, cssCont
 	}
 
 	opts := RenderOptions{
-		Nav:       navCtx,
-		SiteTitle: cfg.Title,
+		Nav:         navCtx,
+		SiteTitle:   cfg.Title,
+		FilePath:    file.RelPath,
+		Description: llmsSummary(doc),
 	}
 
 	finalHTML := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
@@ -871,6 +922,7 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 		htmlPath = filepath.Base(indexPath)
 	}
 	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, htmlPath)
+	opts.Description = llmsSummary(doc)
 
 	title := cfg.Title
 	if docTitle, ok := doc.Frontmatter["title"].(string); ok && docTitle != "" {

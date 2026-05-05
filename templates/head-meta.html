@@ -1,0 +1,8 @@
+{{define "head-meta"}}
+{{if .Description}}<meta name="description" content="{{.Description}}">{{end}}
+{{if .CanonicalURL}}<link rel="canonical" href="{{.CanonicalURL}}">{{end}}
+{{if .Title}}<meta property="og:title" content="{{.Title}}">{{end}}
+{{if .Description}}<meta property="og:description" content="{{.Description}}">{{end}}
+{{if .OpenGraphImage}}<meta property="og:image" content="{{.OpenGraphImage}}">{{end}}
+{{if .CanonicalURL}}<meta property="og:url" content="{{.CanonicalURL}}">{{end}}
+{{end}}

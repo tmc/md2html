@@ -1,0 +1,55 @@
+package md2html
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestRenderTemplateMetadata(t *testing.T) {
+	cfg := Config{
+		SiteURL: "https://example.com/docs/",
+		HTMLExt: "html",
+	}
+	frontmatter := map[string]interface{}{
+		"description": "A useful page summary.",
+		"og_image":    "https://example.com/og.png",
+	}
+	opts := RenderOptions{FilePath: "guide/intro.md"}
+
+	got := renderTemplateWithOptions(cfg, "<p>body</p>", "Intro", "", false, frontmatter, opts)
+	for _, want := range []string{
+		`<meta name="description" content="A useful page summary.">`,
+		`<link rel="canonical" href="https://example.com/docs/guide/intro.html">`,
+		`<meta property="og:title" content="Intro">`,
+		`<meta property="og:description" content="A useful page summary.">`,
+		`<meta property="og:image" content="https://example.com/og.png">`,
+		`<meta property="og:url" content="https://example.com/docs/guide/intro.html">`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("rendered metadata missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderTemplateMetadataFallbackAndAbsence(t *testing.T) {
+	cfg := Config{HTMLExt: "html"}
+	opts := RenderOptions{
+		FilePath:    "guide/intro.md",
+		Description: "First paragraph summary.",
+	}
+
+	got := renderTemplateWithOptions(cfg, "<p>body</p>", "Intro", "", false, nil, opts)
+	if !strings.Contains(got, `<meta name="description" content="First paragraph summary.">`) {
+		t.Fatalf("rendered metadata missing description fallback:\n%s", got)
+	}
+	for _, not := range []string{
+		`rel="canonical"`,
+		`property="og:image"`,
+		`property="og:url"`,
+		`content=""`,
+	} {
+		if strings.Contains(got, not) {
+			t.Fatalf("rendered metadata unexpectedly contains %q in:\n%s", not, got)
+		}
+	}
+}

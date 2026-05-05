@@ -399,11 +399,12 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 	html := markdownToHTMLWithContext(s.config, content, filePath)
 
 	opts := RenderOptions{
-		SiteTitle: s.config.Title,
-		Data:      s.jsonData,
-		FilePath:  filePath,
-		Version:   version,
-		Versions:  s.versions,
+		SiteTitle:   s.config.Title,
+		Data:        s.jsonData,
+		FilePath:    filePath,
+		Version:     version,
+		Versions:    s.versions,
+		Description: llmsSummary(doc),
 	}
 	if s.nav != nil {
 		opts.Nav = s.nav.ForPage(filePath)
