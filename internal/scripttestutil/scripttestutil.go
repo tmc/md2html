@@ -24,6 +24,63 @@ import (
 
 var scriptPortPattern = regexp.MustCompile(`(localhost:|127\.0\.0\.1:|:)([1-9]\d{3,4})\b`)
 
+// WaitPortCmd returns a script command that waits until a TCP port accepts
+// connections.
+func WaitPortCmd() script.Cmd {
+	return script.Command(
+		script.CmdUsage{
+			Summary: "wait for a TCP port to accept connections",
+			Args:    "addr [timeout]",
+		},
+		func(s *script.State, args ...string) (script.WaitFunc, error) {
+			if len(args) != 1 && len(args) != 2 {
+				return nil, fmt.Errorf("usage: wait-port addr [timeout]")
+			}
+
+			timeout := 5 * time.Second
+			if len(args) == 2 {
+				d, err := time.ParseDuration(args[1])
+				if err != nil {
+					return nil, err
+				}
+				timeout = d
+			}
+			return nil, waitPort(s.Context(), args[0], timeout)
+		},
+	)
+}
+
+func waitPort(ctx context.Context, addr string, timeout time.Duration) error {
+	if strings.HasPrefix(addr, ":") {
+		addr = "localhost" + addr
+	} else if !strings.Contains(addr, ":") {
+		addr = "localhost:" + addr
+	}
+
+	start := time.Now()
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+
+	tick := time.NewTicker(50 * time.Millisecond)
+	defer tick.Stop()
+
+	for {
+		conn, err := net.DialTimeout("tcp", addr, 100*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			return fmt.Errorf("wait-port %s: no connection after %v", addr, time.Since(start).Round(time.Millisecond))
+		case <-tick.C:
+		}
+	}
+}
+
 // BackgroundCmd returns a command that runs prog in the background
 // with graceful shutdown support via SIGTERM instead of SIGKILL.
 //

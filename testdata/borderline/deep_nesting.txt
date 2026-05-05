@@ -49,7 +49,7 @@ EOF
 
 # Start server
 md2html -http :9003 &
-sleep 1s
+wait-port :9003
 
 # Test all heading levels are rendered
 curl -s http://localhost:9003/ | grep '<h1'

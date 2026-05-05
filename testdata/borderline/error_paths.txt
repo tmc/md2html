@@ -26,7 +26,7 @@ sleep 200ms
 
 # Test frontmatter parsing error
 md2html -http :9028 &
-sleep 1s
+wait-port :9028
 curl -s http://localhost:9028/
 stdout '<!DOCTYPE html>'
 

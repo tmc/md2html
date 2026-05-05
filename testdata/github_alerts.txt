@@ -2,7 +2,7 @@
 
 # Start server with the alerts file
 md2html -http :8093 alerts.md &
-sleep 1s
+wait-port :8093
 
 # Test alerts are rendered with proper CSS classes
 curl -s http://localhost:8093/

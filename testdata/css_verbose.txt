@@ -2,7 +2,7 @@
 
 # Start server with custom CSS file and verbose mode
 md2html -css custom.css -v -http :9011 doc.md &
-sleep 1s
+wait-port :9011
 
 # Custom CSS should be included in the output
 curl -s http://localhost:9011/

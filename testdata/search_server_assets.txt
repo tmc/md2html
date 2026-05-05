@@ -1,7 +1,7 @@
 # Test server search keeps stable asset URLs.
 
 md2html -search -http :8394 src &
-sleep 1s
+wait-port :8394
 
 curl -s http://localhost:8394/README.md
 stdout 'src="./js/minisearch.min.js"'

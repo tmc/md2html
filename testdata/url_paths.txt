@@ -2,7 +2,7 @@
 
 # Start server with multiple markdown files
 md2html -http :9016 &
-sleep 1s
+wait-port :9016
 
 # Test accessing files with .md extension in URL
 curl -s http://localhost:9016/readme.md

@@ -2,7 +2,7 @@
 
 # Start server with a markdown file
 md2html -http :9020 &
-sleep 1s
+wait-port :9020
 
 # Test that SSE endpoint responds with correct headers
 curl -s -I http://localhost:9020/events

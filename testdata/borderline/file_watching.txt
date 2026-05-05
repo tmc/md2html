@@ -2,7 +2,7 @@
 
 # Start server with file watching
 md2html -v -http :9029 &
-sleep 1s
+wait-port :9029
 
 # Initial content check
 curl -s http://localhost:9029/
@@ -19,7 +19,7 @@ stdout 'Modified Content'
 
 # Test CSS file watching
 md2html -css watch.css -v -http :9030 &
-sleep 1s
+wait-port :9030
 
 # Verify CSS is loaded
 curl -s http://localhost:9030/
@@ -31,7 +31,7 @@ sleep 2s
 
 # Test directory watching for new files
 md2html -v -http :9031 &
-sleep 1s
+wait-port :9031
 
 # Create new markdown file in directory
 echo '# New File' > new_file.md

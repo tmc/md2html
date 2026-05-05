@@ -7,7 +7,7 @@ cd testdir
 md2html -http :8092 &
 
 # Wait for server
-sleep 1s
+wait-port :8092
 
 # Test directory listing appears
 curl -s http://localhost:8092/

@@ -2,7 +2,7 @@
 
 # Start server with markdown containing HTML blocks
 md2html -http :9009 html_test.md &
-sleep 1s
+wait-port :9009
 
 # Verify HTML blocks are NOT rendered without -allow-unsafe (security default)
 curl -s http://localhost:9009/
@@ -12,7 +12,7 @@ curl -s http://localhost:9009/
 
 # Test with unsafe HTML allowed
 md2html -allow-unsafe -http :9010 html_test.md &
-sleep 1s
+wait-port :9010
 
 # Should render HTML blocks when unsafe is allowed
 curl -s http://localhost:9010/

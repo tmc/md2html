@@ -1,7 +1,7 @@
 # Test the /_jsonspec/schemas.json server endpoint returns the loaded bundle.
 
 md2html -http :8182 -jsonspec-prefixes ascf/ -jsonspec-schemas schema doc.md &
-sleep 1s
+wait-port :8182
 
 # Bundle is served as application/json.
 curl -s -H 'Accept: application/json' http://localhost:8182/_jsonspec/schemas.json
@@ -12,7 +12,7 @@ stdout '"local_search"'
 # Without -jsonspec-schemas the endpoint 404s. Start a second server
 # on a different port.
 md2html -http :8183 doc.md &
-sleep 1s
+wait-port :8183
 curl -s -w '%{http_code}' http://localhost:8183/_jsonspec/schemas.json
 stdout '404'
 

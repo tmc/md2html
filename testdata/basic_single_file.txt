@@ -1,7 +1,7 @@
 # Test single markdown file rendering
 
 md2html -http :9080 test.md &
-sleep 1s
+wait-port :9080
 
 curl -s http://localhost:9080/
 stdout '<!DOCTYPE html>'

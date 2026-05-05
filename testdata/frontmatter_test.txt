@@ -2,7 +2,7 @@
 
 # Start server normally (frontmatter should be stripped)
 md2html -http :8195 frontmatter.md &
-sleep 1s
+wait-port :8195
 
 # Test that frontmatter is not visible in output by default
 curl -s http://localhost:8195/
@@ -15,7 +15,7 @@ stdout 'Content After Frontmatter'
 
 # Now test with -render-frontmatter flag
 md2html -render-frontmatter -http :8296 frontmatter.md &
-sleep 1s
+wait-port :8296
 
 # Test that frontmatter IS visible with flag (rendered as YAML code block)
 curl -s http://localhost:8296/

@@ -2,7 +2,7 @@
 
 # Test with malformed template directory structure
 md2html -templates bad-templates -http :9039 &
-sleep 1s
+wait-port :9039
 
 # Should fall back to embedded templates
 curl -s http://localhost:9039/
@@ -10,7 +10,7 @@ stdout '<!DOCTYPE html>'
 
 # Test with data JSON in templates
 md2html -data-json data.json -templates data-templates -http :9040 &
-sleep 1s
+wait-port :9040
 
 # Verify JSON data is accessible in template
 curl -s http://localhost:9040/
@@ -18,7 +18,7 @@ stdout 'Test Value'
 
 # Test template with various names
 md2html -templates named-templates -http :9041 &
-sleep 1s
+wait-port :9041
 
 curl -s http://localhost:9041/
 stdout 'Custom Layout Template'

@@ -2,7 +2,7 @@
 
 # Start server with custom templates directory
 md2html -templates my-templates -http :9004 &
-sleep 1s
+wait-port :9004
 
 # Verify custom template is being used
 curl -s http://localhost:9004/
@@ -10,7 +10,7 @@ stdout 'Custom Template Loaded'
 
 # Test with non-existent template directory (should fall back to embedded)
 md2html -templates nonexistent-dir -http :9005 &
-sleep 1s
+wait-port :9005
 
 # Should still work with embedded templates
 curl -s http://localhost:9005/

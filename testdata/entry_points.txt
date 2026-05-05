@@ -9,7 +9,7 @@ stderr 'Usage of'
 
 # Test running with input file
 md2html -http :9017 entry_test.md &
-sleep 1s
+wait-port :9017
 
 # Verify server started
 curl -s -o /dev/null -w '%{http_code}' http://localhost:9017/

@@ -1,7 +1,7 @@
 # Test basic HTTP server functionality
 
 md2html -v -http :9081 simple.md &
-sleep 1s
+wait-port :9081
 
 # Test basic content
 # curl -s http://localhost:9081/

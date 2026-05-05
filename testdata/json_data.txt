@@ -2,7 +2,7 @@
 
 # Start server with JSON data file
 md2html -data-json test_data.json -http :9001 test_json.md &
-sleep 1s
+wait-port :9001
 
 # Verify server started and JSON is loaded
 curl -s http://localhost:9001/

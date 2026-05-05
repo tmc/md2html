@@ -2,7 +2,7 @@
 
 # Start server with index file specified
 md2html -index README.md -http :9006 &
-sleep 1s
+wait-port :9006
 
 # Root should serve the index file
 curl -s http://localhost:9006/
@@ -10,7 +10,7 @@ stdout 'Project README'
 
 # Test with non-existent index file (should fall back to directory listing)
 md2html -index nonexistent.md -http :9007 &
-sleep 1s
+wait-port :9007
 
 # Should show directory listing when index doesn't exist
 curl -s http://localhost:9007/
@@ -18,7 +18,7 @@ stdout '<!DOCTYPE html>'
 
 # Test directory with multiple markdown files
 md2html -index index.md -http :9008 &
-sleep 1s
+wait-port :9008
 
 # Should serve index.md for root
 curl -s http://localhost:9008/

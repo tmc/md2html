@@ -2,7 +2,7 @@
 
 # Test with various HTML blocks (should be sanitized by default)
 md2html -http :9021 complex_html.md &
-sleep 1s
+wait-port :9021
 
 # Verify HTML blocks are sanitized (security default)
 curl -s http://localhost:9021/
@@ -12,7 +12,7 @@ stdout '<!-- raw HTML omitted -->'
 
 # Test with allow-unsafe flag for all HTML blocks
 md2html -allow-unsafe -http :9022 complex_html.md &
-sleep 1s
+wait-port :9022
 
 curl -s http://localhost:9022/
 stdout '<div class="container">'

@@ -2,7 +2,7 @@
 
 # Test with different depth settings
 md2html -depth 2 -v -http :9032 &
-sleep 1s
+wait-port :9032
 
 # Check that shallow files are found
 curl -s http://localhost:9032/
@@ -10,7 +10,7 @@ stdout 'level1.md'
 
 # Test deeper depth
 md2html -depth 4 -v -http :9033 &
-sleep 1s
+wait-port :9033
 
 # Check that deeper files are found
 curl -s http://localhost:9033/

@@ -17,6 +17,7 @@ func TestScripts(t *testing.T) {
 	engine := script.NewEngine()
 	engine.Cmds["md2html"] = scripttestutil.BackgroundCmd(exe, nil, 0)
 	engine.Cmds["curl"] = script.Program("curl", nil, 0)
+	engine.Cmds["wait-port"] = scripttestutil.WaitPortCmd()
 	// remove Exec:
 	delete(engine.Cmds, "exec")
 

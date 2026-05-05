@@ -1,8 +1,11 @@
 package scripttestutil
 
 import (
+	"context"
+	"net"
 	"regexp"
 	"testing"
+	"time"
 )
 
 func TestRewriteScriptPorts(t *testing.T) {
@@ -90,5 +93,18 @@ func TestRewriteScriptPortsRange(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestWaitPort(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	err = waitPort(context.Background(), ln.Addr().String(), time.Second)
+	if err != nil {
+		t.Fatalf("waitPort() error = %v", err)
 	}
 }

@@ -5,7 +5,7 @@ mkdir custom-templates
 
 # Start server with custom templates
 md2html -templates custom-templates -http :8294 template_test.md &
-sleep 1s
+wait-port :8294
 
 # Check custom styles are applied
 curl -s http://localhost:8294/

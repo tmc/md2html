@@ -2,7 +2,7 @@
 
 # Start server with live reload
 md2html -http :9003 live.md &
-sleep 1s
+wait-port :9003
 
 # Test raw markdown endpoint
 curl -s http://localhost:9003/

@@ -2,7 +2,7 @@
 
 # Start server
 md2html -http :8097 code.md &
-sleep 1s
+wait-port :8097
 
 # Test that Chroma CSS is included
 curl -s http://localhost:8097/

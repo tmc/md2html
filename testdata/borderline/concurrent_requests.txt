@@ -5,7 +5,7 @@ echo '# Concurrent Test' > concurrent.md
 
 # Start server
 md2html -http :9002 &
-sleep 1s
+wait-port :9002
 
 # Send 50 concurrent requests
 sh -c 'for i in $(seq 1 50); do curl -s -o /dev/null -w "%{http_code}\n" http://localhost:9002/ & done; wait' | grep -c 200
