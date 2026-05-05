@@ -19,6 +19,8 @@ sleep 1s
 
 # Test that frontmatter IS visible with flag (rendered as YAML code block)
 curl -s http://localhost:8296/
+stdout 'class="frontmatter"'
+stdout 'class="language-yaml"'
 stdout 'Test Author'
 
 # Clean up background process

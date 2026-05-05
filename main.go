@@ -18,8 +18,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
@@ -384,14 +382,10 @@ func openBrowser(url string) bool {
 }
 
 func renderDocument(cfg Config, doc DocumentData, title, customCSS, filePath string) string {
-	content := doc.Content
-	if cfg.RenderFrontmatter && len(doc.Frontmatter) > 0 {
-		if frontmatterYAML, err := yaml.Marshal(doc.Frontmatter); err == nil {
-			content = "```yaml\n" + string(frontmatterYAML) + "```\n\n" + content
-		}
+	html := markdownToHTMLWithContext(cfg, doc.Content, filePath)
+	if cfg.RenderFrontmatter {
+		html = renderFrontmatterHTML(doc.Frontmatter) + html
 	}
-
-	html := markdownToHTMLWithContext(cfg, content, filePath)
 	opts := RenderOptions{
 		FilePath:    filePath,
 		Description: llmsSummary(doc),

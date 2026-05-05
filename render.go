@@ -29,6 +29,7 @@ import (
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
 	"go.abhg.dev/goldmark/toc"
+	"gopkg.in/yaml.v3"
 )
 
 //go:embed all:templates
@@ -463,7 +464,8 @@ func parseFrontmatter(content string) (DocumentData, error) {
 	context := parser.NewContext()
 
 	// Parse to extract metadata
-	md.Parser().Parse(text.NewReader([]byte(content)), parser.WithContext(context))
+	source := []byte(content)
+	tree := md.Parser().Parse(text.NewReader(source), parser.WithContext(context))
 
 	// Get metadata
 	metaData := meta.Get(context)
@@ -471,39 +473,52 @@ func parseFrontmatter(content string) (DocumentData, error) {
 		metaData = make(map[string]interface{})
 	}
 
-	// Strip frontmatter from content manually (goldmark-meta doesn't do this for us)
-	strippedContent := stripFrontmatter(content)
-
 	return DocumentData{
-		Content:     strippedContent,
+		Content:     documentBody(source, tree),
 		Frontmatter: metaData,
 	}, nil
 }
 
-func stripFrontmatter(content string) string {
-	// Check for YAML frontmatter
-	if !strings.HasPrefix(content, "---\n") {
-		return content
-	}
-
-	// Find the closing delimiter
-	lines := strings.Split(content, "\n")
-	var frontmatterEnd int
-	for i := 1; i < len(lines); i++ {
-		if lines[i] == "---" {
-			frontmatterEnd = i
-			break
+func documentBody(source []byte, tree ast.Node) string {
+	var start int
+	found := false
+	_ = ast.Walk(tree, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if found || !entering || n.Type() != ast.TypeBlock {
+			return ast.WalkContinue, nil
 		}
+		lines := n.Lines()
+		if lines == nil || lines.Len() == 0 {
+			return ast.WalkContinue, nil
+		}
+		start = lineStart(source, lines.At(0).Start)
+		found = true
+		return ast.WalkStop, nil
+	})
+	if !found {
+		return ""
 	}
+	return string(source[start:])
+}
 
-	if frontmatterEnd == 0 {
-		// No closing delimiter found, treat as regular content
-		return content
+func lineStart(source []byte, pos int) int {
+	if pos > len(source) {
+		pos = len(source)
 	}
+	for pos > 0 && source[pos-1] != '\n' {
+		pos--
+	}
+	return pos
+}
 
-	// Extract content after frontmatter
-	if frontmatterEnd+1 < len(lines) {
-		return strings.Join(lines[frontmatterEnd+1:], "\n")
+func renderFrontmatterHTML(frontmatter map[string]interface{}) string {
+	if len(frontmatter) == 0 {
+		return ""
 	}
-	return ""
+	b, err := yaml.Marshal(frontmatter)
+	if err != nil {
+		return ""
+	}
+	return `<pre class="frontmatter"><code class="language-yaml">` +
+		template.HTMLEscapeString(string(b)) +
+		"</code></pre>\n"
 }

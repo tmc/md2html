@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"gopkg.in/yaml.v3"
 )
 
 func newServer(cfg Config, logger *slog.Logger) *server {
@@ -399,14 +398,10 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 // renderDocumentWithVersion renders a document with version information
 func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, filePath, version string) string {
-	content := doc.Content
-	if s.config.RenderFrontmatter && len(doc.Frontmatter) > 0 {
-		if frontmatterYAML, err := yaml.Marshal(doc.Frontmatter); err == nil {
-			content = "```yaml\n" + string(frontmatterYAML) + "```\n\n" + content
-		}
+	html := markdownToHTMLWithContext(s.config, doc.Content, filePath)
+	if s.config.RenderFrontmatter {
+		html = renderFrontmatterHTML(doc.Frontmatter) + html
 	}
-
-	html := markdownToHTMLWithContext(s.config, content, filePath)
 
 	opts := RenderOptions{
 		SiteTitle:   s.config.Title,

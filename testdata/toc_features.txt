@@ -14,6 +14,8 @@ sleep 1s
 
 # Frontmatter should be visible as YAML block
 curl -s http://localhost:9015/
+stdout 'class="frontmatter"'
+stdout 'class="language-yaml"'
 stdout 'Test Author'
 stdout 'Document with Frontmatter'
 
