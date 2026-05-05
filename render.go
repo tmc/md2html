@@ -27,6 +27,7 @@ import (
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 	"go.abhg.dev/goldmark/toc"
 )
 
@@ -34,6 +35,8 @@ import (
 var templates embed.FS
 
 var htmlLinkAttrPattern = regexp.MustCompile(`(?i)\b(href|src)\s*=\s*(?:"([^"<>]+)"|'([^'<>]+)')`)
+
+var alertKindAttr = []byte("data-md2html-alert")
 
 func generateChromaCSS() string {
 	lightStyle := styles.Get("github")
@@ -72,61 +75,6 @@ func generateChromaCSS() string {
 	return buf.String()
 }
 
-func convertGitHubAlerts(markdown string) string {
-	alerts := map[string]string{
-		"[!NOTE]":      "note",
-		"[!TIP]":       "tip",
-		"[!IMPORTANT]": "important",
-		"[!WARNING]":   "warning",
-		"[!CAUTION]":   "danger",
-	}
-
-	lines := strings.Split(markdown, "\n")
-	var result []string
-	var alert []string
-	var alertType string
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "> ") {
-			if alert != nil {
-				alert = append(alert, "!!!")
-				result = append(result, alert...)
-				alert = nil
-			}
-			result = append(result, line)
-			continue
-		}
-
-		content := strings.TrimPrefix(trimmed, "> ")
-		if alert == nil {
-			for gh, adm := range alerts {
-				if strings.HasPrefix(content, gh) {
-					alertType = adm
-					title := strings.TrimSpace(strings.TrimPrefix(content, gh))
-					if title == "" {
-						title = strings.Title(alertType)
-					}
-					alert = []string{"!!!" + alertType + " " + title}
-					break
-				}
-			}
-			if alert == nil {
-				result = append(result, line)
-			}
-		} else {
-			alert = append(alert, content)
-		}
-	}
-
-	if alert != nil {
-		alert = append(alert, "!!!")
-		result = append(result, alert...)
-	}
-
-	return strings.Join(result, "\n")
-}
-
 func preprocessHTMLBlocks(markdown string) string {
 	blockTags := []string{"<div", "<dl", "<table", "<section"}
 	lines := strings.Split(markdown, "\n")
@@ -153,7 +101,6 @@ func preprocessHTMLBlocks(markdown string) string {
 }
 
 func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
-	markdown = convertGitHubAlerts(markdown)
 	if cfg.AllowUnsafe {
 		markdown = rewriteLocalHTMLAttributes(markdown, filePath, cfg.HTMLExt, cfg.Index)
 		markdown = preprocessHTMLBlocks(markdown)
@@ -180,6 +127,7 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 		meta.Meta,
 		highlighting.NewHighlighting(highlightOpts...),
 		&admonitions.Extender{},
+		alertsExtender{},
 		tabs.Extender{},
 		media.Extender{},
 		jsonspec.Extension(jscfg),
@@ -243,6 +191,140 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 	}
 	logTabsErrors(pc, filePath)
 	return buf.String()
+}
+
+type alertsExtender struct{}
+
+func (alertsExtender) Extend(md goldmark.Markdown) {
+	md.Parser().AddOptions(parser.WithASTTransformers(
+		util.Prioritized(alertsTransformer{}, 900),
+	))
+	md.Renderer().AddOptions(renderer.WithNodeRenderers(
+		util.Prioritized(alertsRenderer{}, 100),
+	))
+}
+
+type alertsTransformer struct{}
+
+func (alertsTransformer) Transform(doc *ast.Document, reader text.Reader, pc parser.Context) {
+	source := reader.Source()
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering || n.Kind() != ast.KindBlockquote {
+			return ast.WalkContinue, nil
+		}
+		bq := n.(*ast.Blockquote)
+		para, ok := bq.FirstChild().(*ast.Paragraph)
+		if !ok {
+			return ast.WalkContinue, nil
+		}
+		kind, markerLen, ok := alertKind(source, para)
+		if !ok {
+			return ast.WalkContinue, nil
+		}
+		bq.SetAttribute(alertKindAttr, kind)
+		stripAlertMarker(source, para, markerLen)
+		if para.FirstChild() == nil {
+			bq.RemoveChild(bq, para)
+		}
+		return ast.WalkContinue, nil
+	})
+}
+
+func alertKind(source []byte, para *ast.Paragraph) ([]byte, int, bool) {
+	var buf []byte
+	for n := para.FirstChild(); n != nil && len(buf) < len("[!IMPORTANT]"); n = n.NextSibling() {
+		txt, ok := n.(*ast.Text)
+		if !ok {
+			break
+		}
+		buf = append(buf, txt.Segment.Value(source)...)
+	}
+	alerts := [...]struct {
+		marker string
+		kind   string
+	}{
+		{"[!NOTE]", "note"},
+		{"[!TIP]", "tip"},
+		{"[!IMPORTANT]", "important"},
+		{"[!WARNING]", "warning"},
+		{"[!CAUTION]", "danger"},
+	}
+	for _, a := range alerts {
+		if bytes.HasPrefix(buf, []byte(a.marker)) {
+			return []byte(a.kind), len(a.marker), true
+		}
+	}
+	return nil, 0, false
+}
+
+func stripAlertMarker(source []byte, para *ast.Paragraph, n int) {
+	for c := para.FirstChild(); c != nil && n > 0; {
+		next := c.NextSibling()
+		txt, ok := c.(*ast.Text)
+		if !ok {
+			return
+		}
+		value := txt.Segment.Value(source)
+		if n >= len(value) {
+			n -= len(value)
+			para.RemoveChild(para, txt)
+			c = next
+			continue
+		}
+		txt.Segment = text.NewSegment(txt.Segment.Start+n, txt.Segment.Stop)
+		break
+	}
+	for c := para.FirstChild(); c != nil; c = c.NextSibling() {
+		txt, ok := c.(*ast.Text)
+		if !ok {
+			return
+		}
+		value := txt.Segment.Value(source)
+		trim := len(value) - len(bytes.TrimLeft(value, " \t"))
+		if trim == 0 {
+			return
+		}
+		if trim == len(value) {
+			para.RemoveChild(para, txt)
+			continue
+		}
+		txt.Segment = text.NewSegment(txt.Segment.Start+trim, txt.Segment.Stop)
+		return
+	}
+}
+
+type alertsRenderer struct{}
+
+func (alertsRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
+	reg.Register(ast.KindBlockquote, renderAlertBlockquote)
+}
+
+func renderAlertBlockquote(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
+	v, ok := n.Attribute(alertKindAttr)
+	if !ok {
+		if entering {
+			if n.Attributes() != nil {
+				_, _ = w.WriteString("<blockquote")
+				html.RenderAttributes(w, n, html.BlockquoteAttributeFilter)
+				_, _ = w.WriteString(">\n")
+			} else {
+				_, _ = w.WriteString("<blockquote>\n")
+			}
+		} else {
+			_, _ = w.WriteString("</blockquote>\n")
+		}
+		return ast.WalkContinue, nil
+	}
+	kind := v.([]byte)
+	if entering {
+		_, _ = w.WriteString(`<div class="admonition adm-`)
+		_, _ = w.Write(util.EscapeHTML(kind))
+		_, _ = w.WriteString(`">`)
+		_ = w.WriteByte('\n')
+	} else {
+		_, _ = w.WriteString("</div>\n")
+	}
+	return ast.WalkContinue, nil
 }
 
 // jsonSpecConfig derives the jsonspec extension configuration from the
