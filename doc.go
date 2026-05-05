@@ -23,4 +23,19 @@
 //	err := md2html.Run(context.Background(), cfg, slog.Default(), os.Stdout, fs.Args())
 //
 // For navigation and structured parsing, use ParseSummary and Loader.
+//
+// # Compatibility
+//
+// The stable public API is [Config], [ConfigFromFlags], [NewFlagSet],
+// [Run], [RenderFragment], [FragmentOptions], [Fragment], [FragmentStyles],
+// [NewLoader], [Loader], [MarkdownDoc], [Navigation], [NavContext],
+// [ParseSummary], [GitVersion], and [GitVersionManager]. Changes to
+// exported names, method signatures, or exported struct fields follow
+// semantic versioning.
+//
+// The template data passed to bundled and user templates is also part of
+// the compatibility contract. Fields documented on [RenderOptions] and
+// [DocumentData], plus the derived top-level template fields checked by
+// the contract tests, must not be renamed, removed, or retyped without a
+// deliberate compatibility decision.
 package md2html

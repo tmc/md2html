@@ -8,20 +8,31 @@ import (
 
 // FragmentOptions configures fragment rendering.
 type FragmentOptions struct {
+	// AllowUnsafe permits raw HTML in rendered Markdown.
 	AllowUnsafe bool
-	TOC         bool
-	HTMLExt     string
+	// TOC enables table-of-contents generation for the fragment.
+	TOC bool
+	// HTMLExt is the extension used when rewriting local Markdown links.
+	HTMLExt string
+	// Frontmatter supplies page frontmatter used by fragment enhancements.
 	Frontmatter map[string]interface{}
 }
 
 // Fragment contains rendered markdown plus enhancement metadata for clients.
 type Fragment struct {
-	HTML             template.HTML
-	ChromaCSS        template.CSS
-	HasMath          bool
-	HasMermaid       bool
-	MermaidTheme     string
+	// HTML is the rendered Markdown fragment.
+	HTML template.HTML
+	// ChromaCSS is the syntax-highlighting stylesheet needed by HTML.
+	ChromaCSS template.CSS
+	// HasMath reports whether the source appears to contain MathJax syntax.
+	HasMath bool
+	// HasMermaid reports whether the source appears to contain Mermaid fences.
+	HasMermaid bool
+	// MermaidTheme is the light Mermaid theme.
+	MermaidTheme string
+	// MermaidDarkTheme is the dark Mermaid theme.
 	MermaidDarkTheme string
+	// MermaidAutoTheme reports whether client code should follow color scheme.
 	MermaidAutoTheme bool
 }
 

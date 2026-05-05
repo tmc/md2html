@@ -458,19 +458,33 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 	return tmpl, nil
 }
 
-// RenderOptions contains optional parameters for rendering.
+// RenderOptions contains optional data passed to rendering and templates.
+//
+// Its exported fields are part of the template compatibility contract and
+// follow semantic versioning.
 type RenderOptions struct {
-	Nav         *NavContext
-	SiteTitle   string
-	Data        interface{} // from -data-json
-	FilePath    string      // source file path (for edit links)
-	Version     string      // currently rendered version, when versioning is enabled
-	Versions    []GitVersion
-	RawMDURL    string
+	// Nav is the navigation context for the current page.
+	Nav *NavContext
+	// SiteTitle is the configured site title.
+	SiteTitle string
+	// Data is the decoded value loaded from -data-json.
+	Data interface{}
+	// FilePath is the source Markdown path relative to the rendered tree.
+	FilePath string
+	// Version is the currently rendered git version, when versioning is enabled.
+	Version string
+	// Versions is the list of available git-backed documentation versions.
+	Versions []GitVersion
+	// RawMDURL is the URL for the source Markdown file, when available.
+	RawMDURL string
+	// Description is the page description used for metadata and search.
 	Description string
-	EditURL     string
+	// EditURL is the resolved edit link for the current page.
+	EditURL string
+	// LastUpdated is the page's last modification date, when known.
 	LastUpdated string
-	Assets      map[string]string
+	// Assets maps logical asset names to emitted, fingerprinted paths.
+	Assets map[string]string
 }
 
 func firstFrontmatterString(frontmatter map[string]interface{}, keys ...string) string {
@@ -565,36 +579,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 	mermaidTheme, mermaidDarkTheme, mermaidAutoTheme := resolveMermaidThemes(frontmatter)
 	meta := pageMetadata(cfg, title, frontmatter, opts)
 
-	data := struct {
-		Title            string
-		Content          template.HTML
-		CustomCSS        template.CSS
-		ChromaCSS        template.CSS
-		Verbose          bool
-		LiveReload       bool
-		HTMLExt          string
-		Frontmatter      map[string]interface{}
-		Version          string
-		Versions         []GitVersion
-		Search           bool
-		Nav              *NavContext
-		SiteTitle        string
-		Data             interface{}
-		IndexFile        string
-		MermaidTheme     string
-		MermaidDarkTheme string
-		MermaidAutoTheme bool
-		FilePath         string
-		AssetBase        string
-		RawMDURL         string
-		Description      string
-		CanonicalURL     string
-		OpenGraphImage   string
-		LastUpdated      string
-		EditURL          string
-		Assets           map[string]string
-		JSONSpec         template.JS
-	}{
+	data := templateData{
 		Title:            title,
 		Content:          template.HTML(htmlContent),
 		CustomCSS:        template.CSS(customCSS),
@@ -630,6 +615,37 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		return fmt.Sprintf("<p>Template execution error: %v</p>", err)
 	}
 	return buf.String()
+}
+
+type templateData struct {
+	Title            string
+	Content          template.HTML
+	CustomCSS        template.CSS
+	ChromaCSS        template.CSS
+	Verbose          bool
+	LiveReload       bool
+	HTMLExt          string
+	Frontmatter      map[string]interface{}
+	Version          string
+	Versions         []GitVersion
+	Search           bool
+	Nav              *NavContext
+	SiteTitle        string
+	Data             interface{}
+	IndexFile        string
+	MermaidTheme     string
+	MermaidDarkTheme string
+	MermaidAutoTheme bool
+	FilePath         string
+	AssetBase        string
+	RawMDURL         string
+	Description      string
+	CanonicalURL     string
+	OpenGraphImage   string
+	LastUpdated      string
+	EditURL          string
+	Assets           map[string]string
+	JSONSpec         template.JS
 }
 
 type renderMetadata struct {

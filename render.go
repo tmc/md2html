@@ -439,8 +439,15 @@ func rewriteLocalHTMLAttributes(content, filePath, htmlExt, indexFile string) st
 	})
 }
 
+// DocumentData is the parsed Markdown document passed through rendering.
+//
+// Its exported fields are template-visible and follow semantic versioning.
 type DocumentData struct {
-	Content     string
+	// Content is the Markdown body after YAML frontmatter has been parsed.
+	// The frontmatter block itself is not included.
+	Content string
+	// Frontmatter is the parsed YAML frontmatter map. It is empty when
+	// the document has no frontmatter or frontmatter parsing failed.
 	Frontmatter map[string]interface{}
 }
 
