@@ -110,11 +110,7 @@ func renderSearchIndexJS(documents []SearchDocument) ([]byte, error) {
 // generateSearchIndexJS builds the search index for sourceDir and writes it
 // to outputDir/search-index.js.
 func generateSearchIndexJS(sourceDir, outputDir string, cfg Config) (int, error) {
-	documents, err := buildSearchIndex(sourceDir, cfg)
-	if err != nil {
-		return 0, err
-	}
-	body, err := renderSearchIndexJS(documents)
+	body, n, err := buildSearchIndexJS(sourceDir, cfg)
 	if err != nil {
 		return 0, err
 	}
@@ -122,7 +118,19 @@ func generateSearchIndexJS(sourceDir, outputDir string, cfg Config) (int, error)
 	if err := os.WriteFile(indexPath, body, 0644); err != nil {
 		return 0, fmt.Errorf("error writing search index: %w", err)
 	}
-	return len(documents), nil
+	return n, nil
+}
+
+func buildSearchIndexJS(sourceDir string, cfg Config) ([]byte, int, error) {
+	documents, err := buildSearchIndex(sourceDir, cfg)
+	if err != nil {
+		return nil, 0, err
+	}
+	body, err := renderSearchIndexJS(documents)
+	if err != nil {
+		return nil, 0, err
+	}
+	return body, len(documents), nil
 }
 
 // extractPlainText extracts plain text from markdown content

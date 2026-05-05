@@ -438,6 +438,14 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 		"navHref": func(currentFile, targetFile, htmlExt, indexFile string) string {
 			return relativeRenderedLink(currentFile, targetFile, htmlExt, indexFile)
 		},
+		"asset": func(assets map[string]string, name string) string {
+			if assets != nil {
+				if v := assets[name]; v != "" {
+					return v
+				}
+			}
+			return name
+		},
 	}).ParseFS(templates, "templates/*.html", "templates/*/*.html")
 
 	if err != nil {
@@ -468,6 +476,7 @@ type RenderOptions struct {
 	Description string
 	EditURL     string
 	LastUpdated string
+	Assets      map[string]string
 }
 
 func firstFrontmatterString(frontmatter map[string]interface{}, keys ...string) string {
@@ -589,6 +598,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		OpenGraphImage   string
 		LastUpdated      string
 		EditURL          string
+		Assets           map[string]string
 		JSONSpec         template.JS
 	}{
 		Title:            title,
@@ -617,6 +627,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		OpenGraphImage:   meta.OpenGraphImage,
 		LastUpdated:      meta.LastUpdated,
 		EditURL:          opts.EditURL,
+		Assets:           opts.Assets,
 		JSONSpec:         jsonSpecBundleJSON(cfg),
 	}
 
@@ -730,6 +741,22 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	} else if cfg.Verbose {
 		logger.Debug("git metadata unavailable", "error", err)
 	}
+	assets := map[string]string{}
+	if cfg.Search {
+		body, n, err := buildSearchIndexJS(sourceDir, cfg)
+		if err != nil {
+			logger.Error("Error generating search index", "error", err)
+		} else {
+			var writeErr error
+			assets, writeErr = writeFingerprintedSearchAssets(outputDir, body)
+			if writeErr != nil {
+				logger.Error("Error writing search assets", "error", writeErr)
+				assets = map[string]string{}
+			} else {
+				logger.Info("Generated search index", "documents", n)
+			}
+		}
+	}
 
 	// Process each markdown file
 	for _, file := range files {
@@ -744,6 +771,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			FilePath:    file.RelPath,
 			EditURL:     editURL(cfg.EditURL, file.RelPath),
 			LastUpdated: lastUpdated[filepath.ToSlash(file.RelPath)],
+			Assets:      assets,
 		}
 		if cfg.LLMS {
 			opts.RawMDURL = rawMarkdownURL(file.RelPath)
@@ -768,6 +796,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 				FilePath:    cfg.Index,
 				EditURL:     editURL(cfg.EditURL, cfg.Index),
 				LastUpdated: lastUpdated[filepath.ToSlash(cfg.Index)],
+				Assets:      assets,
 			}
 			if cfg.LLMS {
 				indexOpts.RawMDURL = rawMarkdownURL(cfg.Index)
@@ -783,24 +812,13 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		}
 	} else {
 		// Generate table of contents as index.html
-		if err := generateTOCIndex(sourceDir, outputDir, files, cssContent, cfg); err != nil {
+		if err := generateTOCIndex(sourceDir, outputDir, files, cssContent, cfg, assets); err != nil {
 			logger.Error("Error generating TOC index", "error", err)
 		} else {
 			logger.Debug("Generated TOC index")
 		}
 	}
 
-	if cfg.Search {
-		if err := writeSearchAssets(outputDir); err != nil {
-			logger.Error("Error writing search assets", "error", err)
-		}
-		n, err := generateSearchIndexJS(sourceDir, outputDir, cfg)
-		if err != nil {
-			logger.Error("Error generating search index", "error", err)
-		} else {
-			logger.Info("Generated search index", "documents", n)
-		}
-	}
 	if cfg.LLMS {
 		n, err := generateLLMSFiles(sourceDir, outputDir, files, nav, cfg)
 		if err != nil {
@@ -1000,7 +1018,7 @@ func processIndexFile(indexPath, outputDir, cssContent string, cfg Config) error
 	return os.WriteFile(indexOutputPath, []byte(finalHTML), 0644)
 }
 
-func generateTOCIndex(sourceDir, outputDir string, files []markdownFile, cssContent string, cfg Config) error {
+func generateTOCIndex(sourceDir, outputDir string, files []markdownFile, cssContent string, cfg Config, assets map[string]string) error {
 	// Generate table of contents markdown
 	var buf strings.Builder
 	buf.WriteString(fmt.Sprintf("# Directory Listing: %s\n\n", sourceDir))
@@ -1020,7 +1038,7 @@ func generateTOCIndex(sourceDir, outputDir string, files []markdownFile, cssCont
 
 	// Render with template
 	doc := DocumentData{Content: buf.String(), Frontmatter: make(map[string]interface{})}
-	finalHTML := renderTemplate(cfg, htmlContent, "Directory Listing", cssContent, false, doc.Frontmatter)
+	finalHTML := renderTemplateWithOptions(cfg, htmlContent, "Directory Listing", cssContent, false, doc.Frontmatter, RenderOptions{Assets: assets})
 
 	// Write index.html
 	indexOutputPath := filepath.Join(outputDir, "index.html")
