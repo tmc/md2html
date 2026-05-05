@@ -26,11 +26,7 @@
         <main class="main-content">
             {{template "nav-breadcrumb" .}}
             {{template "content" .}}
-            {{if and .Data .FilePath}}{{with index .Data "editBaseURL"}}
-            <div class="edit-link">
-                <a href="{{.}}/{{$.FilePath}}" target="_blank" rel="noopener">Edit this page on GitHub</a>
-            </div>
-            {{end}}{{end}}
+            {{template "page-footer" .}}
             {{template "nav-prevnext" .}}
         </main>
         <aside class="sidebar-toc" id="sidebar-toc">

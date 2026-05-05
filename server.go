@@ -72,6 +72,15 @@ func newServer(cfg Config, logger *slog.Logger) *server {
 				s.nav = nav
 				logger.Info("Loaded navigation", "pages", len(nav.Flat))
 			}
+			files, err := findMarkdownFiles(root, 100)
+			if err == nil {
+				times, err := gitLastUpdated(root, files)
+				if err == nil {
+					s.lastUpdated = times
+				} else if cfg.Verbose {
+					logger.Debug("git metadata unavailable", "error", err)
+				}
+			}
 		}
 	}
 
@@ -124,7 +133,8 @@ type server struct {
 	versions   []GitVersion
 
 	// Navigation from SUMMARY.md
-	nav *Navigation
+	nav         *Navigation
+	lastUpdated map[string]string
 }
 
 func (s *server) watchFiles() {
@@ -405,6 +415,10 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 		Version:     version,
 		Versions:    s.versions,
 		Description: llmsSummary(doc),
+		EditURL:     editURL(s.config.EditURL, filePath),
+	}
+	if s.lastUpdated != nil {
+		opts.LastUpdated = s.lastUpdated[filepath.ToSlash(filePath)]
 	}
 	if s.nav != nil {
 		opts.Nav = s.nav.ForPage(filePath)

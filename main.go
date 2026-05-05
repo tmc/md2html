@@ -45,6 +45,7 @@ type Config struct {
 	Search            bool
 	LLMS              bool
 	SiteURL           string
+	EditURL           string
 
 	// Vet enables non-blocking mdvet checks. When true, [Run] reports
 	// any diagnostics it finds to the logger (or stderr) at warn level
@@ -99,6 +100,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.Bool("search", false, "enable client-side search")
 	fs.Bool("llms", false, "emit llms.txt, llms-full.txt, and raw markdown links in static output")
 	fs.String("site-url", "", "canonical base URL for generated pages")
+	fs.String("edit-url", "", "URL template for edit links; {path} is replaced with the source path")
 	fs.String("jsonspec-prefixes", "", "comma-separated JSON type-discriminator prefixes to enrich (e.g. 'ascf/')")
 	fs.String("jsonspec-badge-url", "", "URL template for schema badges; %s is the discriminator suffix (e.g. 'schemas.html#%s')")
 	fs.String("jsonspec-badge-label", "", "label template for schema badges; %s is the discriminator suffix")
@@ -132,6 +134,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		Search:            fs.Lookup("search").Value.String() == "true",
 		LLMS:              fs.Lookup("llms").Value.String() == "true",
 		SiteURL:           fs.Lookup("site-url").Value.String(),
+		EditURL:           fs.Lookup("edit-url").Value.String(),
 
 		JSONSpecPrefixes:   fs.Lookup("jsonspec-prefixes").Value.String(),
 		JSONSpecBadgeURL:   fs.Lookup("jsonspec-badge-url").Value.String(),
@@ -392,6 +395,7 @@ func renderDocument(cfg Config, doc DocumentData, title, customCSS, filePath str
 	opts := RenderOptions{
 		FilePath:    filePath,
 		Description: llmsSummary(doc),
+		EditURL:     editURL(cfg.EditURL, filePath),
 	}
 	return renderTemplateWithOptions(cfg, html, title, customCSS, true, doc.Frontmatter, opts)
 }
@@ -462,6 +466,8 @@ type RenderOptions struct {
 	Versions    []GitVersion
 	RawMDURL    string
 	Description string
+	EditURL     string
+	LastUpdated string
 }
 
 func firstFrontmatterString(frontmatter map[string]interface{}, keys ...string) string {
@@ -582,6 +588,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		CanonicalURL     string
 		OpenGraphImage   string
 		LastUpdated      string
+		EditURL          string
 		JSONSpec         template.JS
 	}{
 		Title:            title,
@@ -609,6 +616,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		CanonicalURL:     meta.CanonicalURL,
 		OpenGraphImage:   meta.OpenGraphImage,
 		LastUpdated:      meta.LastUpdated,
+		EditURL:          opts.EditURL,
 		JSONSpec:         jsonSpecBundleJSON(cfg),
 	}
 
@@ -634,6 +642,7 @@ func pageMetadata(cfg Config, title string, frontmatter map[string]interface{}, 
 	meta := renderMetadata{
 		Description:    desc,
 		OpenGraphImage: firstFrontmatterString(frontmatter, "og_image", "image"),
+		LastUpdated:    opts.LastUpdated,
 	}
 	if cfg.SiteURL != "" && opts.FilePath != "" {
 		meta.CanonicalURL = joinSiteURL(cfg.SiteURL, renderedPathForSource(opts.FilePath, cfg.HTMLExt, cfg.Index))
@@ -648,6 +657,13 @@ func joinSiteURL(base, pagePath string) string {
 		return base
 	}
 	return base + "/" + pagePath
+}
+
+func editURL(pattern, filePath string) string {
+	if pattern == "" || filePath == "" {
+		return ""
+	}
+	return strings.ReplaceAll(pattern, "{path}", filepath.ToSlash(filePath))
 }
 
 func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) error {
@@ -708,6 +724,12 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	} else if nav != nil && len(nav.Items) > 0 {
 		logger.Info("Loaded navigation", "pages", len(nav.Flat))
 	}
+	lastUpdated := map[string]string{}
+	if times, err := gitLastUpdated(sourceDir, files); err == nil {
+		lastUpdated = times
+	} else if cfg.Verbose {
+		logger.Debug("git metadata unavailable", "error", err)
+	}
 
 	// Process each markdown file
 	for _, file := range files {
@@ -716,7 +738,13 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			logger.Debug("Skipping draft", "file", file.RelPath)
 			continue
 		}
-		opts := RenderOptions{SiteTitle: cfg.Title, Data: jsonData, FilePath: file.RelPath}
+		opts := RenderOptions{
+			SiteTitle:   cfg.Title,
+			Data:        jsonData,
+			FilePath:    file.RelPath,
+			EditURL:     editURL(cfg.EditURL, file.RelPath),
+			LastUpdated: lastUpdated[filepath.ToSlash(file.RelPath)],
+		}
 		if cfg.LLMS {
 			opts.RawMDURL = rawMarkdownURL(file.RelPath)
 		}
@@ -734,7 +762,13 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	if cfg.Index != "" {
 		indexFile := filepath.Join(sourceDir, cfg.Index)
 		if _, err := os.Stat(indexFile); err == nil {
-			indexOpts := RenderOptions{SiteTitle: cfg.Title, Data: jsonData, FilePath: cfg.Index}
+			indexOpts := RenderOptions{
+				SiteTitle:   cfg.Title,
+				Data:        jsonData,
+				FilePath:    cfg.Index,
+				EditURL:     editURL(cfg.EditURL, cfg.Index),
+				LastUpdated: lastUpdated[filepath.ToSlash(cfg.Index)],
+			}
 			if cfg.LLMS {
 				indexOpts.RawMDURL = rawMarkdownURL(cfg.Index)
 			}
@@ -897,6 +931,7 @@ func processMarkdownFileWithNav(file markdownFile, sourceDir, outputDir, cssCont
 		SiteTitle:   cfg.Title,
 		FilePath:    file.RelPath,
 		Description: llmsSummary(doc),
+		EditURL:     editURL(cfg.EditURL, file.RelPath),
 	}
 
 	finalHTML := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)

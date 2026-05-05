@@ -1,0 +1,11 @@
+# Test first-class edit links in static output.
+
+md2html -html out -html-ext html -edit-url 'https://example.com/edit/{path}' src
+
+exists out/README.html
+grep '<a class="edit-link" href="https://example.com/edit/README.md" target="_blank" rel="noopener">Edit this page</a>' out/README.html
+
+-- src/README.md --
+# README
+
+Edit me.

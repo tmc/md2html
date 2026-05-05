@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // GitVersion represents a git tag or branch that can be used for versioned docs
@@ -229,6 +230,83 @@ func (gvm *GitVersionManager) GetCurrentVersion() (string, error) {
 	}
 
 	return strings.TrimSpace(string(output)), nil
+}
+
+func gitLastUpdated(repoPath string, files []markdownFile) (map[string]string, error) {
+	paths := make([]string, 0, len(files))
+	for _, f := range files {
+		paths = append(paths, filepath.ToSlash(f.RelPath))
+	}
+	return gitLastUpdatedPaths(repoPath, paths)
+}
+
+func gitLastUpdatedPaths(repoPath string, paths []string) (map[string]string, error) {
+	if len(paths) == 0 {
+		return map[string]string{}, nil
+	}
+	head := exec.Command("git", "rev-parse", "--verify", "HEAD")
+	head.Dir = repoPath
+	if err := head.Run(); err != nil {
+		return map[string]string{}, nil
+	}
+	args := []string{"log", "--format=%ct", "--name-only", "--"}
+	args = append(args, paths...)
+	cmd := exec.Command("git", args...)
+	cmd.Dir = repoPath
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	want := make(map[string]bool)
+	for _, p := range paths {
+		want[filepath.ToSlash(p)] = true
+	}
+	return parseGitLastUpdated(out, want), nil
+}
+
+func parseGitLastUpdated(out []byte, want map[string]bool) map[string]string {
+	result := make(map[string]string)
+	var stamp string
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if isDigits(line) {
+			stamp = line
+			continue
+		}
+		name := filepath.ToSlash(line)
+		if stamp == "" || !want[name] || result[name] != "" {
+			continue
+		}
+		sec, err := parseUnix(stamp)
+		if err != nil {
+			continue
+		}
+		result[name] = time.Unix(sec, 0).UTC().Format("2006-01-02")
+	}
+	return result
+}
+
+func isDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return s != ""
+}
+
+func parseUnix(s string) (int64, error) {
+	var n int64
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return 0, fmt.Errorf("invalid unix time")
+		}
+		n = n*10 + int64(r-'0')
+	}
+	return n, nil
 }
 
 // CheckoutVersion checks out a specific version (for local development)

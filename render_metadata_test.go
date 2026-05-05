@@ -53,3 +53,21 @@ func TestRenderTemplateMetadataFallbackAndAbsence(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderTemplateFooterMetadata(t *testing.T) {
+	opts := RenderOptions{
+		FilePath:    "guide/intro.md",
+		EditURL:     "https://example.com/edit/guide/intro.md",
+		LastUpdated: "2026-05-05",
+	}
+
+	got := renderTemplateWithOptions(Config{}, "<p>body</p>", "Intro", "", false, nil, opts)
+	for _, want := range []string{
+		`<div class="last-updated">Last updated: 2026-05-05</div>`,
+		`<a class="edit-link" href="https://example.com/edit/guide/intro.md" target="_blank" rel="noopener">Edit this page</a>`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("rendered footer missing %q in:\n%s", want, got)
+		}
+	}
+}

@@ -1,0 +1,8 @@
+{{define "page-footer"}}
+{{if or .EditURL .LastUpdated}}
+<footer class="page-footer">
+    {{if .LastUpdated}}<div class="last-updated">Last updated: {{.LastUpdated}}</div>{{end}}
+    {{if .EditURL}}<a class="edit-link" href="{{.EditURL}}" target="_blank" rel="noopener">Edit this page</a>{{end}}
+</footer>
+{{end}}
+{{end}}
