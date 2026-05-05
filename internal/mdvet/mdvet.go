@@ -58,6 +58,7 @@ func AllChecks() []Check {
 	return []Check{
 		NavigationCheck{},
 		FrontmatterCheck{},
+		AssetsCheck{},
 		LinkCheck{},
 		ImageCheck{},
 		AnchorCheck{},
@@ -101,6 +102,7 @@ func Run(paths []string, checks []Check) ([]Diagnostic, error) {
 		return nil, err
 	}
 	e := newEnv()
+	assetMode := hasCheck(checks, "assets")
 	var diags []Diagnostic
 	for _, f := range files {
 		src, err := os.ReadFile(f)
@@ -114,6 +116,9 @@ func Run(paths []string, checks []Check) ([]Diagnostic, error) {
 			env:    e,
 		}
 		for _, c := range checks {
+			if assetMode && legacyAssetCheck(c.Name()) {
+				continue
+			}
 			ds, err := c.Check(doc)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %s: %w", f, c.Name(), err)
@@ -131,6 +136,23 @@ func Run(paths []string, checks []Check) ([]Diagnostic, error) {
 		return diags[i].Message < diags[j].Message
 	})
 	return diags, nil
+}
+
+func hasCheck(checks []Check, name string) bool {
+	for _, c := range checks {
+		if c.Name() == name {
+			return true
+		}
+	}
+	return false
+}
+
+func legacyAssetCheck(name string) bool {
+	switch name {
+	case "links", "images", "anchors":
+		return true
+	}
+	return false
 }
 
 // parseTree parses Markdown source with the same options used by md2html

@@ -26,8 +26,8 @@ func TestRunVet(t *testing.T) {
 	if !strings.Contains(out, "missing.md") {
 		t.Errorf("expected diagnostic in vet output, got %q", out)
 	}
-	if !strings.Contains(out, `check=links`) {
-		t.Errorf("expected check=links in vet output, got %q", out)
+	if !strings.Contains(out, `check=assets`) {
+		t.Errorf("expected check=assets in vet output, got %q", out)
 	}
 }
 

@@ -96,6 +96,12 @@ func kind(dest []byte) string {
 	return ""
 }
 
+// IsMediaPath reports whether name has an audio or video extension
+// recognized by Extender.
+func IsMediaPath(name string) bool {
+	return kind([]byte(name)) != ""
+}
+
 func (r *Renderer) renderImage(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if !entering {
 		return ast.WalkContinue, nil

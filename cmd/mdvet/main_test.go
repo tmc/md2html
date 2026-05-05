@@ -36,3 +36,30 @@ func TestRunChecksFlag(t *testing.T) {
 		t.Fatalf("-checks=frontmatter ran nav:\n%s", got)
 	}
 }
+
+func TestRunAssetsFlag(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte("![demo](demo.mp4)\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, err := os.CreateTemp(t.TempDir(), "stdout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stderr, err := os.CreateTemp(t.TempDir(), "stderr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := run([]string{"-checks=assets", dir}, stdout, stderr)
+	if code != 1 {
+		t.Fatalf("exit code %d, want 1", code)
+	}
+	out, err := os.ReadFile(stdout.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(out)
+	if !strings.Contains(got, "[assets] media \"demo.mp4\"") {
+		t.Fatalf("stdout missing asset diagnostic:\n%s", got)
+	}
+}
