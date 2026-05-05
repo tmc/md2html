@@ -1,0 +1,49 @@
+# Test llms.txt static generation.
+
+md2html -llms -html out -html-ext html -title Docs src
+
+exists out/llms.txt
+exists out/llms-full.txt
+exists out/README.html
+exists out/README.md
+exists out/guide.html
+exists out/guide.md
+exists out/z-extra.html
+exists out/z-extra.md
+
+cmp out/llms.txt want-llms.txt
+grep '^--- README.html$' out/llms-full.txt
+grep '^--- guide.html$' out/llms-full.txt
+grep '^--- z-extra.html$' out/llms-full.txt
+grep '<link rel="alternate" type="text/markdown" href="./README.md">' out/README.html
+
+-- want-llms.txt --
+Docs
+
+README.html — Home — Frontmatter description wins.
+guide.html — Guide — Guide summary comes from the first paragraph.
+z-extra.html — Extra — Extra summary outside navigation.
+
+-- src/SUMMARY.md --
+# Summary
+
+* [Home](README.md)
+* [Guide](guide.md)
+
+-- src/README.md --
+---
+description: Frontmatter description wins.
+---
+# Home
+
+This paragraph should not be used.
+
+-- src/guide.md --
+# Guide
+
+Guide summary comes from the first paragraph.
+
+-- src/z-extra.md --
+# Extra
+
+Extra summary outside navigation.

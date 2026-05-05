@@ -43,6 +43,7 @@ type Config struct {
 	VersionBranches   bool
 	VersionDefault    string
 	Search            bool
+	LLMS              bool
 
 	// Vet enables non-blocking mdvet checks. When true, [Run] reports
 	// any diagnostics it finds to the logger (or stderr) at warn level
@@ -95,6 +96,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.Bool("version-branches", false, "include branches as versions alongside tags")
 	fs.String("version-default", "", "default version to show (empty = current/latest)")
 	fs.Bool("search", false, "enable client-side search")
+	fs.Bool("llms", false, "emit llms.txt, llms-full.txt, and raw markdown links in static output")
 	fs.String("jsonspec-prefixes", "", "comma-separated JSON type-discriminator prefixes to enrich (e.g. 'ascf/')")
 	fs.String("jsonspec-badge-url", "", "URL template for schema badges; %s is the discriminator suffix (e.g. 'schemas.html#%s')")
 	fs.String("jsonspec-badge-label", "", "label template for schema badges; %s is the discriminator suffix")
@@ -126,6 +128,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		VersionBranches:   fs.Lookup("version-branches").Value.String() == "true",
 		VersionDefault:    fs.Lookup("version-default").Value.String(),
 		Search:            fs.Lookup("search").Value.String() == "true",
+		LLMS:              fs.Lookup("llms").Value.String() == "true",
 
 		JSONSpecPrefixes:   fs.Lookup("jsonspec-prefixes").Value.String(),
 		JSONSpecBadgeURL:   fs.Lookup("jsonspec-badge-url").Value.String(),
@@ -450,6 +453,7 @@ type RenderOptions struct {
 	FilePath  string      // source file path (for edit links)
 	Version   string      // currently rendered version, when versioning is enabled
 	Versions  []GitVersion
+	RawMDURL  string
 }
 
 func firstFrontmatterString(frontmatter map[string]interface{}, keys ...string) string {
@@ -564,6 +568,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		MermaidAutoTheme bool
 		FilePath         string
 		AssetBase        string
+		RawMDURL         string
 		JSONSpec         template.JS
 	}{
 		Title:            title,
@@ -586,6 +591,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		MermaidAutoTheme: mermaidAutoTheme,
 		FilePath:         opts.FilePath,
 		AssetBase:        assetBase(opts.FilePath),
+		RawMDURL:         opts.RawMDURL,
 		JSONSpec:         jsonSpecBundleJSON(cfg),
 	}
 
@@ -661,6 +667,9 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			continue
 		}
 		opts := RenderOptions{SiteTitle: cfg.Title, Data: jsonData, FilePath: file.RelPath}
+		if cfg.LLMS {
+			opts.RawMDURL = rawMarkdownURL(file.RelPath)
+		}
 		if nav != nil {
 			opts.Nav = nav.ForPage(file.RelPath)
 		}
@@ -676,6 +685,9 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		indexFile := filepath.Join(sourceDir, cfg.Index)
 		if _, err := os.Stat(indexFile); err == nil {
 			indexOpts := RenderOptions{SiteTitle: cfg.Title, Data: jsonData, FilePath: cfg.Index}
+			if cfg.LLMS {
+				indexOpts.RawMDURL = rawMarkdownURL(cfg.Index)
+			}
 			if nav != nil {
 				indexOpts.Nav = nav.ForPage(cfg.Index)
 			}
@@ -703,6 +715,14 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			logger.Error("Error generating search index", "error", err)
 		} else {
 			logger.Info("Generated search index", "documents", n)
+		}
+	}
+	if cfg.LLMS {
+		n, err := generateLLMSFiles(sourceDir, outputDir, files, nav, cfg)
+		if err != nil {
+			logger.Error("Error generating llms files", "error", err)
+		} else {
+			logger.Info("Generated llms files", "documents", n)
 		}
 	}
 
@@ -756,6 +776,11 @@ func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssCon
 
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return err
+	}
+	if cfg.LLMS {
+		if err := copyRawMarkdown(sourcePath, outputDir, file.RelPath); err != nil {
+			return err
+		}
 	}
 
 	title := cfg.Title
@@ -853,6 +878,11 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 	finalHTML := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
 
 	indexOutputPath := filepath.Join(outputDir, "index.html")
+	if cfg.LLMS && opts.FilePath != "" {
+		if err := copyRawMarkdown(indexPath, outputDir, opts.FilePath); err != nil {
+			return err
+		}
+	}
 	return os.WriteFile(indexOutputPath, []byte(finalHTML), 0644)
 }
 

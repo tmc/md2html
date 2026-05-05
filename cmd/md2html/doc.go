@@ -18,6 +18,10 @@
 //
 //	md2html -html _site .
 //
+// Generate static output with agent-readable summaries:
+//
+//	md2html -html _site -llms .
+//
 // The command is a thin wrapper around package github.com/tmc/md2html.
 //
 //go:generate gocmddoc -o ../../README.md
