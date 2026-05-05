@@ -561,6 +561,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		MermaidDarkTheme string
 		MermaidAutoTheme bool
 		FilePath         string
+		AssetBase        string
 		JSONSpec         template.JS
 	}{
 		Title:            title,
@@ -582,6 +583,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		MermaidDarkTheme: mermaidDarkTheme,
 		MermaidAutoTheme: mermaidAutoTheme,
 		FilePath:         opts.FilePath,
+		AssetBase:        assetBase(opts.FilePath),
 		JSONSpec:         jsonSpecBundleJSON(cfg),
 	}
 
@@ -687,6 +689,18 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			logger.Error("Error generating TOC index", "error", err)
 		} else {
 			logger.Debug("Generated TOC index")
+		}
+	}
+
+	if cfg.Search {
+		if err := writeSearchAssets(outputDir); err != nil {
+			logger.Error("Error writing search assets", "error", err)
+		}
+		n, err := generateSearchIndexJS(sourceDir, outputDir, cfg)
+		if err != nil {
+			logger.Error("Error generating search index", "error", err)
+		} else {
+			logger.Info("Generated search index", "documents", n)
 		}
 	}
 

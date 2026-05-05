@@ -277,6 +277,7 @@
 {{end}}
 
 {{define "search-scripts"}}
-<script src="/js/minisearch.min.js" defer></script>
-<script src="/js/search.js" defer></script>
+<script src="{{.AssetBase}}js/minisearch.min.js" defer></script>
+<script src="{{.AssetBase}}search-index.js" defer></script>
+<script src="{{.AssetBase}}js/search.js" defer></script>
 {{end}}

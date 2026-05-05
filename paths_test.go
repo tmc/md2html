@@ -70,6 +70,30 @@ func TestRelativeRenderedLink(t *testing.T) {
 	}
 }
 
+func TestAssetBase(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "empty", in: "", want: "./"},
+		{name: "top-level file", in: "README.md", want: "./"},
+		{name: "one deep", in: "docs/guide.md", want: "../"},
+		{name: "multi deep", in: "a/b/c/page.md", want: "../../../"},
+		{name: "leading slash", in: "/install.md", want: "./"},
+		{name: "leading slash nested", in: "/docs/guide.md", want: "../"},
+		{name: "index at root", in: "index.md", want: "./"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := assetBase(tt.in); got != tt.want {
+				t.Fatalf("assetBase(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRewriteLocalMarkdownReference(t *testing.T) {
 	tests := []struct {
 		name      string

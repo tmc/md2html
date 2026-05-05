@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// SearchDocument represents a document in the search index
+// SearchDocument represents a document in the search index.
 type SearchDocument struct {
 	Title    string `json:"title"`
 	Text     string `json:"text"`
@@ -18,38 +18,33 @@ type SearchDocument struct {
 	Type     string `json:"type"`
 }
 
-// generateSearchIndex creates a JSON search index for all markdown files
-func generateSearchIndex(sourceDir, outputDir string, cfg Config) error {
+// buildSearchIndex walks sourceDir and returns a search document for every
+// markdown file found, ready to be marshaled and consumed by the client-side
+// search.
+func buildSearchIndex(sourceDir string, cfg Config) ([]SearchDocument, error) {
 	var documents []SearchDocument
 
-	// Walk through all markdown files
 	err := filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-
-		// Skip directories and non-markdown files
 		if info.IsDir() || !strings.HasSuffix(path, ".md") {
 			return nil
 		}
 
-		// Read the file
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("error reading %s: %w", path, err)
 		}
 
-		// Parse frontmatter
 		doc, err := parseFrontmatter(string(content))
 		if err != nil {
-			// If no frontmatter, use raw content
 			doc = DocumentData{
 				Content:     string(content),
 				Frontmatter: make(map[string]interface{}),
 			}
 		}
 
-		// Extract title from frontmatter or filename
 		title := ""
 		if t, ok := doc.Frontmatter["title"].(string); ok {
 			title = t
@@ -57,31 +52,24 @@ func generateSearchIndex(sourceDir, outputDir string, cfg Config) error {
 			title = strings.TrimSuffix(filepath.Base(path), ".md")
 		}
 
-		// Extract blurb/description
 		blurb := ""
 		if b, ok := doc.Frontmatter["description"].(string); ok {
 			blurb = b
 		} else if b, ok := doc.Frontmatter["blurb"].(string); ok {
 			blurb = b
 		} else {
-			// Extract first paragraph as blurb
 			blurb = extractBlurb(doc.Content)
 		}
 
-		// Extract category from path
 		relPath, _ := filepath.Rel(sourceDir, path)
 		category := filepath.Dir(relPath)
 		if category == "." {
 			category = ""
 		}
 
-		// Convert path to URL
 		url := convertPathToURL(relPath, cfg.HTMLExt)
-
-		// Extract plain text from markdown
 		plainText := extractPlainText(doc.Content)
 
-		// Determine document type
 		docType := "documentation"
 		if t, ok := doc.Frontmatter["type"].(string); ok {
 			docType = t
@@ -98,24 +86,43 @@ func generateSearchIndex(sourceDir, outputDir string, cfg Config) error {
 
 		return nil
 	})
-
 	if err != nil {
-		return fmt.Errorf("error walking directory: %w", err)
+		return nil, fmt.Errorf("error walking directory: %w", err)
 	}
 
-	// Write search index
-	indexPath := filepath.Join(outputDir, "search-index.json")
-	indexData, err := json.MarshalIndent(documents, "", "  ")
+	return documents, nil
+}
+
+// renderSearchIndexJS serializes documents into a JavaScript file that
+// assigns window.MD2HTML_SEARCH_INDEX. Using a global variable instead of a
+// fetched JSON file keeps search working when the rendered site is opened
+// directly via file:// (the offline-by-default contract).
+func renderSearchIndexJS(documents []SearchDocument) ([]byte, error) {
+	data, err := json.Marshal(documents)
 	if err != nil {
-		return fmt.Errorf("error marshaling search index: %w", err)
+		return nil, fmt.Errorf("error marshaling search index: %w", err)
 	}
+	out := append([]byte("window.MD2HTML_SEARCH_INDEX = "), data...)
+	out = append(out, ';', '\n')
+	return out, nil
+}
 
-	if err := os.WriteFile(indexPath, indexData, 0644); err != nil {
-		return fmt.Errorf("error writing search index: %w", err)
+// generateSearchIndexJS builds the search index for sourceDir and writes it
+// to outputDir/search-index.js.
+func generateSearchIndexJS(sourceDir, outputDir string, cfg Config) (int, error) {
+	documents, err := buildSearchIndex(sourceDir, cfg)
+	if err != nil {
+		return 0, err
 	}
-
-	fmt.Printf("Generated search index: %d documents\n", len(documents))
-	return nil
+	body, err := renderSearchIndexJS(documents)
+	if err != nil {
+		return 0, err
+	}
+	indexPath := filepath.Join(outputDir, "search-index.js")
+	if err := os.WriteFile(indexPath, body, 0644); err != nil {
+		return 0, fmt.Errorf("error writing search index: %w", err)
+	}
+	return len(documents), nil
 }
 
 // extractPlainText extracts plain text from markdown content

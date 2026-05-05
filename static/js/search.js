@@ -4,36 +4,27 @@ let searchData = null;
 let selectedResultIndex = -1;
 
 // Initialize search when modal is opened
-async function initSearch() {
+function initSearch() {
     if (searchIndex) return; // Already initialized
 
-    try {
-        // Load search index
-        const response = await fetch('/search-index.json');
-        searchData = await response.json();
-
-        // Create MiniSearch instance
-        searchIndex = new MiniSearch({
-            fields: ['title', 'text', 'category', 'blurb'],
-            storeFields: ['title', 'url', 'category', 'blurb', 'type'],
-            searchOptions: {
-                boost: {
-                    title: 100,
-                    category: 20,
-                    blurb: 2
-                },
-                fuzzy: 0.2,
-                prefix: true
-            }
-        });
-
-        // Add documents to index
-        searchIndex.addAll(searchData.map((doc, id) => ({ id, ...doc })));
-
-        console.log(`Search index loaded: ${searchData.length} documents`);
-    } catch (error) {
-        console.error('Failed to load search index:', error);
+    if (!window.MD2HTML_SEARCH_INDEX) {
+        console.error('Search index not loaded (window.MD2HTML_SEARCH_INDEX is missing)');
+        return;
     }
+    searchData = window.MD2HTML_SEARCH_INDEX;
+
+    searchIndex = new MiniSearch({
+        fields: ['title', 'text', 'category', 'blurb'],
+        storeFields: ['title', 'url', 'category', 'blurb', 'type'],
+        searchOptions: {
+            boost: { title: 100, category: 20, blurb: 2 },
+            fuzzy: 0.2,
+            prefix: true
+        }
+    });
+    searchIndex.addAll(searchData.map((doc, id) => ({ id, ...doc })));
+
+    console.log(`Search index loaded: ${searchData.length} documents`);
 }
 
 // Open search modal
@@ -113,6 +104,7 @@ function displayResults(results, query) {
     resultsContainer.querySelectorAll('.search-result').forEach(el => {
         el.addEventListener('click', () => {
             const url = el.dataset.url;
+            // TODO: file:// support — doc.url is absolute
             window.location.href = url;
         });
     });
@@ -168,6 +160,7 @@ function selectResult() {
     const results = document.querySelectorAll('.search-result');
     if (selectedResultIndex >= 0 && selectedResultIndex < results.length) {
         const url = results[selectedResultIndex].dataset.url;
+        // TODO: file:// support — doc.url is absolute
         window.location.href = url;
     }
 }

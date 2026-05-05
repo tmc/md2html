@@ -136,6 +136,24 @@ func relativeRenderedLink(currentSourcePath, targetSourcePath, htmlExt, indexFil
 	return rel
 }
 
+// assetBase returns a relative URL prefix from the page rendered for
+// currentSourcePath up to the output root, suitable for prefixing static
+// asset paths like "js/search.js". It always ends with "/".
+//
+// Examples:
+//
+//	assetBase("README.md")        -> "./"
+//	assetBase("docs/guide.md")    -> "../"
+//	assetBase("a/b/c/page.md")    -> "../../../"
+func assetBase(currentSourcePath string) string {
+	clean := strings.TrimPrefix(normalizeSourcePath(currentSourcePath), "/")
+	dir := path.Dir(clean)
+	if dir == "." || dir == "" || dir == "/" {
+		return "./"
+	}
+	return strings.Repeat("../", strings.Count(dir, "/")+1)
+}
+
 func splitLinkSuffix(raw string) (base, suffix string) {
 	for i, r := range raw {
 		if r == '#' || r == '?' {

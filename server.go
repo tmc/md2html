@@ -407,6 +407,46 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 	return renderTemplateWithOptions(s.config, html, title, customCSS, true, doc.Frontmatter, opts)
 }
 
+// handleSearchAsset serves an embedded JS asset (minisearch, search.js) as
+// application/javascript. The asset name is the path inside the embed.FS, e.g.
+// "static/js/search.js".
+func handleSearchAsset(name string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := readSearchAsset(name)
+		if err != nil {
+			http.Error(w, "asset not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Write(body)
+	}
+}
+
+// handleSearchIndex builds the search index on every request so live edits
+// show up without a server restart. The index is small enough that the cost
+// is negligible for a development server.
+func (s *server) handleSearchIndex(w http.ResponseWriter, r *http.Request) {
+	root, err := sourceRoot(s.inputPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("resolve source root: %v", err), http.StatusInternalServerError)
+		return
+	}
+	docs, err := buildSearchIndex(root, s.config)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("build search index: %v", err), http.StatusInternalServerError)
+		return
+	}
+	body, err := renderSearchIndexJS(docs)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("render search index: %v", err), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Write(body)
+}
+
 func (s *server) handleRaw(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	content := s.content
@@ -575,6 +615,14 @@ func (s *server) Run(ctx context.Context) error {
 	mux.HandleFunc("/raw", s.handleRaw)
 	mux.HandleFunc("/api/versions", s.handleVersionsAPI)
 	mux.HandleFunc("/_jsonspec/schemas.json", s.handleJSONSpecSchemas)
+
+	// Register search routes ahead of handleIndex so the embedded assets win
+	// over any js/ directory or stale search-index.js in the source tree.
+	if s.config.Search {
+		mux.HandleFunc("/js/minisearch.min.js", handleSearchAsset("static/js/minisearch.min.js"))
+		mux.HandleFunc("/js/search.js", handleSearchAsset("static/js/search.js"))
+		mux.HandleFunc("/search-index.js", s.handleSearchIndex)
+	}
 
 	srv := &http.Server{
 		Addr:    s.config.HTTP,
