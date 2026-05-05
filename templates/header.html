@@ -3,7 +3,7 @@
 <nav class="top-nav">
     <div class="top-nav-left">
         {{range .Nav.Items}}{{if .IsGroup}}
-        <a class="top-nav-link" href="#section-{{.Title}}">{{.Title}}</a>
+        <span class="top-nav-link">{{.Title}}</span>
         {{end}}{{end}}
     </div>
     <div class="top-nav-right">
