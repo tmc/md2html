@@ -21,6 +21,7 @@ func run(args []string, stdout, stderr *os.File) int {
 		fs.PrintDefaults()
 	}
 	checksFlag := fs.String("c", "", "comma-separated list of checks to run (default: all)")
+	checksAliasFlag := fs.String("checks", "", "comma-separated list of checks to run (default: all)")
 	listFlag := fs.Bool("list", false, "print the available checks and exit")
 
 	if err := fs.Parse(args); err != nil {
@@ -41,8 +42,12 @@ func run(args []string, stdout, stderr *os.File) int {
 	}
 
 	var names []string
-	if *checksFlag != "" {
-		for n := range strings.SplitSeq(*checksFlag, ",") {
+	spec := *checksFlag
+	if *checksAliasFlag != "" {
+		spec = *checksAliasFlag
+	}
+	if spec != "" {
+		for n := range strings.SplitSeq(spec, ",") {
 			n = strings.TrimSpace(n)
 			if n != "" {
 				names = append(names, n)

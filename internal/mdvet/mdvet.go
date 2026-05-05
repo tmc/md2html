@@ -19,16 +19,22 @@ import (
 type Diagnostic struct {
 	File    string // markdown file the finding came from
 	Line    int    // 1-based source line, 0 if unknown
+	Col     int    // 1-based source column, 0 if unknown
 	Check   string // name of the check that produced the diagnostic
 	Message string // human-readable description
 }
 
-// String formats the diagnostic in "file:line: check: message" form.
+// String formats the diagnostic in "file:line:col: [check] message" form.
 func (d Diagnostic) String() string {
-	if d.Line > 0 {
-		return fmt.Sprintf("%s:%d: %s: %s", d.File, d.Line, d.Check, d.Message)
+	line := d.Line
+	col := d.Col
+	if line == 0 {
+		line = 1
 	}
-	return fmt.Sprintf("%s: %s: %s", d.File, d.Check, d.Message)
+	if col == 0 {
+		col = 1
+	}
+	return fmt.Sprintf("%s:%d:%d: [%s] %s", d.File, line, col, d.Check, d.Message)
 }
 
 // Document is a parsed Markdown file passed to each [Check].
@@ -50,6 +56,8 @@ type Check interface {
 // AllChecks returns the default set of checks.
 func AllChecks() []Check {
 	return []Check{
+		NavigationCheck{},
+		FrontmatterCheck{},
 		LinkCheck{},
 		ImageCheck{},
 		AnchorCheck{},
