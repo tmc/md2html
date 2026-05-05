@@ -136,25 +136,99 @@
 {{define "tabs-script"}}
 <script>
     (function() {
-        function activate(group, btn) {
+        var storagePrefix = 'md2html:tab:';
+        var storageLimit = 50;
+
+        function storageGet(key) {
+            try { return window.localStorage && window.localStorage.getItem(key); }
+            catch (e) { return null; }
+        }
+        function storageSet(key, value) {
+            try {
+                if (window.localStorage) window.localStorage.setItem(key, value);
+            } catch (e) {}
+        }
+        function storageRemove(key) {
+            try {
+                if (window.localStorage) window.localStorage.removeItem(key);
+            } catch (e) {}
+        }
+        function storageKeys() {
+            var keys = [];
+            try {
+                if (!window.localStorage) return keys;
+                for (var i = 0; i < window.localStorage.length; i++) {
+                    var key = window.localStorage.key(i);
+                    if (key && key.indexOf(storagePrefix) === 0) keys.push(key);
+                }
+            } catch (e) {}
+            return keys;
+        }
+        function storageKey(slug) {
+            return storagePrefix + slug;
+        }
+        function preferred(slug) {
+            return storageGet(storageKey(slug)) === '1';
+        }
+        function pruneStoredTabs() {
+            var keys = storageKeys();
+            while (keys.length > storageLimit) {
+                storageRemove(keys.shift());
+            }
+        }
+        function hasGroupPreference(group) {
+            var tabs = group.querySelectorAll('[role="tab"]');
+            for (var i = 0; i < tabs.length; i++) {
+                if (preferred(tabs[i].getAttribute('data-tab-slug'))) return true;
+            }
+            return false;
+        }
+        function clearGroupPreferences(group) {
+            group.querySelectorAll('[role="tab"]').forEach(function(b) {
+                storageRemove(storageKey(b.getAttribute('data-tab-slug')));
+            });
+        }
+        function persistChoice(group, btn) {
             var slug = btn.getAttribute('data-tab-slug');
+            var first = group.querySelector('[role="tab"]');
+            var hadPreference = hasGroupPreference(group);
+            clearGroupPreferences(group);
+            if (btn !== first || hadPreference) {
+                storageSet(storageKey(slug), '1');
+                pruneStoredTabs();
+            }
+        }
+        function syncChoice(group, btn) {
+            var slug = btn.getAttribute('data-tab-slug');
+            document.querySelectorAll('.md-tabs').forEach(function(other) {
+                if (other === group) return;
+                var match = other.querySelector('[role="tab"][data-tab-slug="' + CSS.escape(slug) + '"]');
+                if (match) activate(other, match, { persist: false, sync: false });
+            });
+        }
+        function activate(group, btn, opts) {
+            opts = opts || {};
+            var slug = btn.getAttribute('data-tab-slug');
+            var panelID = btn.getAttribute('aria-controls');
             group.querySelectorAll('[role="tab"]').forEach(function(b) {
                 var active = b === btn;
                 b.setAttribute('aria-selected', active ? 'true' : 'false');
                 b.tabIndex = active ? 0 : -1;
             });
             group.querySelectorAll('.md-tab-panel').forEach(function(p) {
-                if (p.id === slug) { p.removeAttribute('hidden'); }
+                if (p.id === panelID) { p.removeAttribute('hidden'); }
                 else { p.setAttribute('hidden', ''); }
             });
+            if (opts.persist) persistChoice(group, btn);
+            if (opts.sync) syncChoice(group, btn);
         }
         function activateFromHash() {
             var id = window.location.hash.slice(1);
             if (!id) return;
-            var btn = document.querySelector('.md-tabs [data-tab-slug="' + CSS.escape(id) + '"]');
+            var btn = document.querySelector('.md-tabs [aria-controls="' + CSS.escape(id) + '"]');
             if (!btn) return;
             var group = btn.closest('.md-tabs');
-            activate(group, btn);
+            activate(group, btn, { persist: true, sync: true });
             var panel = document.getElementById(id);
             if (panel && panel.scrollIntoView) {
                 panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -164,7 +238,7 @@
             var btn = e.target.closest('.md-tabs [role="tab"]');
             if (!btn) return;
             var group = btn.closest('.md-tabs');
-            activate(group, btn);
+            activate(group, btn, { persist: true, sync: true });
         });
         document.addEventListener('keydown', function(e) {
             var btn = e.target.closest && e.target.closest('.md-tabs [role="tab"]');
@@ -176,16 +250,24 @@
             else if (e.key === 'ArrowLeft') next = tabs[(i - 1 + tabs.length) % tabs.length];
             else if (e.key === 'Home') next = tabs[0];
             else if (e.key === 'End') next = tabs[tabs.length - 1];
-            if (next) { e.preventDefault(); next.focus(); activate(btn.closest('.md-tabs'), next); }
+            if (next) { e.preventDefault(); next.focus(); activate(btn.closest('.md-tabs'), next, { persist: true, sync: true }); }
         });
+        function preferredTab(group) {
+            var tabs = Array.prototype.slice.call(group.querySelectorAll('[role="tab"]'));
+            for (var i = 0; i < tabs.length; i++) {
+                if (preferred(tabs[i].getAttribute('data-tab-slug'))) return tabs[i];
+            }
+            return null;
+        }
         function initTabs() {
             // Render emits all panels visible so no-JS readers see
             // full content. On load, collapse non-selected panels so
             // tabs behave as tabs once JS is live.
             document.querySelectorAll('.md-tabs').forEach(function(group) {
-                var selected = group.querySelector('[role="tab"][aria-selected="true"]')
+                var selected = preferredTab(group)
+                    || group.querySelector('[role="tab"][aria-selected="true"]')
                     || group.querySelector('[role="tab"]');
-                if (selected) activate(group, selected);
+                if (selected) activate(group, selected, { persist: false, sync: false });
             });
             activateFromHash();
         }

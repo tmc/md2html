@@ -45,6 +45,34 @@ func TestAudioElement(t *testing.T) {
 	}
 }
 
+func TestMediaExtensions(t *testing.T) {
+	tests := []struct {
+		name string
+		tag  string
+	}{
+		{"demo.mp4", "video"},
+		{"demo.webm", "video"},
+		{"demo.mov", "video"},
+		{"demo.m4v", "video"},
+		{"demo.ogv", "video"},
+		{"clip.mp3", "audio"},
+		{"clip.wav", "audio"},
+		{"clip.oga", "audio"},
+		{"clip.ogg", "audio"},
+		{"clip.m4a", "audio"},
+		{"clip.flac", "audio"},
+		{"clip.aac", "audio"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := render(t, "![x]("+tt.name+")\n")
+			if !strings.Contains(out, "<"+tt.tag+" ") {
+				t.Fatalf("got:\n%s\nwant <%s>", out, tt.tag)
+			}
+		})
+	}
+}
+
 func TestImageFallthrough(t *testing.T) {
 	out := render(t, "![pic](foo.png)\n")
 	if !strings.Contains(out, `<img src="foo.png"`) {

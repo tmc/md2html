@@ -10,8 +10,8 @@ import (
 )
 
 // Renderer emits ARIA-compliant tablist markup for TabGroup and Tab
-// nodes. Panels are marked hidden so progressive enhancement is opt-in
-// via JavaScript.
+// nodes. Panels are emitted visible; JavaScript hides inactive panels
+// after load.
 type Renderer struct{}
 
 // RegisterFuncs implements renderer.NodeRenderer.
@@ -47,7 +47,7 @@ func (r *Renderer) renderTabGroup(w util.BufWriter, source []byte, node ast.Node
 				html.EscapeString(t.Slug),
 				aria,
 				tabindex,
-				html.EscapeString(t.Slug),
+				html.EscapeString(choiceSlug(t.Label)),
 				html.EscapeString(t.Label),
 			)
 			w.WriteByte('\n')
@@ -56,6 +56,14 @@ func (r *Renderer) renderTabGroup(w util.BufWriter, source []byte, node ast.Node
 	}
 	w.WriteString("</div>\n")
 	return ast.WalkContinue, nil
+}
+
+func choiceSlug(label string) string {
+	slug := kebab(label)
+	if slug == "" {
+		return "tab"
+	}
+	return slug
 }
 
 func (r *Renderer) renderTab(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {

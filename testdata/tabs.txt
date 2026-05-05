@@ -13,6 +13,7 @@ grep 'role="tab"' output/README.html
 grep 'id="install-ubuntu-tab"' output/README.html
 grep 'aria-controls="install-ubuntu"' output/README.html
 grep 'aria-controls="install-debian"' output/README.html
+grep 'data-tab-slug="ubuntu"' output/README.html
 grep 'aria-selected="true"' output/README.html
 
 # Tab panels with stable ids for deep linking
@@ -26,6 +27,8 @@ grep 'cove up --linux --distro debian' output/README.html
 
 # JS + CSS partial wired in
 grep 'activateFromHash' output/README.html
+grep 'md2html:tab:' output/README.html
+grep 'syncChoice' output/README.html
 grep '\.md-tabs ' output/README.html
 
 # Progressive enhancement: no panel is hidden at render time. JS
@@ -34,6 +37,27 @@ grep '\.md-tabs ' output/README.html
 ! grep 'tabpanel.* hidden' output/README.html
 
 rm -rf testsite output
+
+# Multiple tab groups with shared labels keep all panels in HTML and
+# include the persistence/sync module.
+md2html -html output -html-ext html synced
+exists output/README.html
+grep 'data-tab-group="client"' output/README.html
+grep 'data-tab-group="server"' output/README.html
+grep 'id="client-go"' output/README.html
+grep 'id="server-go"' output/README.html
+grep 'id="client-python"' output/README.html
+grep 'id="server-python"' output/README.html
+grep 'data-tab-slug="go"' output/README.html
+grep 'data-tab-slug="python"' output/README.html
+grep 'client go' output/README.html
+grep 'server go' output/README.html
+grep 'client python' output/README.html
+grep 'server python' output/README.html
+grep 'localStorage' output/README.html
+grep 'md2html:tab:' output/README.html
+grep 'syncChoice' output/README.html
+! grep 'tabpanel.* hidden' output/README.html
 
 -- testsite/README.md --
 # Install
@@ -48,5 +72,26 @@ cove up --linux --distro ubuntu
 ```bash
 cove up --linux --distro debian
 ```
+:::
+:::
+
+-- synced/README.md --
+# Synced Tabs
+
+::: tabs client
+::: tab Go
+client go
+:::
+::: tab Python
+client python
+:::
+:::
+
+::: tabs server
+::: tab Go
+server go
+:::
+::: tab Python
+server python
 :::
 :::

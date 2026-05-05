@@ -22,6 +22,11 @@
 //
 //	md2html -html _site -llms .
 //
+// Markdown supports GitHub-style alerts such as "> [!NOTE]" and
+// fenced admonitions such as "!!!note". Image syntax pointing at
+// audio or video files, for example "![demo](demo.mp4)", renders as
+// media controls.
+//
 // The command is a thin wrapper around package github.com/tmc/md2html.
 //
 //go:generate gocmddoc -o ../../README.md

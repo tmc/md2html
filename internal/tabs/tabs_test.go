@@ -45,6 +45,7 @@ func TestRenderBasic(t *testing.T) {
 		`id="install-debian"`,
 		`aria-controls="install-ubuntu"`,
 		`aria-labelledby="install-ubuntu-tab"`,
+		`data-tab-slug="ubuntu"`,
 		`>Ubuntu<`,
 		`>Debian<`,
 		`hello ubuntu`,
