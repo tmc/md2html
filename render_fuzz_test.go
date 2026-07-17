@@ -25,7 +25,7 @@ func FuzzRenderFragment(f *testing.F) {
 			AllowUnsafe: true,
 			TOC:         true,
 			HTMLExt:     ".html",
-			Frontmatter: map[string]interface{}{"mermaid_theme": "auto"},
+			Frontmatter: map[string]any{"mermaid_theme": "auto"},
 		})
 	})
 }

@@ -10,7 +10,7 @@ func TestRenderTemplateMetadata(t *testing.T) {
 		SiteURL: "https://example.com/docs/",
 		HTMLExt: "html",
 	}
-	frontmatter := map[string]interface{}{
+	frontmatter := map[string]any{
 		"description": "A useful page summary.",
 		"og_image":    "https://example.com/og.png",
 	}

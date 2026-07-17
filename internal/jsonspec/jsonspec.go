@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	highlighting "github.com/yuin/goldmark-highlighting/v2"
 	"github.com/yuin/goldmark"
+	highlighting "github.com/yuin/goldmark-highlighting/v2"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/text"

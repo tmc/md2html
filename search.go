@@ -41,7 +41,7 @@ func buildSearchIndex(sourceDir string, cfg Config) ([]SearchDocument, error) {
 		if err != nil {
 			doc = DocumentData{
 				Content:     string(content),
-				Frontmatter: make(map[string]interface{}),
+				Frontmatter: make(map[string]any),
 			}
 		}
 

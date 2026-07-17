@@ -25,7 +25,7 @@ type Loader struct {
 	htmlExt string // Extension for HTML files (e.g., ".html" or "")
 
 	mu    sync.RWMutex
-	cache map[string]interface{}
+	cache map[string]any
 }
 
 // NewLoader creates a new data loader rooted at baseDir.
@@ -33,12 +33,12 @@ func NewLoader(baseDir, htmlExt string) *Loader {
 	return &Loader{
 		baseDir: baseDir,
 		htmlExt: htmlExt,
-		cache:   make(map[string]interface{}),
+		cache:   make(map[string]any),
 	}
 }
 
 // Load auto-detects file type by extension and loads accordingly.
-func (l *Loader) Load(path string) (interface{}, error) {
+func (l *Loader) Load(path string) (any, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".json":
@@ -58,13 +58,13 @@ func (l *Loader) Load(path string) (interface{}, error) {
 }
 
 // LoadJSON loads and parses a JSON file.
-func (l *Loader) LoadJSON(path string) (interface{}, error) {
+func (l *Loader) LoadJSON(path string) (any, error) {
 	content, err := l.readFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	var data interface{}
+	var data any
 	if err := json.Unmarshal(content, &data); err != nil {
 		return nil, err
 	}
@@ -72,13 +72,13 @@ func (l *Loader) LoadJSON(path string) (interface{}, error) {
 }
 
 // LoadYAML loads and parses a YAML file.
-func (l *Loader) LoadYAML(path string) (interface{}, error) {
+func (l *Loader) LoadYAML(path string) (any, error) {
 	content, err := l.readFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	var data interface{}
+	var data any
 	if err := yaml.Unmarshal(content, &data); err != nil {
 		return nil, err
 	}
@@ -87,13 +87,13 @@ func (l *Loader) LoadYAML(path string) (interface{}, error) {
 
 // MarkdownDoc represents a parsed markdown file with extracted structure.
 type MarkdownDoc struct {
-	Frontmatter map[string]interface{} // YAML frontmatter
-	Content     string                 // Raw markdown content
-	HTML        template.HTML          // Rendered HTML
-	Title       string                 // First H1 or frontmatter title
-	Headings    []Heading              // All headings
-	Links       []Link                 // All links with context
-	Lists       []ListItem             // Top-level list items (with nesting)
+	Frontmatter map[string]any // YAML frontmatter
+	Content     string         // Raw markdown content
+	HTML        template.HTML  // Rendered HTML
+	Title       string         // First H1 or frontmatter title
+	Headings    []Heading      // All headings
+	Links       []Link         // All links with context
+	Lists       []ListItem     // Top-level list items (with nesting)
 }
 
 // Heading represents a heading in the document.
@@ -133,7 +133,7 @@ func (l *Loader) LoadMD(path string) (*MarkdownDoc, error) {
 func (l *Loader) ParseMD(content string) (*MarkdownDoc, error) {
 	doc := &MarkdownDoc{
 		Content:     content,
-		Frontmatter: make(map[string]interface{}),
+		Frontmatter: make(map[string]any),
 	}
 
 	// Create goldmark parser with extensions

@@ -15,7 +15,7 @@ type FragmentOptions struct {
 	// HTMLExt is the extension used when rewriting local Markdown links.
 	HTMLExt string
 	// Frontmatter supplies page frontmatter used by fragment enhancements.
-	Frontmatter map[string]interface{}
+	Frontmatter map[string]any
 }
 
 // Fragment contains rendered markdown plus enhancement metadata for clients.

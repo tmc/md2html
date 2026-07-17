@@ -18,7 +18,7 @@ func TestLinkCheck(t *testing.T) {
 		{
 			name: "valid relative link",
 			files: map[string]string{
-				"README.md": "See [docs](docs/intro.md).\n",
+				"README.md":     "See [docs](docs/intro.md).\n",
 				"docs/intro.md": "# Intro\n",
 			},
 			target:   "README.md",
@@ -86,8 +86,8 @@ func TestLinkCheck(t *testing.T) {
 		{
 			name: "percent-encoded path",
 			files: map[string]string{
-				"README.md":   "See [doc](my%20doc.md).\n",
-				"my doc.md":   "# my doc\n",
+				"README.md": "See [doc](my%20doc.md).\n",
+				"my doc.md": "# my doc\n",
 			},
 			target:   "README.md",
 			wantNone: true,
@@ -168,9 +168,9 @@ func TestLinkCheck(t *testing.T) {
 func TestRunWalksDirectory(t *testing.T) {
 	dir := t.TempDir()
 	files := map[string]string{
-		"a.md":         "[ok](b.md)\n",
-		"b.md":         "[bad](missing.md)\n",
-		"sub/c.md":     "[up](../a.md)\n",
+		"a.md":          "[ok](b.md)\n",
+		"b.md":          "[bad](missing.md)\n",
+		"sub/c.md":      "[up](../a.md)\n",
 		"not-a-doc.txt": "ignored",
 	}
 	for rel, content := range files {

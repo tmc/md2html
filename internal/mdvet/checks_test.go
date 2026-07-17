@@ -70,7 +70,7 @@ func TestImageCheck(t *testing.T) {
 	})
 	t.Run("present image ok", func(t *testing.T) {
 		diags := runCheck(t, map[string]string{
-			"a.md":   "![alt](pic.png)\n",
+			"a.md":    "![alt](pic.png)\n",
 			"pic.png": "x",
 		}, "a.md", ImageCheck{})
 		if len(diags) != 0 {
@@ -130,8 +130,8 @@ func TestAnchorCheck(t *testing.T) {
 	})
 	t.Run("cross-file anchor matches", func(t *testing.T) {
 		diags := runCheck(t, map[string]string{
-			"a.md":     "See [there](b.md#hello).\n",
-			"b.md":     "# Hello\n",
+			"a.md": "See [there](b.md#hello).\n",
+			"b.md": "# Hello\n",
 		}, "a.md", AnchorCheck{})
 		if len(diags) != 0 {
 			t.Errorf("got %v, want none", diags)
@@ -146,7 +146,7 @@ func TestAnchorCheck(t *testing.T) {
 	})
 	t.Run("anchor on non-markdown skipped", func(t *testing.T) {
 		diags := runCheck(t, map[string]string{
-			"a.md":  "See [there](page.html#nope).\n",
+			"a.md":      "See [there](page.html#nope).\n",
 			"page.html": "x",
 		}, "a.md", AnchorCheck{})
 		if len(diags) != 0 {

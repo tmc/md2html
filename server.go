@@ -110,7 +110,7 @@ type server struct {
 	clientsMu  sync.RWMutex
 	cssContent string
 	inputPath  string
-	jsonData   interface{} // Generic JSON data for templates
+	jsonData   any // Generic JSON data for templates
 	shutdownCh chan struct{}
 	watcher    *fsnotify.Watcher
 	watchMu    sync.Mutex
@@ -331,7 +331,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			doc, err := parseFrontmatter(string(fileContent))
 			if err != nil {
 				log.Printf("Error parsing frontmatter in %s: %v", s.config.Index, err)
-				doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]interface{})}
+				doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
 			}
 			html := s.renderDocumentWithVersion(doc, s.config.Index, css, s.config.Index, requestedVersion)
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -384,7 +384,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 				doc, err := parseFrontmatter(string(fileContent))
 				if err != nil {
 					log.Printf("Error parsing frontmatter in %s: %v", candidate, err)
-					doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]interface{})}
+					doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
 				}
 				html := s.renderDocumentWithVersion(doc, candidate, css, candidate, requestedVersion)
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -430,7 +430,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		doc, err := parseFrontmatter(string(content))
 		if err != nil {
 			log.Printf("Error parsing frontmatter in %s: %v", file, err)
-			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
+			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
 		html := s.renderDocumentWithVersion(doc, file, css, file, requestedVersion)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -452,7 +452,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		doc := DocumentData{Content: listing, Frontmatter: make(map[string]interface{})}
+		doc := DocumentData{Content: listing, Frontmatter: make(map[string]any)}
 		html := s.renderDocumentWithVersion(doc, "Directory Listing", css, "", "")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write([]byte(html))
@@ -462,7 +462,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	doc, err := parseFrontmatter(content)
 	if err != nil {
 		log.Printf("Error parsing frontmatter: %v", err)
-		doc = DocumentData{Content: content, Frontmatter: make(map[string]interface{})}
+		doc = DocumentData{Content: content, Frontmatter: make(map[string]any)}
 	}
 	html := s.renderDocumentWithVersion(doc, s.config.Title, css, "", "")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

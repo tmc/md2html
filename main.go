@@ -214,7 +214,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		doc, err := parseFrontmatter(string(content))
 		if err != nil {
 			logger.Error("Error parsing frontmatter", "error", err)
-			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
+			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
 
 		html := markdownToHTMLWithContext(cfg, doc.Content, cfg.Source)
@@ -421,7 +421,7 @@ func renderDocument(cfg Config, doc DocumentData, title, customCSS, filePath str
 
 func loadAllTemplates(cfg Config) (*template.Template, error) {
 	tmpl, err := template.New("root").Funcs(template.FuncMap{
-		"default": func(def, val interface{}) interface{} {
+		"default": func(def, val any) any {
 			if val == nil {
 				return def
 			}
@@ -430,7 +430,7 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 			}
 			return val
 		},
-		"loadJSON": func(filename string) interface{} {
+		"loadJSON": func(filename string) any {
 			data, err := loadJSONFile(filename)
 			if err != nil {
 				log.Printf("Error loading JSON %s: %v", filename, err)
@@ -440,11 +440,11 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 		},
 		"replace": strings.ReplaceAll,
 		// dict creates a map from key-value pairs for passing to templates
-		"dict": func(values ...interface{}) map[string]interface{} {
+		"dict": func(values ...any) map[string]any {
 			if len(values)%2 != 0 {
 				return nil
 			}
-			dict := make(map[string]interface{}, len(values)/2)
+			dict := make(map[string]any, len(values)/2)
 			for i := 0; i < len(values); i += 2 {
 				key, ok := values[i].(string)
 				if !ok {
@@ -493,7 +493,7 @@ type RenderOptions struct {
 	// SiteTitle is the configured site title.
 	SiteTitle string
 	// Data is the decoded value loaded from -data-json.
-	Data interface{}
+	Data any
 	// FilePath is the source Markdown path relative to the rendered tree.
 	FilePath string
 	// Version is the currently rendered git version, when versioning is enabled.
@@ -512,7 +512,7 @@ type RenderOptions struct {
 	Assets map[string]string
 }
 
-func firstFrontmatterString(frontmatter map[string]interface{}, keys ...string) string {
+func firstFrontmatterString(frontmatter map[string]any, keys ...string) string {
 	for _, key := range keys {
 		value, ok := frontmatter[key]
 		if !ok {
@@ -530,7 +530,7 @@ func firstFrontmatterString(frontmatter map[string]interface{}, keys ...string) 
 	return ""
 }
 
-func resolveMermaidThemes(frontmatter map[string]interface{}) (theme, darkTheme string, auto bool) {
+func resolveMermaidThemes(frontmatter map[string]any) (theme, darkTheme string, auto bool) {
 	theme = "default"
 	darkTheme = "dark"
 	auto = true
@@ -567,11 +567,11 @@ func resolveMermaidThemes(frontmatter map[string]interface{}) (theme, darkTheme 
 	return theme, darkTheme, auto
 }
 
-func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]interface{}) string {
+func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any) string {
 	return renderTemplateWithOptions(cfg, htmlContent, title, customCSS, liveReload, frontmatter, RenderOptions{})
 }
 
-func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]interface{}, opts RenderOptions) string {
+func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any, opts RenderOptions) string {
 	tmpl, err := loadAllTemplates(cfg)
 	if err != nil {
 		log.Printf("Error loading templates: %v", err)
@@ -650,13 +650,13 @@ type templateData struct {
 	Verbose          bool
 	LiveReload       bool
 	HTMLExt          string
-	Frontmatter      map[string]interface{}
+	Frontmatter      map[string]any
 	Version          string
 	Versions         []GitVersion
 	Search           bool
 	Nav              *NavContext
 	SiteTitle        string
-	Data             interface{}
+	Data             any
 	IndexFile        string
 	MermaidTheme     string
 	MermaidDarkTheme string
@@ -680,7 +680,7 @@ type renderMetadata struct {
 	LastUpdated    string
 }
 
-func pageMetadata(cfg Config, title string, frontmatter map[string]interface{}, opts RenderOptions) renderMetadata {
+func pageMetadata(cfg Config, title string, frontmatter map[string]any, opts RenderOptions) renderMetadata {
 	desc := firstFrontmatterString(frontmatter, "description")
 	if desc == "" {
 		desc = opts.Description
@@ -729,7 +729,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	}
 
 	// Load JSON data if provided
-	var jsonData interface{}
+	var jsonData any
 	if cfg.DataJSON != "" {
 		var err error
 		jsonData, err = loadJSONFile(cfg.DataJSON)
@@ -904,7 +904,7 @@ func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssCon
 	doc, err := parseFrontmatter(string(content))
 	if err != nil {
 		log.Printf("Error parsing frontmatter in %s: %v", file.RelPath, err)
-		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
+		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 	}
 
 	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, file.RelPath)
@@ -949,7 +949,7 @@ func processMarkdownFileWithNav(file markdownFile, sourceDir, outputDir, cssCont
 	doc, err := parseFrontmatter(string(content))
 	if err != nil {
 		log.Printf("Error parsing frontmatter in %s: %v", file.RelPath, err)
-		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
+		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 	}
 
 	// Generate HTML content
@@ -1007,7 +1007,7 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 	doc, err := parseFrontmatter(string(content))
 	if err != nil {
 		log.Printf("Error parsing frontmatter in index file: %v", err)
-		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
+		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 	}
 
 	htmlPath := opts.FilePath
@@ -1042,7 +1042,7 @@ func processIndexFile(indexPath, outputDir, cssContent string, cfg Config) error
 	doc, err := parseFrontmatter(string(content))
 	if err != nil {
 		log.Printf("Error parsing frontmatter in index file: %v", err)
-		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]interface{})}
+		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 	}
 
 	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, filepath.Base(indexPath))
@@ -1077,7 +1077,7 @@ func generateTOCIndex(sourceDir, outputDir string, files []markdownFile, cssCont
 	htmlContent := markdownToHTMLWithContext(cfg, buf.String(), "")
 
 	// Render with template
-	doc := DocumentData{Content: buf.String(), Frontmatter: make(map[string]interface{})}
+	doc := DocumentData{Content: buf.String(), Frontmatter: make(map[string]any)}
 	finalHTML := renderTemplateWithOptions(cfg, htmlContent, "Directory Listing", cssContent, false, doc.Frontmatter, RenderOptions{Assets: assets})
 
 	// Write index.html

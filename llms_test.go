@@ -16,7 +16,7 @@ func TestLLMSSummary(t *testing.T) {
 		{
 			name: "description",
 			doc: DocumentData{
-				Frontmatter: map[string]interface{}{"description": "frontmatter summary"},
+				Frontmatter: map[string]any{"description": "frontmatter summary"},
 				Content:     "# Title\n\nBody paragraph.",
 			},
 			want: "frontmatter summary",
@@ -24,7 +24,7 @@ func TestLLMSSummary(t *testing.T) {
 		{
 			name: "first paragraph",
 			doc: DocumentData{
-				Frontmatter: map[string]interface{}{},
+				Frontmatter: map[string]any{},
 				Content:     "# Title\n\nFirst **paragraph** with [a link](guide.md).\n\nSecond paragraph.",
 			},
 			want: "First paragraph with a link.",
@@ -32,7 +32,7 @@ func TestLLMSSummary(t *testing.T) {
 		{
 			name: "truncate",
 			doc: DocumentData{
-				Frontmatter: map[string]interface{}{},
+				Frontmatter: map[string]any{},
 				Content:     strings.Repeat("word ", 80),
 			},
 		},

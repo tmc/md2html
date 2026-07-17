@@ -383,7 +383,7 @@ func readAutoNavFile(name, rel string) (autoNavFile, error) {
 	}
 	doc, err := parseFrontmatter(string(data))
 	if err != nil {
-		doc = DocumentData{Content: string(data), Frontmatter: map[string]interface{}{}}
+		doc = DocumentData{Content: string(data), Frontmatter: map[string]any{}}
 	}
 	base := path.Base(rel)
 	stem := strings.TrimSuffix(base, path.Ext(base))
@@ -561,17 +561,17 @@ func titleWords(s string) string {
 	return strings.Join(fields, " ")
 }
 
-func hasFrontmatterInt(frontmatter map[string]interface{}, key string) bool {
+func hasFrontmatterInt(frontmatter map[string]any, key string) bool {
 	_, ok := frontmatterIntValue(frontmatter, key)
 	return ok
 }
 
-func frontmatterInt(frontmatter map[string]interface{}, key string) int {
+func frontmatterInt(frontmatter map[string]any, key string) int {
 	n, _ := frontmatterIntValue(frontmatter, key)
 	return n
 }
 
-func frontmatterIntValue(frontmatter map[string]interface{}, key string) (int, bool) {
+func frontmatterIntValue(frontmatter map[string]any, key string) (int, bool) {
 	switch v := frontmatter[key].(type) {
 	case int:
 		return v, true

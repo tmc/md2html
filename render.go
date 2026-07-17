@@ -448,16 +448,16 @@ type DocumentData struct {
 	Content string
 	// Frontmatter is the parsed YAML frontmatter map. It is empty when
 	// the document has no frontmatter or frontmatter parsing failed.
-	Frontmatter map[string]interface{}
+	Frontmatter map[string]any
 }
 
-func loadJSONFile(filename string) (interface{}, error) {
+func loadJSONFile(filename string) (any, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	var jsonData interface{}
+	var jsonData any
 	if err := json.Unmarshal(data, &jsonData); err != nil {
 		return nil, err
 	}
@@ -477,7 +477,7 @@ func parseFrontmatter(content string) (DocumentData, error) {
 	// Get metadata
 	metaData := meta.Get(context)
 	if metaData == nil {
-		metaData = make(map[string]interface{})
+		metaData = make(map[string]any)
 	}
 
 	return DocumentData{
@@ -517,7 +517,7 @@ func lineStart(source []byte, pos int) int {
 	return pos
 }
 
-func renderFrontmatterHTML(frontmatter map[string]interface{}) string {
+func renderFrontmatterHTML(frontmatter map[string]any) string {
 	if len(frontmatter) == 0 {
 		return ""
 	}

@@ -78,7 +78,7 @@ func collectLLMSPages(sourceDir string, files []markdownFile, nav *Navigation, c
 		}
 		doc, err := parseFrontmatter(string(content))
 		if err != nil {
-			doc = DocumentData{Content: string(content), Frontmatter: map[string]interface{}{}}
+			doc = DocumentData{Content: string(content), Frontmatter: map[string]any{}}
 		}
 		title := llmsTitle(f.RelPath, doc)
 		pages = append(pages, llmsPage{

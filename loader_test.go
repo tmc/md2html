@@ -204,13 +204,13 @@ func TestLoaderLoadJSON(t *testing.T) {
 	content := `{"name": "test", "count": 42}`
 
 	// Test the underlying JSON parsing logic
-	var data interface{}
+	var data any
 	err := json.Unmarshal([]byte(content), &data)
 	if err != nil {
 		t.Fatalf("JSON parse error: %v", err)
 	}
 
-	m, ok := data.(map[string]interface{})
+	m, ok := data.(map[string]any)
 	if !ok {
 		t.Fatal("Expected map from JSON")
 	}
@@ -229,13 +229,13 @@ items:
   - one
   - two
 `
-	var data interface{}
+	var data any
 	err := yaml.Unmarshal([]byte(content), &data)
 	if err != nil {
 		t.Fatalf("YAML parse error: %v", err)
 	}
 
-	m, ok := data.(map[string]interface{})
+	m, ok := data.(map[string]any)
 	if !ok {
 		t.Fatal("Expected map from YAML")
 	}
