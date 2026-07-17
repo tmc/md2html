@@ -329,7 +329,10 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 				}
 				seen[real] = true
 				if err := walkDir(realPath, apparentPath); err != nil {
-					return err
+					// Skip subdirectories we cannot read (e.g. permission
+					// denied on system directories like .Trashes) rather than
+					// aborting the entire listing.
+					log.Printf("skipping %s: %v", apparentPath, err)
 				}
 				continue
 			}
