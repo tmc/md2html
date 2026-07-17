@@ -16,8 +16,22 @@ Serve the current tree:
 
 	md2html -http :8080
 
+Disable live-reload file watching:
+
+	md2html -watch=false -http :8080
+
 Generate static output:
 
 	md2html -html _site .
+
+Generate static output with docs navigation:
+
+	md2html -nav -html _site .
+
+Generate static output with agent-readable summaries:
+
+	md2html -html _site -llms .
+
+Markdown supports GitHub-style alerts such as "> \[!NOTE]" and fenced admonitions such as "!!!note". Image syntax pointing at audio or video files, for example "!\[demo](demo.mp4)", renders as media controls.
 
 The command is a thin wrapper around package github.com/tmc/md2html.

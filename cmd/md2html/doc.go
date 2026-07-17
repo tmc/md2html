@@ -14,9 +14,17 @@
 //
 //	md2html -http :8080
 //
+// Disable live-reload file watching:
+//
+//	md2html -watch=false -http :8080
+//
 // Generate static output:
 //
 //	md2html -html _site .
+//
+// Generate static output with docs navigation:
+//
+//	md2html -nav -html _site .
 //
 // Generate static output with agent-readable summaries:
 //
