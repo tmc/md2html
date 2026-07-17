@@ -159,6 +159,40 @@
 
     li > p { margin-top: 16px; }
 
+    li:has(> input[type="checkbox"][disabled]:first-child) {
+        list-style-type: none;
+    }
+
+    li > input[type="checkbox"][disabled]:first-child {
+        -webkit-appearance: none;
+        appearance: none;
+        box-sizing: border-box;
+        display: inline-grid;
+        place-content: center;
+        width: 1em;
+        height: 1em;
+        margin: 0 .2em .25em -1.4em;
+        vertical-align: middle;
+        background: var(--bg);
+        border: 2px solid var(--fg-muted);
+        border-radius: 3px;
+        cursor: default;
+        opacity: 1;
+    }
+
+    li > input[type="checkbox"][disabled]:first-child:checked {
+        background: var(--accent);
+        border-color: var(--accent);
+    }
+
+    li > input[type="checkbox"][disabled]:first-child:checked::before {
+        content: "";
+        width: .55em;
+        height: .55em;
+        background: white;
+        clip-path: polygon(14% 44%, 0 59%, 41% 100%, 100% 21%, 86% 7%, 38% 67%);
+    }
+
     hr {
         height: .25em;
         padding: 0;
