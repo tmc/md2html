@@ -109,6 +109,24 @@ func renderedPathForSource(sourcePath, htmlExt, indexFile string) string {
 	return base
 }
 
+// canonicalPagePath maps a rendered page path to the path used in its
+// canonical URL, collapsing index pages into their directory:
+// "index.html" becomes "" and "posts/index.html" becomes "posts/".
+func canonicalPagePath(rendered, htmlExt string) string {
+	htmlExt = normalizeHTMLExt(htmlExt)
+	if htmlExt == "" {
+		return rendered
+	}
+	rendered = filepath.ToSlash(rendered)
+	if rendered == "index"+htmlExt {
+		return ""
+	}
+	if dir, ok := strings.CutSuffix(rendered, "/index"+htmlExt); ok {
+		return dir + "/"
+	}
+	return rendered
+}
+
 func relativeRenderedLink(currentSourcePath, targetSourcePath, htmlExt, indexFile string) string {
 	target := renderedPathForSource(targetSourcePath, htmlExt, indexFile)
 	if target == "" {

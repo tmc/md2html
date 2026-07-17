@@ -94,6 +94,31 @@ func TestAssetBase(t *testing.T) {
 	}
 }
 
+func TestCanonicalPagePath(t *testing.T) {
+	tests := []struct {
+		name     string
+		rendered string
+		htmlExt  string
+		want     string
+	}{
+		{name: "regular page", rendered: "guide/intro.html", htmlExt: "html", want: "guide/intro.html"},
+		{name: "root index", rendered: "index.html", htmlExt: "html", want: ""},
+		{name: "nested index", rendered: "posts/index.html", htmlExt: "html", want: "posts/"},
+		{name: "deep nested index", rendered: "a/b/index.html", htmlExt: "html", want: "a/b/"},
+		{name: "index-prefixed page", rendered: "posts/indexing.html", htmlExt: "html", want: "posts/indexing.html"},
+		{name: "no extension passthrough", rendered: "guide/intro", htmlExt: "", want: "guide/intro"},
+		{name: "dotted extension", rendered: "index.htm", htmlExt: ".htm", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := canonicalPagePath(tt.rendered, tt.htmlExt); got != tt.want {
+				t.Fatalf("canonicalPagePath(%q, %q) = %q, want %q", tt.rendered, tt.htmlExt, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRewriteLocalMarkdownReference(t *testing.T) {
 	tests := []struct {
 		name      string

@@ -691,7 +691,8 @@ func pageMetadata(cfg Config, title string, frontmatter map[string]interface{}, 
 		LastUpdated:    opts.LastUpdated,
 	}
 	if cfg.SiteURL != "" && opts.FilePath != "" {
-		meta.CanonicalURL = joinSiteURL(cfg.SiteURL, renderedPathForSource(opts.FilePath, cfg.HTMLExt, cfg.Index))
+		rendered := renderedPathForSource(opts.FilePath, cfg.HTMLExt, cfg.Index)
+		meta.CanonicalURL = joinSiteURL(cfg.SiteURL, canonicalPagePath(rendered, cfg.HTMLExt))
 	}
 	return meta
 }
@@ -699,7 +700,7 @@ func pageMetadata(cfg Config, title string, frontmatter map[string]interface{}, 
 func joinSiteURL(base, pagePath string) string {
 	base = strings.TrimRight(strings.TrimSpace(base), "/")
 	pagePath = strings.TrimLeft(filepath.ToSlash(pagePath), "/")
-	if base == "" || pagePath == "" {
+	if base == "" {
 		return base
 	}
 	return base + "/" + pagePath

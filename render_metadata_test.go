@@ -31,6 +31,24 @@ func TestRenderTemplateMetadata(t *testing.T) {
 	}
 }
 
+func TestRenderTemplateMetadataIndexCanonical(t *testing.T) {
+	cfg := Config{
+		SiteURL: "https://example.com",
+		HTMLExt: "html",
+		Index:   "index.md",
+	}
+
+	got := renderTemplateWithOptions(cfg, "<p>body</p>", "Home", "", false, nil, RenderOptions{FilePath: "index.md"})
+	if !strings.Contains(got, `<link rel="canonical" href="https://example.com/">`) {
+		t.Fatalf("root index canonical not collapsed to site root in:\n%s", got)
+	}
+
+	got = renderTemplateWithOptions(cfg, "<p>body</p>", "Posts", "", false, nil, RenderOptions{FilePath: "posts/index.md"})
+	if !strings.Contains(got, `<link rel="canonical" href="https://example.com/posts/">`) {
+		t.Fatalf("nested index canonical not collapsed to directory in:\n%s", got)
+	}
+}
+
 func TestRenderTemplateMetadataFallbackAndAbsence(t *testing.T) {
 	cfg := Config{HTMLExt: "html"}
 	opts := RenderOptions{
