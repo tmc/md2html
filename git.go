@@ -244,9 +244,7 @@ func gitLastUpdatedPaths(repoPath string, paths []string) (map[string]string, er
 	if len(paths) == 0 {
 		return map[string]string{}, nil
 	}
-	head := exec.Command("git", "rev-parse", "--verify", "HEAD")
-	head.Dir = repoPath
-	if err := head.Run(); err != nil {
+	if !gitHasHead(repoPath) {
 		return map[string]string{}, nil
 	}
 	args := []string{"log", "--format=%ct", "--name-only", "--"}
@@ -262,6 +260,12 @@ func gitLastUpdatedPaths(repoPath string, paths []string) (map[string]string, er
 		want[filepath.ToSlash(p)] = true
 	}
 	return parseGitLastUpdated(out, want), nil
+}
+
+func gitHasHead(repoPath string) bool {
+	head := exec.Command("git", "rev-parse", "--verify", "HEAD")
+	head.Dir = repoPath
+	return head.Run() == nil
 }
 
 func parseGitLastUpdated(out []byte, want map[string]bool) map[string]string {

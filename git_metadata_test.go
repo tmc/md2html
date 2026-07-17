@@ -24,12 +24,18 @@ func TestGitLastUpdatedPaths(t *testing.T) {
 	runGit(t, dir, "init")
 	runGit(t, dir, "config", "user.email", "test@example.com")
 	runGit(t, dir, "config", "user.name", "Test User")
+	if gitHasHead(dir) {
+		t.Fatalf("gitHasHead(empty repo) = true, want false")
+	}
 
 	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("# README\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	runGit(t, dir, "add", "README.md")
 	runGit(t, dir, "commit", "-m", "add readme")
+	if !gitHasHead(dir) {
+		t.Fatalf("gitHasHead(committed repo) = false, want true")
+	}
 
 	got, err := gitLastUpdatedPaths(dir, []string{"README.md", "missing.md"})
 	if err != nil {
