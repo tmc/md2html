@@ -209,6 +209,7 @@ func TestGenerateStaticHTMLSummaryLinksAreRelative(t *testing.T) {
 		HTML:    out,
 		Index:   "index.md",
 		HTMLExt: "html",
+		Nav:     true,
 	}
 
 	if err := generateStaticHTML(context.Background(), cfg, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {

@@ -44,6 +44,8 @@ type Config struct {
 	LLMS              bool
 	SiteURL           string
 	EditURL           string
+	Nav               bool
+	Watch             string
 
 	// Vet enables non-blocking mdvet checks. When true, [Run] reports
 	// any diagnostics it finds to the logger (or stderr) at warn level
@@ -99,6 +101,8 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.Bool("llms", false, "emit llms.txt, llms-full.txt, and raw markdown links in static output")
 	fs.String("site-url", "", "canonical base URL for generated pages")
 	fs.String("edit-url", "", "URL template for edit links; {path} is replaced with the source path")
+	fs.Bool("nav", false, "render docs navigation from SUMMARY.md or the markdown tree")
+	fs.String("watch", "auto", "live reload file watching: auto, true, or false")
 	fs.String("jsonspec-prefixes", "", "comma-separated JSON type-discriminator prefixes to enrich (e.g. 'ascf/')")
 	fs.String("jsonspec-badge-url", "", "URL template for schema badges; %s is the discriminator suffix (e.g. 'schemas.html#%s')")
 	fs.String("jsonspec-badge-label", "", "label template for schema badges; %s is the discriminator suffix")
@@ -133,6 +137,8 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		LLMS:              fs.Lookup("llms").Value.String() == "true",
 		SiteURL:           fs.Lookup("site-url").Value.String(),
 		EditURL:           fs.Lookup("edit-url").Value.String(),
+		Nav:               fs.Lookup("nav").Value.String() == "true",
+		Watch:             fs.Lookup("watch").Value.String(),
 
 		JSONSpecPrefixes:   fs.Lookup("jsonspec-prefixes").Value.String(),
 		JSONSpecBadgeURL:   fs.Lookup("jsonspec-badge-url").Value.String(),
@@ -224,8 +230,24 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 }
 
 func runServer(ctx context.Context, cfg Config, logger *slog.Logger) error {
+	if _, err := watchEnabled(cfg.Watch, cfg.Source); err != nil {
+		return err
+	}
 	s := newServer(cfg, logger)
 	return s.Run(ctx)
+}
+
+func watchEnabled(mode, source string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", "auto":
+		return source != "-", nil
+	case "true", "1", "yes", "on":
+		return true, nil
+	case "false", "0", "no", "off":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid watch mode %q (want auto, true, or false)", mode)
+	}
 }
 
 func formatServerURL(addr string) string {
@@ -737,16 +759,20 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 
 	logger.Info("Found markdown files to process", "count", len(files))
 
-	// Load navigation from SUMMARY.md or build it from the markdown tree.
-	htmlExt := ""
-	if cfg.HTMLExt != "" {
-		htmlExt = "." + cfg.HTMLExt
-	}
-	nav, err := LoadNavigationOrAutoFromDir(sourceDir, htmlExt)
-	if err != nil {
-		logger.Error("Error loading navigation", "error", err)
-	} else if nav != nil && len(nav.Items) > 0 {
-		logger.Info("Loaded navigation", "pages", len(nav.Flat))
+	var nav *Navigation
+	if cfg.Nav {
+		// Load navigation from SUMMARY.md or build it from the markdown tree.
+		htmlExt := ""
+		if cfg.HTMLExt != "" {
+			htmlExt = "." + cfg.HTMLExt
+		}
+		var err error
+		nav, err = LoadNavigationOrAutoFromDir(sourceDir, htmlExt)
+		if err != nil {
+			logger.Error("Error loading navigation", "error", err)
+		} else if nav != nil && len(nav.Items) > 0 {
+			logger.Info("Loaded navigation", "pages", len(nav.Flat))
+		}
 	}
 	lastUpdated := map[string]string{}
 	if times, err := gitLastUpdated(sourceDir, files); err == nil {

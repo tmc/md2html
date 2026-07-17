@@ -1,0 +1,26 @@
+# Test static output does not render docs navigation by default.
+
+md2html -html out -html-ext html src
+
+exists out/index.html
+exists out/guide.html
+
+! grep '<aside class="sidebar">' out/guide.html
+! grep '<nav class="top-nav">' out/guide.html
+grep 'Guide page.' out/guide.html
+
+-- src/SUMMARY.md --
+# Summary
+
+* [Home](index.md)
+* [Guide](guide.md)
+
+-- src/index.md --
+# Home
+
+Home page.
+
+-- src/guide.md --
+# Guide
+
+Guide page.

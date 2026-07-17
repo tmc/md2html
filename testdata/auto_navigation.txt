@@ -1,6 +1,6 @@
 # Test static docs layout with auto navigation and no SUMMARY.md.
 
-md2html -html out -html-ext html src
+md2html -nav -html out -html-ext html src
 
 exists out/index.html
 exists out/guide/README.html
