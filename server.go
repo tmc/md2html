@@ -656,12 +656,6 @@ func (s *server) handleSSE(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) notifyClients() {
-	select {
-	case <-time.After(50 * time.Millisecond):
-	default:
-		return
-	}
-
 	s.clientsMu.RLock()
 	defer s.clientsMu.RUnlock()
 
