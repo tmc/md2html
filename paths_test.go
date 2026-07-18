@@ -193,6 +193,22 @@ func TestMarkdownToHTMLWithContextRewritesRelativeLinks(t *testing.T) {
 	}
 }
 
+func TestMarkdownToHTMLWithContextRewritesOKFRootLinks(t *testing.T) {
+	cfg := Config{Format: "okf", HTMLExt: "html", Index: "index.md"}
+
+	html := markdownToHTMLWithContext(cfg, "[Orders](/tables/orders.md?view=all#columns)\n", "datasets/sales.md")
+	if !strings.Contains(html, `href="../tables/orders.html?view=all#columns"`) {
+		t.Fatalf("rendered HTML missing rewritten OKF href:\n%s", html)
+	}
+}
+
+func TestMarkdownToHTMLWithContextLeavesRootLinksInDefaultFormat(t *testing.T) {
+	html := markdownToHTMLWithContext(Config{HTMLExt: "html"}, "[Orders](/tables/orders.md)\n", "datasets/sales.md")
+	if !strings.Contains(html, `href="/tables/orders.md"`) {
+		t.Fatalf("rendered HTML rewrote ordinary root-relative href:\n%s", html)
+	}
+}
+
 func TestMarkdownToHTMLWithContextRewritesUnsafeHTMLLinks(t *testing.T) {
 	cfg := Config{AllowUnsafe: true, HTMLExt: "html", Index: "index.md"}
 
@@ -202,6 +218,64 @@ func TestMarkdownToHTMLWithContextRewritesUnsafeHTMLLinks(t *testing.T) {
 	}
 	if strings.Contains(html, `href="../install.md#x"`) {
 		t.Fatalf("rendered HTML still contains markdown source href:\n%s", html)
+	}
+}
+
+func TestMarkdownToHTMLWithContextRewritesUnsafeOKFRootLinks(t *testing.T) {
+	cfg := Config{AllowUnsafe: true, Format: "okf", HTMLExt: "html", Index: "index.md"}
+
+	html := markdownToHTMLWithContext(cfg, `<div><a href="/tables/orders.md#columns">Orders</a></div>`, "datasets/sales.md")
+	if !strings.Contains(html, `href="../tables/orders.html#columns"`) {
+		t.Fatalf("rendered HTML missing rewritten OKF raw HTML href:\n%s", html)
+	}
+}
+
+func TestValidateFormat(t *testing.T) {
+	for _, format := range []string{"", "okf", " OKF "} {
+		if err := validateFormat(format); err != nil {
+			t.Errorf("validateFormat(%q) = %v, want nil", format, err)
+		}
+	}
+	if err := validateFormat("openspec"); err == nil {
+		t.Fatal("validateFormat(\"openspec\") = nil, want error")
+	}
+}
+
+func TestRunRejectsInvalidFormat(t *testing.T) {
+	err := Run(context.Background(), Config{Format: "openspec"}, slog.New(slog.NewTextHandler(io.Discard, nil)), io.Discard, nil)
+	if err == nil || !strings.Contains(err.Error(), "invalid format") {
+		t.Fatalf("Run() error = %v, want invalid format", err)
+	}
+}
+
+func TestGenerateStaticHTMLOKFLinks(t *testing.T) {
+	root := t.TempDir()
+	write := func(name, content string) {
+		t.Helper()
+		full := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(full), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	write("datasets/sales.md", "---\ntype: Dataset\n---\n[Orders](/tables/orders.md)\n")
+	write("tables/orders.md", "---\ntype: Table\n---\n# Orders\n")
+
+	out := filepath.Join(root, "out")
+	cfg := Config{Source: root, HTML: out, HTMLExt: "html", Format: "okf"}
+	if err := generateStaticHTML(context.Background(), cfg, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
+		t.Fatalf("generateStaticHTML() error = %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(out, "datasets", "sales.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `href="../tables/orders.html"`) {
+		t.Fatalf("static HTML missing rewritten OKF href:\n%s", data)
 	}
 }
 

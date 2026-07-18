@@ -24,6 +24,9 @@ func runVet(cfg Config, logger *slog.Logger) {
 	if len(checks) == 0 {
 		return
 	}
+	if normalizedFormat(cfg.Format) == "okf" {
+		checks = withoutVetCheck(checks, "frontmatter")
+	}
 
 	diags, err := mdvet.Run([]string{src}, checks)
 	if err != nil {
@@ -41,6 +44,16 @@ func runVet(cfg Config, logger *slog.Logger) {
 	if len(diags) > 0 {
 		logger.Info("vet: completed with diagnostics", "count", len(diags))
 	}
+}
+
+func withoutVetCheck(checks []mdvet.Check, name string) []mdvet.Check {
+	out := checks[:0]
+	for _, check := range checks {
+		if check.Name() != name {
+			out = append(out, check)
+		}
+	}
+	return out
 }
 
 // selectVetChecks returns the mdvet checks named in spec, or every

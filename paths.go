@@ -203,3 +203,34 @@ func rewriteLocalMarkdownReference(currentSourcePath, href, htmlExt, indexFile s
 	targetSourcePath := path.Clean(path.Join(currentDir, base))
 	return relativeRenderedLink(currentSourcePath, targetSourcePath, htmlExt, indexFile) + suffix, true
 }
+
+// rewriteMarkdownReference rewrites local Markdown links for format. Ordinary
+// Markdown keeps root-relative links unchanged. OKF uses root-relative links
+// to identify concepts within the bundle, so its profile rewrites those links
+// relative to the rendered page.
+func rewriteMarkdownReference(format, currentSourcePath, href, htmlExt, indexFile string) (string, bool) {
+	if normalizedFormat(format) != "okf" || !strings.HasPrefix(href, "/") {
+		return rewriteLocalMarkdownReference(currentSourcePath, href, htmlExt, indexFile)
+	}
+
+	base, suffix := splitLinkSuffix(href)
+	ext := strings.ToLower(path.Ext(base))
+	if ext != ".md" && ext != ".markdown" {
+		return href, false
+	}
+	targetSourcePath := strings.TrimPrefix(path.Clean(base), "/")
+	return relativeRenderedLink(currentSourcePath, targetSourcePath, htmlExt, indexFile) + suffix, true
+}
+
+func validateFormat(format string) error {
+	switch normalizedFormat(format) {
+	case "", "okf":
+		return nil
+	default:
+		return fmt.Errorf("invalid format %q (want okf)", format)
+	}
+}
+
+func normalizedFormat(format string) string {
+	return strings.ToLower(strings.TrimSpace(format))
+}

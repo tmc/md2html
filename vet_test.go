@@ -61,6 +61,24 @@ func TestRunVet_UnknownCheck(t *testing.T) {
 	}
 }
 
+func TestRunVet_OKFSkipsFrontmatterCheck(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sales.md")
+	if err := os.WriteFile(path, []byte("---\ntype: Dataset\n---\n# Sales\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var ordinary, okf bytes.Buffer
+	runVet(Config{Source: path, Vet: true, VetChecks: "frontmatter"}, slog.New(slog.NewTextHandler(&ordinary, nil)))
+	runVet(Config{Source: path, Format: "okf", Vet: true, VetChecks: "frontmatter"}, slog.New(slog.NewTextHandler(&okf, nil)))
+	if !strings.Contains(ordinary.String(), "title is missing") {
+		t.Fatalf("ordinary vet output missing title diagnostic: %q", ordinary.String())
+	}
+	if okf.Len() != 0 {
+		t.Fatalf("OKF vet output = %q, want no frontmatter diagnostic", okf.String())
+	}
+}
+
 func TestSelectVetChecks(t *testing.T) {
 	checks, err := selectVetChecks("")
 	if err != nil {

@@ -103,7 +103,7 @@ func preprocessHTMLBlocks(markdown string) string {
 
 func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 	if cfg.AllowUnsafe {
-		markdown = rewriteLocalHTMLAttributes(markdown, filePath, cfg.HTMLExt, cfg.Index)
+		markdown = rewriteLocalHTMLAttributes(markdown, filePath, cfg.HTMLExt, cfg.Index, cfg.Format)
 		markdown = preprocessHTMLBlocks(markdown)
 	}
 
@@ -172,7 +172,7 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 				return ast.WalkContinue, nil
 			}
 			href := string(link.Destination)
-			if rewritten, ok := rewriteLocalMarkdownReference(filePath, href, cfg.HTMLExt, cfg.Index); ok {
+			if rewritten, ok := rewriteMarkdownReference(cfg.Format, filePath, href, cfg.HTMLExt, cfg.Index); ok {
 				link.Destination = []byte(rewritten)
 			}
 			return ast.WalkContinue, nil
@@ -415,7 +415,7 @@ func logTabsErrors(pc parser.Context, filePath string) {
 	}
 }
 
-func rewriteLocalHTMLAttributes(content, filePath, htmlExt, indexFile string) string {
+func rewriteLocalHTMLAttributes(content, filePath, htmlExt, indexFile, format string) string {
 	if filePath == "" {
 		return content
 	}
@@ -431,7 +431,7 @@ func rewriteLocalHTMLAttributes(content, filePath, htmlExt, indexFile string) st
 			raw = match[3]
 			quote = `'`
 		}
-		rewritten, ok := rewriteLocalMarkdownReference(filePath, raw, htmlExt, indexFile)
+		rewritten, ok := rewriteMarkdownReference(format, filePath, raw, htmlExt, indexFile)
 		if !ok {
 			return attr
 		}

@@ -14,6 +14,10 @@ type FragmentOptions struct {
 	TOC bool
 	// HTMLExt is the extension used when rewriting local Markdown links.
 	HTMLExt string
+	// Format selects an opt-in structured Markdown presentation profile.
+	// The empty string uses ordinary Markdown behavior. "okf" enables
+	// Open Knowledge Format link handling.
+	Format string
 	// Frontmatter supplies page frontmatter used by fragment enhancements.
 	Frontmatter map[string]any
 }
@@ -57,10 +61,14 @@ func pageHasMath(htmlContent string) bool {
 // client enhancement metadata for MathJax and Mermaid. An invalid Format is
 // treated as ordinary Markdown because fragment rendering has no error result.
 func RenderFragment(markdown, filePath string, opts FragmentOptions) Fragment {
+	if validateFormat(opts.Format) != nil {
+		opts.Format = ""
+	}
 	cfg := Config{
 		AllowUnsafe: opts.AllowUnsafe,
 		TOC:         opts.TOC,
 		HTMLExt:     opts.HTMLExt,
+		Format:      opts.Format,
 	}
 	theme, darkTheme, autoTheme := resolveMermaidThemes(opts.Frontmatter)
 	return Fragment{

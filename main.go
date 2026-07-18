@@ -46,6 +46,10 @@ type Config struct {
 	EditURL           string
 	Nav               bool
 	Watch             string
+	// Format selects an opt-in structured Markdown presentation profile.
+	// The empty string uses ordinary Markdown behavior. "okf" enables
+	// Open Knowledge Format link handling.
+	Format string
 
 	// Vet enables non-blocking mdvet checks. When true, [Run] reports
 	// any diagnostics it finds to the logger (or stderr) at warn level
@@ -103,6 +107,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.String("edit-url", "", "URL template for edit links; {path} is replaced with the source path")
 	fs.Bool("nav", false, "render docs navigation from SUMMARY.md or the markdown tree")
 	fs.String("watch", "auto", "live reload file watching: auto, true, or false")
+	fs.String("format", "", "structured Markdown format: okf")
 	fs.String("jsonspec-prefixes", "", "comma-separated JSON type-discriminator prefixes to enrich (e.g. 'ascf/')")
 	fs.String("jsonspec-badge-url", "", "URL template for schema badges; %s is the discriminator suffix (e.g. 'schemas.html#%s')")
 	fs.String("jsonspec-badge-label", "", "label template for schema badges; %s is the discriminator suffix")
@@ -139,6 +144,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		EditURL:           fs.Lookup("edit-url").Value.String(),
 		Nav:               fs.Lookup("nav").Value.String() == "true",
 		Watch:             fs.Lookup("watch").Value.String(),
+		Format:            fs.Lookup("format").Value.String(),
 
 		JSONSpecPrefixes:   fs.Lookup("jsonspec-prefixes").Value.String(),
 		JSONSpecBadgeURL:   fs.Lookup("jsonspec-badge-url").Value.String(),
@@ -154,6 +160,10 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	// Set up signal handling
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	if err := validateFormat(cfg.Format); err != nil {
+		return err
+	}
 
 	// Handle positional arguments
 	if len(args) > 0 {
