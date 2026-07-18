@@ -46,6 +46,10 @@ type Config struct {
 	EditURL           string
 	Nav               bool
 	Watch             string
+	// Drafts renders pages whose frontmatter sets draft: true instead of
+	// skipping them. Drafts stay excluded from llms.txt either way;
+	// templates can check .Frontmatter.draft to mark rendered drafts.
+	Drafts bool
 	// Format selects an opt-in structured Markdown presentation profile.
 	// The empty string uses ordinary Markdown behavior. "okf" enables
 	// Open Knowledge Format link handling.
@@ -107,6 +111,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.String("edit-url", "", "URL template for edit links; {path} is replaced with the source path")
 	fs.Bool("nav", false, "render docs navigation from SUMMARY.md or the markdown tree")
 	fs.String("watch", "auto", "live reload file watching: auto, true, or false")
+	fs.Bool("drafts", false, "render pages marked draft: true instead of skipping them")
 	fs.String("format", "", "structured Markdown format: okf")
 	fs.String("jsonspec-prefixes", "", "comma-separated JSON type-discriminator prefixes to enrich (e.g. 'ascf/')")
 	fs.String("jsonspec-badge-url", "", "URL template for schema badges; %s is the discriminator suffix (e.g. 'schemas.html#%s')")
@@ -144,6 +149,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		EditURL:           fs.Lookup("edit-url").Value.String(),
 		Nav:               fs.Lookup("nav").Value.String() == "true",
 		Watch:             fs.Lookup("watch").Value.String(),
+		Drafts:            fs.Lookup("drafts").Value.String() == "true",
 		Format:            fs.Lookup("format").Value.String(),
 
 		JSONSpecPrefixes:   fs.Lookup("jsonspec-prefixes").Value.String(),
@@ -815,8 +821,8 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 
 	// Process each markdown file
 	for _, file := range files {
-		// Check for draft frontmatter and skip
-		if isDraft(filepath.Join(sourceDir, file.RelPath)) {
+		// Check for draft frontmatter and skip unless drafts are requested
+		if !cfg.Drafts && isDraft(filepath.Join(sourceDir, file.RelPath)) {
 			logger.Debug("Skipping draft", "file", file.RelPath)
 			continue
 		}
