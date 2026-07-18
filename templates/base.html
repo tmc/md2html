@@ -407,7 +407,7 @@
 {{end}}
 
 {{define "scripts"}}
-    <!-- MathJax support - always included -->
+    {{if .HasMath}}<!-- MathJax support -->
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>
         window.MathJax = {
@@ -417,6 +417,7 @@
             }
         };
     </script>
+    {{end}}
 
     <!-- Mermaid support - always included -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>

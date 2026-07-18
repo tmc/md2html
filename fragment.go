@@ -37,13 +37,25 @@ type Fragment struct {
 }
 
 var (
-	mathBlockPattern  = regexp.MustCompile(`(?s)\$\$.*?\$\$|\\\[.*?\\\]`)
-	mathInlinePattern = regexp.MustCompile(`(^|[^\\])\$(.+?)\$|\\\((.+?)\\\)`)
+	mathBlockPattern = regexp.MustCompile(`(?s)\$\$.*?\$\$|\\\[.*?\\\]`)
+	// Inline $...$ follows Pandoc's rule to avoid currency false positives:
+	// the opening $ needs a non-space character to its right, the closing $
+	// a non-space character to its left, and the closing $ must not be
+	// immediately followed by a digit ("$3 billion ... for $1000" is prose).
+	mathInlinePattern = regexp.MustCompile(`(^|[^\\$])\$[^\s$](?:[^$]*[^\s$])?\$([^0-9]|$)|\\\((.+?)\\\)`)
 	mermaidPattern    = regexp.MustCompile("(?m)^```mermaid\\s*$")
+	codeRegionPattern = regexp.MustCompile(`(?s)<pre.*?</pre>|<code.*?</code>`)
 )
 
-// RenderFragment renders markdown using the md2html pipeline and returns
-// client enhancement metadata for MathJax and Mermaid.
+// pageHasMath reports whether rendered HTML contains MathJax-style TeX
+// delimiters outside <pre> and <code> regions, which MathJax skips.
+func pageHasMath(htmlContent string) bool {
+	return hasMath(codeRegionPattern.ReplaceAllString(htmlContent, ""))
+}
+
+// RenderFragment renders Markdown using the md2html pipeline and returns
+// client enhancement metadata for MathJax and Mermaid. An invalid Format is
+// treated as ordinary Markdown because fragment rendering has no error result.
 func RenderFragment(markdown, filePath string, opts FragmentOptions) Fragment {
 	cfg := Config{
 		AllowUnsafe: opts.AllowUnsafe,

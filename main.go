@@ -626,6 +626,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		FilePath:         opts.FilePath,
 		AssetBase:        assetBase(opts.FilePath),
 		RawMDURL:         opts.RawMDURL,
+		HasMath:          pageHasMath(htmlContent),
 		Description:      meta.Description,
 		CanonicalURL:     meta.CanonicalURL,
 		OpenGraphImage:   meta.OpenGraphImage,
@@ -664,13 +665,17 @@ type templateData struct {
 	FilePath         string
 	AssetBase        string
 	RawMDURL         string
-	Description      string
-	CanonicalURL     string
-	OpenGraphImage   string
-	LastUpdated      string
-	EditURL          string
-	Assets           map[string]string
-	JSONSpec         template.JS
+	// HasMath reports whether the page content contains TeX math
+	// delimiters outside code regions, so templates can load MathJax
+	// only where it is needed.
+	HasMath        bool
+	Description    string
+	CanonicalURL   string
+	OpenGraphImage string
+	LastUpdated    string
+	EditURL        string
+	Assets         map[string]string
+	JSONSpec       template.JS
 }
 
 type renderMetadata struct {

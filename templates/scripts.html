@@ -1,5 +1,5 @@
 {{define "scripts"}}
-{{template "mathjax-script" .}}
+{{if .HasMath}}{{template "mathjax-script" .}}{{end}}
 {{template "mermaid-script" .}}
 {{template "copy-code-script" .}}
 {{template "tabs-script" .}}

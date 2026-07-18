@@ -61,6 +61,7 @@ func TestPublicContractFields(t *testing.T) {
 				{"FilePath", "string"},
 				{"AssetBase", "string"},
 				{"RawMDURL", "string"},
+				{"HasMath", "bool"},
 				{"Description", "string"},
 				{"CanonicalURL", "string"},
 				{"OpenGraphImage", "string"},
