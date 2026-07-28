@@ -3,7 +3,6 @@ package md2html
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -219,7 +218,7 @@ func (s *server) watchEvents(watcher *fsnotify.Watcher) {
 			if !ok {
 				return
 			}
-			log.Printf("Watcher error: %v", err)
+			s.logger.Error("Watcher error", "error", err)
 		case <-s.shutdownCh:
 			return
 		}
@@ -327,7 +326,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			}
 			doc, err := parseFrontmatter(string(fileContent))
 			if err != nil {
-				log.Printf("Error parsing frontmatter in %s: %v", s.config.Index, err)
+				s.logger.Error("Error parsing frontmatter", "file", s.config.Index, "error", err)
 				doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
 			}
 			html, err := s.renderDocumentWithVersion(doc, s.config.Index, css, s.config.Index, requestedVersion)
@@ -339,7 +338,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(html))
 			return
 		} else if s.config.Verbose {
-			log.Printf("Index file %s not found, falling back to directory listing", s.config.Index)
+			s.logger.Warn("Index file not found, falling back to directory listing", "file", s.config.Index)
 		}
 	}
 
@@ -384,7 +383,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 				}
 				doc, err := parseFrontmatter(string(fileContent))
 				if err != nil {
-					log.Printf("Error parsing frontmatter in %s: %v", candidate, err)
+					s.logger.Error("Error parsing frontmatter", "file", candidate, "error", err)
 					doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
 				}
 				html, err := s.renderDocumentWithVersion(doc, candidate, css, candidate, requestedVersion)
@@ -434,7 +433,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 		doc, err := parseFrontmatter(string(content))
 		if err != nil {
-			log.Printf("Error parsing frontmatter in %s: %v", file, err)
+			s.logger.Error("Error parsing frontmatter", "file", file, "error", err)
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
 		html, err := s.renderDocumentWithVersion(doc, file, css, file, requestedVersion)
@@ -474,7 +473,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	doc, err := parseFrontmatter(content)
 	if err != nil {
-		log.Printf("Error parsing frontmatter: %v", err)
+		s.logger.Error("Error parsing frontmatter", "error", err)
 		doc = DocumentData{Content: content, Frontmatter: make(map[string]any)}
 	}
 	html, err := s.renderDocumentWithVersion(doc, s.config.Title, css, "", "")
@@ -684,7 +683,7 @@ func (s *server) notifyClients() {
 	defer s.clientsMu.RUnlock()
 
 	if s.config.Verbose {
-		log.Printf("Notifying %d clients", len(s.clients))
+		s.logger.Debug("Notifying clients", "count", len(s.clients))
 	}
 
 	for ch := range s.clients {

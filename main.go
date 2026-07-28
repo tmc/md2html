@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"log"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -396,7 +395,7 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 					// Skip subdirectories we cannot read (e.g. permission
 					// denied on system directories like .Trashes) rather than
 					// aborting the entire listing.
-					log.Printf("skipping %s: %v", apparentPath, err)
+					slog.Default().Warn("Skipping path", "path", apparentPath, "error", err)
 				}
 				continue
 			}
@@ -462,7 +461,7 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 		"loadJSON": func(filename string) any {
 			data, err := loadJSONFile(filename)
 			if err != nil {
-				log.Printf("Error loading JSON %s: %v", filename, err)
+				slog.Default().Error("Error loading JSON", "file", filename, "error", err)
 				return nil
 			}
 			return data
@@ -497,7 +496,7 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 	}).ParseFS(templates, "templates/*.html", "templates/*/*.html")
 
 	if err != nil {
-		log.Printf("Error parsing embedded templates: %v", err)
+		slog.Default().Error("Error parsing embedded templates", "error", err)
 		tmpl = template.New("root")
 	}
 
@@ -612,7 +611,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		if tmpl.Lookup("docs-layout") != nil {
 			name = "docs-layout"
 		} else {
-			log.Printf("Warning: SUMMARY.md navigation loaded but docs-layout template not found, falling back to layout")
+			slog.Default().Warn("SUMMARY.md navigation loaded but docs-layout template not found, falling back to layout")
 		}
 	}
 	if tmpl.Lookup(name) == nil {
@@ -931,7 +930,7 @@ func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssCon
 
 	doc, err := parseFrontmatter(string(content))
 	if err != nil {
-		log.Printf("Error parsing frontmatter in %s: %v", file.RelPath, err)
+		slog.Default().Error("Error parsing frontmatter", "file", file.RelPath, "error", err)
 		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 	}
 
@@ -985,7 +984,7 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 
 	doc, err := parseFrontmatter(string(content))
 	if err != nil {
-		log.Printf("Error parsing frontmatter in index file: %v", err)
+		slog.Default().Error("Error parsing frontmatter", "file", indexPath, "error", err)
 		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 	}
 
