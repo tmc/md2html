@@ -6,11 +6,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/tmc/md2html/internal/scripttestutil"
+	"github.com/tmc/md2html/internal/scripttest"
 )
 
 func TestMain(m *testing.M) {
-	scripttestutil.TestMain(m, func() {
+	scripttest.TestMain(m, func() {
 		flags := NewFlagSet("md2html")
 		flags.Parse(os.Args[1:])
 		cfg := ConfigFromFlags(flags)

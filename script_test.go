@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/tmc/md2html/internal/scripttestutil"
+	"github.com/tmc/md2html/internal/scripttest"
 	"rsc.io/script"
 )
 
@@ -15,9 +15,9 @@ var borderline = flag.Bool("include-borderline-tests", false, "run borderline te
 func TestScripts(t *testing.T) {
 	exe, _ := os.Executable()
 	engine := script.NewEngine()
-	engine.Cmds["md2html"] = scripttestutil.BackgroundCmd(exe, nil, 0)
+	engine.Cmds["md2html"] = scripttest.BackgroundCmd(exe, nil, 0)
 	engine.Cmds["curl"] = script.Program("curl", nil, 0)
-	engine.Cmds["wait-port"] = scripttestutil.WaitPortCmd()
+	engine.Cmds["wait-port"] = scripttest.WaitPortCmd()
 	// remove Exec:
 	delete(engine.Cmds, "exec")
 
@@ -29,8 +29,8 @@ func TestScripts(t *testing.T) {
 	if gcd := os.Getenv("GOCOVERDIR"); gcd != "" {
 		env = append(env, "GOCOVERDIR="+gcd)
 	}
-	scripttestutil.Test(t, context.Background(), engine, env, "testdata/*.txt")
+	scripttest.Test(t, context.Background(), engine, env, "testdata/*.txt")
 	if *borderline {
-		scripttestutil.Test(t, context.Background(), engine, env, "testdata/borderline/*.txt")
+		scripttest.Test(t, context.Background(), engine, env, "testdata/borderline/*.txt")
 	}
 }

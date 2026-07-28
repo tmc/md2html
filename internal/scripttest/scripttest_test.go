@@ -1,4 +1,4 @@
-package scripttestutil
+package scripttest
 
 import (
 	"context"

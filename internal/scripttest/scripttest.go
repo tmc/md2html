@@ -1,5 +1,5 @@
-// Package scripttestutil helps with script-based testing.
-package scripttestutil
+// Package scripttest helps with script-based testing.
+package scripttest
 
 import (
 	"bytes"
@@ -106,10 +106,10 @@ func waitPort(ctx context.Context, addr string, timeout time.Duration) error {
 // Example:
 //
 //	// Drop-in replacement with graceful shutdown
-//	engine.Cmds["myserver"] = scripttestutil.BackgroundCmd(exe, nil, 0)
+//	engine.Cmds["myserver"] = scripttest.BackgroundCmd(exe, nil, 0)
 //
 //	// Custom shutdown signal
-//	engine.Cmds["myapp"] = scripttestutil.BackgroundCmd(exe, func(cmd *exec.Cmd) error {
+//	engine.Cmds["myapp"] = scripttest.BackgroundCmd(exe, func(cmd *exec.Cmd) error {
 //	    return cmd.Process.Signal(os.Interrupt)
 //	}, 2*time.Second)
 func BackgroundCmd(prog string, cancel func(*exec.Cmd) error, waitDelay time.Duration) script.Cmd {
