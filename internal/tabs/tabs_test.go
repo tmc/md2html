@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/parser"
 )
 
 func render(t *testing.T, src string) string {
@@ -135,5 +136,18 @@ func TestMultipleGroupsOnPage(t *testing.T) {
 	out := render(t, src)
 	if strings.Count(out, `role="tablist"`) != 2 {
 		t.Errorf("expected 2 tablists, got:\n%s", out)
+	}
+}
+
+func TestContextValuesIgnoreWrongTypes(t *testing.T) {
+	pc := parser.NewContext()
+	pc.Set(slugsContextKey, "wrong")
+	pc.Set(errorsContextKey, "wrong")
+
+	if got := getSlugCounts(pc); got == nil {
+		t.Fatal("getSlugCounts() = nil, want empty map")
+	}
+	if got := Errors(pc); got != nil {
+		t.Fatalf("Errors() = %v, want nil", got)
 	}
 }

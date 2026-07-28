@@ -75,7 +75,12 @@ func getSlugCounts(pc parser.Context) slugCounts {
 		pc.Set(slugsContextKey, sc)
 		return sc
 	}
-	return v.(slugCounts)
+	sc, ok := v.(slugCounts)
+	if !ok {
+		sc = slugCounts{}
+		pc.Set(slugsContextKey, sc)
+	}
+	return sc
 }
 
 // Errors returns any parse errors recorded on pc.
@@ -84,7 +89,8 @@ func Errors(pc parser.Context) []*ParseError {
 	if v == nil {
 		return nil
 	}
-	return v.([]*ParseError)
+	errs, _ := v.([]*ParseError)
+	return errs
 }
 
 func appendError(pc parser.Context, line int, format string, args ...any) {
