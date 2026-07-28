@@ -29,26 +29,6 @@ func readSearchAsset(name string) ([]byte, error) {
 	return searchAssets.ReadFile(name)
 }
 
-// writeSearchAssets copies the embedded search assets into outputDir/js/.
-// It mirrors the layout that templates/search.html references.
-func writeSearchAssets(outputDir string) error {
-	jsDir := filepath.Join(outputDir, "js")
-	if err := os.MkdirAll(jsDir, 0755); err != nil {
-		return fmt.Errorf("create js dir: %w", err)
-	}
-	for _, name := range searchAssetFiles {
-		body, err := fs.ReadFile(searchAssets, name)
-		if err != nil {
-			return fmt.Errorf("read embedded %s: %w", name, err)
-		}
-		out := filepath.Join(jsDir, filepath.Base(name))
-		if err := os.WriteFile(out, body, 0644); err != nil {
-			return fmt.Errorf("write %s: %w", out, err)
-		}
-	}
-	return nil
-}
-
 func writeFingerprintedSearchAssets(outputDir string, searchIndex []byte) (map[string]string, error) {
 	assets := map[string][]byte{
 		"search-index.js": searchIndex,

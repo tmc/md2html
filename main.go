@@ -445,19 +445,6 @@ func openBrowser(ctx context.Context, url string) bool {
 	return cmd.Start() == nil
 }
 
-func renderDocument(cfg Config, doc DocumentData, title, customCSS, filePath string) string {
-	html := markdownToHTMLWithContext(cfg, doc.Content, filePath)
-	if cfg.RenderFrontmatter {
-		html = renderFrontmatterHTML(doc.Frontmatter) + html
-	}
-	opts := RenderOptions{
-		FilePath:    filePath,
-		Description: llmsSummary(doc),
-		EditURL:     editURL(cfg.EditURL, filePath),
-	}
-	return renderTemplateWithOptions(cfg, html, title, customCSS, true, doc.Frontmatter, opts)
-}
-
 func loadAllTemplates(cfg Config) (*template.Template, error) {
 	tmpl, err := template.New("root").Funcs(template.FuncMap{
 		"default": func(def, val any) any {
@@ -933,10 +920,6 @@ func isDraft(path string) bool {
 	return false
 }
 
-func processMarkdownFile(file markdownFile, sourceDir, outputDir, cssContent string, cfg Config) error {
-	return processMarkdownFileWithNav(file, sourceDir, outputDir, cssContent, cfg, nil)
-}
-
 func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssContent string, cfg Config, opts RenderOptions) error {
 	sourcePath := filepath.Join(sourceDir, file.RelPath)
 
@@ -981,67 +964,6 @@ func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssCon
 	return os.WriteFile(outputPath, []byte(finalHTML), 0644)
 }
 
-func processMarkdownFileWithNav(file markdownFile, sourceDir, outputDir, cssContent string, cfg Config, nav *Navigation) error {
-	sourcePath := filepath.Join(sourceDir, file.RelPath)
-
-	// Read and parse the markdown file
-	content, err := os.ReadFile(sourcePath)
-	if err != nil {
-		return err
-	}
-
-	doc, err := parseFrontmatter(string(content))
-	if err != nil {
-		log.Printf("Error parsing frontmatter in %s: %v", file.RelPath, err)
-		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
-	}
-
-	// Generate HTML content
-	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, file.RelPath)
-
-	// Determine output file path
-	baseName := strings.TrimSuffix(file.RelPath, filepath.Ext(file.RelPath))
-	outputPath := baseName
-	// When HTMLExt is empty, only index gets .html extension
-	// When HTMLExt is set, all files get that extension
-	if cfg.HTMLExt != "" {
-		outputPath = baseName + "." + cfg.HTMLExt
-	}
-	outputPath = filepath.Join(outputDir, outputPath)
-
-	// Create output directory if needed
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
-		return err
-	}
-
-	// Render with template
-	title := cfg.Title
-	if docTitle, ok := doc.Frontmatter["title"].(string); ok && docTitle != "" {
-		title = docTitle
-	} else {
-		title = strings.TrimSuffix(filepath.Base(file.RelPath), filepath.Ext(file.RelPath))
-	}
-
-	// Get navigation context for this page
-	var navCtx *NavContext
-	if nav != nil {
-		navCtx = nav.ForPage(file.RelPath)
-	}
-
-	opts := RenderOptions{
-		Nav:         navCtx,
-		SiteTitle:   cfg.Title,
-		FilePath:    file.RelPath,
-		Description: llmsSummary(doc),
-		EditURL:     editURL(cfg.EditURL, file.RelPath),
-	}
-
-	finalHTML := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
-
-	// Write output file
-	return os.WriteFile(outputPath, []byte(finalHTML), 0644)
-}
-
 func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Config, opts RenderOptions) error {
 	content, err := os.ReadFile(indexPath)
 	if err != nil {
@@ -1074,31 +996,6 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 			return err
 		}
 	}
-	return os.WriteFile(indexOutputPath, []byte(finalHTML), 0644)
-}
-
-func processIndexFile(indexPath, outputDir, cssContent string, cfg Config) error {
-	content, err := os.ReadFile(indexPath)
-	if err != nil {
-		return err
-	}
-
-	doc, err := parseFrontmatter(string(content))
-	if err != nil {
-		log.Printf("Error parsing frontmatter in index file: %v", err)
-		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
-	}
-
-	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, filepath.Base(indexPath))
-
-	title := cfg.Title
-	if docTitle, ok := doc.Frontmatter["title"].(string); ok && docTitle != "" {
-		title = docTitle
-	}
-
-	finalHTML := renderTemplate(cfg, htmlContent, title, cssContent, false, doc.Frontmatter)
-
-	indexOutputPath := filepath.Join(outputDir, "index.html")
 	return os.WriteFile(indexOutputPath, []byte(finalHTML), 0644)
 }
 

@@ -118,11 +118,6 @@ type server struct {
 	watchMu    sync.Mutex
 	watched    map[string]bool
 
-	// Batched reload management
-	reloadPending bool
-	reloadTimer   *time.Timer
-	reloadTimerMu sync.Mutex
-
 	// Version management
 	versionMgr *GitVersionManager
 	versions   []GitVersion

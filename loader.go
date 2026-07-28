@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/yuin/goldmark"
 	meta "github.com/yuin/goldmark-meta"
@@ -23,9 +22,6 @@ import (
 type Loader struct {
 	baseDir string
 	htmlExt string // Extension for HTML files (e.g., ".html" or "")
-
-	mu    sync.RWMutex
-	cache map[string]any
 }
 
 // NewLoader creates a new data loader rooted at baseDir.
@@ -33,7 +29,6 @@ func NewLoader(baseDir, htmlExt string) *Loader {
 	return &Loader{
 		baseDir: baseDir,
 		htmlExt: htmlExt,
-		cache:   make(map[string]any),
 	}
 }
 
