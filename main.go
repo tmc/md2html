@@ -125,41 +125,64 @@ func NewFlagSet(name string) *flag.FlagSet {
 // ConfigFromFlags creates a Config from an initialized FlagSet.
 func ConfigFromFlags(fs *flag.FlagSet) Config {
 	return Config{
-		HTTP:              fs.Lookup("http").Value.String(),
-		HTML:              fs.Lookup("html").Value.String(),
-		Open:              fs.Lookup("open").Value.String() == "true",
-		Verbose:           fs.Lookup("v").Value.String() == "true",
-		Title:             fs.Lookup("title").Value.String(),
-		CSS:               fs.Lookup("css").Value.String(),
-		Depth:             int(fs.Lookup("depth").Value.(flag.Getter).Get().(int)),
-		TOC:               fs.Lookup("toc").Value.String() == "true",
-		AllowUnsafe:       fs.Lookup("allow-unsafe").Value.String() == "true",
-		TemplateDir:       fs.Lookup("templates").Value.String(),
-		DataJSON:          fs.Lookup("data-json").Value.String(),
-		RenderFrontmatter: fs.Lookup("render-frontmatter").Value.String() == "true",
-		Index:             fs.Lookup("index").Value.String(),
-		HTMLExt:           fs.Lookup("html-ext").Value.String(),
-		Versions:          fs.Lookup("versions").Value.String() == "true",
-		VersionPattern:    fs.Lookup("version-pattern").Value.String(),
-		VersionBranches:   fs.Lookup("version-branches").Value.String() == "true",
-		VersionDefault:    fs.Lookup("version-default").Value.String(),
-		Search:            fs.Lookup("search").Value.String() == "true",
-		LLMS:              fs.Lookup("llms").Value.String() == "true",
-		SiteURL:           fs.Lookup("site-url").Value.String(),
-		EditURL:           fs.Lookup("edit-url").Value.String(),
-		Nav:               fs.Lookup("nav").Value.String() == "true",
-		Watch:             fs.Lookup("watch").Value.String(),
-		Drafts:            fs.Lookup("drafts").Value.String() == "true",
-		Format:            fs.Lookup("format").Value.String(),
-
-		JSONSpecPrefixes:   fs.Lookup("jsonspec-prefixes").Value.String(),
-		JSONSpecBadgeURL:   fs.Lookup("jsonspec-badge-url").Value.String(),
-		JSONSpecBadgeLabel: fs.Lookup("jsonspec-badge-label").Value.String(),
-		JSONSpecSchemas:    fs.Lookup("jsonspec-schemas").Value.String(),
-
-		Vet:       fs.Lookup("vet").Value.String() == "true",
-		VetChecks: fs.Lookup("vet-checks").Value.String(),
+		HTTP:               flagString(fs, "http"),
+		HTML:               flagString(fs, "html"),
+		Open:               flagBool(fs, "open"),
+		Verbose:            flagBool(fs, "v"),
+		Title:              flagString(fs, "title"),
+		CSS:                flagString(fs, "css"),
+		Depth:              flagInt(fs, "depth"),
+		TOC:                flagBool(fs, "toc"),
+		AllowUnsafe:        flagBool(fs, "allow-unsafe"),
+		TemplateDir:        flagString(fs, "templates"),
+		DataJSON:           flagString(fs, "data-json"),
+		RenderFrontmatter:  flagBool(fs, "render-frontmatter"),
+		Index:              flagString(fs, "index"),
+		HTMLExt:            flagString(fs, "html-ext"),
+		Versions:           flagBool(fs, "versions"),
+		VersionPattern:     flagString(fs, "version-pattern"),
+		VersionBranches:    flagBool(fs, "version-branches"),
+		VersionDefault:     flagString(fs, "version-default"),
+		Search:             flagBool(fs, "search"),
+		LLMS:               flagBool(fs, "llms"),
+		SiteURL:            flagString(fs, "site-url"),
+		EditURL:            flagString(fs, "edit-url"),
+		Nav:                flagBool(fs, "nav"),
+		Watch:              flagString(fs, "watch"),
+		Drafts:             flagBool(fs, "drafts"),
+		Format:             flagString(fs, "format"),
+		JSONSpecPrefixes:   flagString(fs, "jsonspec-prefixes"),
+		JSONSpecBadgeURL:   flagString(fs, "jsonspec-badge-url"),
+		JSONSpecBadgeLabel: flagString(fs, "jsonspec-badge-label"),
+		JSONSpecSchemas:    flagString(fs, "jsonspec-schemas"),
+		Vet:                flagBool(fs, "vet"),
+		VetChecks:          flagString(fs, "vet-checks"),
 	}
+}
+
+func flagString(fs *flag.FlagSet, name string) string {
+	if f := fs.Lookup(name); f != nil {
+		return f.Value.String()
+	}
+	return ""
+}
+
+func flagBool(fs *flag.FlagSet, name string) bool {
+	f := fs.Lookup(name)
+	return f != nil && f.Value.String() == "true"
+}
+
+func flagInt(fs *flag.FlagSet, name string) int {
+	f := fs.Lookup(name)
+	if f == nil {
+		return 0
+	}
+	getter, ok := f.Value.(flag.Getter)
+	if !ok {
+		return 0
+	}
+	value, _ := getter.Get().(int)
+	return value
 }
 
 func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, args []string) error {
