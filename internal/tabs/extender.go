@@ -15,9 +15,9 @@ type Extender struct{}
 func (Extender) Extend(md goldmark.Markdown) {
 	md.Parser().AddOptions(
 		parser.WithBlockParsers(
-			// tabParser must run first so that inside a TabGroup it can
+			// tabParser must run first so that inside a Group it can
 			// claim "::: tab" before tabGroupParser sees it. Outside a
-			// TabGroup it falls through and tabGroupParser handles
+			// Group it falls through and tabGroupParser handles
 			// "::: tabs <id>".
 			util.Prioritized(&tabParser{}, 200),
 			util.Prioritized(&tabGroupParser{}, 210),

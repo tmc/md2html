@@ -9,7 +9,7 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-// Renderer emits ARIA-compliant tablist markup for TabGroup and Tab
+// Renderer emits ARIA-compliant tablist markup for Group and Tab
 // nodes. Panels are emitted visible; JavaScript hides inactive panels
 // after load.
 type Renderer struct{}
@@ -21,7 +21,7 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 }
 
 func (r *Renderer) renderTabGroup(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-	g := node.(*TabGroup)
+	g := node.(*Group)
 	if entering {
 		fmt.Fprintf(w, `<div class="md-tabs" role="tablist" data-tab-group="%s">`, html.EscapeString(g.GroupID))
 		w.WriteByte('\n')

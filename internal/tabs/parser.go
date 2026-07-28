@@ -194,7 +194,7 @@ func (p *tabGroupParser) Open(parent ast.Node, reader text.Reader, pc parser.Con
 
 	// Only open at the document/root level. Nested "::: tabs" is
 	// rejected by tabParser.Open; it is never accepted here.
-	if _, isGroup := parent.(*TabGroup); isGroup {
+	if _, isGroup := parent.(*Group); isGroup {
 		return nil, parser.NoChildren
 	}
 	if _, isTab := parent.(*Tab); isTab {
@@ -215,7 +215,7 @@ func (p *tabGroupParser) Open(parent ast.Node, reader text.Reader, pc parser.Con
 	}
 
 	reader.Advance(len(line) - 1)
-	node := NewTabGroup(rest)
+	node := NewGroup(rest)
 	pushOpen(pc, openGroup, node)
 	return node, parser.HasChildren
 }
@@ -252,7 +252,7 @@ func (p *tabGroupParser) Close(node ast.Node, reader text.Reader, pc parser.Cont
 func (p *tabGroupParser) CanInterruptParagraph() bool { return true }
 func (p *tabGroupParser) CanAcceptIndentedLine() bool { return false }
 
-// tabParser recognises "::: tab <Label>" inside an open TabGroup.
+// tabParser recognises "::: tab <Label>" inside an open Group.
 type tabParser struct{}
 
 func (p *tabParser) Trigger() []byte { return []byte{':'} }
@@ -274,7 +274,7 @@ func (p *tabParser) Open(parent ast.Node, reader text.Reader, pc parser.Context)
 
 	switch keyword {
 	case "tab":
-		group, ok := parent.(*TabGroup)
+		group, ok := parent.(*Group)
 		if !ok {
 			appendError(pc, currentLine(reader), "::: tab outside of ::: tabs group")
 			return nil, parser.NoChildren
@@ -289,7 +289,7 @@ func (p *tabParser) Open(parent ast.Node, reader text.Reader, pc parser.Context)
 		pushOpen(pc, openTab, node)
 		return node, parser.HasChildren
 	case "tabs":
-		if _, ok := parent.(*TabGroup); ok {
+		if _, ok := parent.(*Group); ok {
 			appendError(pc, currentLine(reader), "nested ::: tabs groups are not supported")
 			return nil, parser.NoChildren
 		}

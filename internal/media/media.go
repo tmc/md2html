@@ -96,9 +96,9 @@ func kind(dest []byte) string {
 	return ""
 }
 
-// IsMediaPath reports whether name has an audio or video extension
+// IsPath reports whether name has an audio or video extension
 // recognized by Extender.
-func IsMediaPath(name string) bool {
+func IsPath(name string) bool {
 	return kind([]byte(name)) != ""
 }
 

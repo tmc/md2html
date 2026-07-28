@@ -53,7 +53,7 @@ func (AssetsCheck) Check(doc *Document) ([]Diagnostic, error) {
 		info, err := os.Stat(target)
 		if err != nil {
 			kind := "link"
-			if media.IsMediaPath(dest) {
+			if media.IsPath(dest) {
 				kind = "media"
 			}
 			diags = append(diags, assetDiag(doc.File, line, fmt.Sprintf("%s %q: %s does not exist", kind, dest, displayPath(doc.File, target))))

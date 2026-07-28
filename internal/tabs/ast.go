@@ -13,31 +13,31 @@ package tabs
 
 import "github.com/yuin/goldmark/ast"
 
-// A TabGroup is a block that wraps a set of Tabs under a shared group ID.
-type TabGroup struct {
+// A Group is a block that wraps a set of Tabs under a shared group ID.
+type Group struct {
 	ast.BaseBlock
 
 	// GroupID is the required identifier supplied after "::: tabs".
 	GroupID string
 }
 
-// KindTabGroup is the NodeKind of TabGroup nodes.
+// KindTabGroup is the NodeKind of Group nodes.
 var KindTabGroup = ast.NewNodeKind("MD2HTMLTabGroup")
 
 // Kind implements ast.Node.Kind.
-func (n *TabGroup) Kind() ast.NodeKind { return KindTabGroup }
+func (n *Group) Kind() ast.NodeKind { return KindTabGroup }
 
 // Dump implements ast.Node.Dump.
-func (n *TabGroup) Dump(source []byte, level int) {
+func (n *Group) Dump(source []byte, level int) {
 	ast.DumpHelper(n, source, level, map[string]string{"GroupID": n.GroupID}, nil)
 }
 
-// NewTabGroup returns a new TabGroup node.
-func NewTabGroup(groupID string) *TabGroup {
-	return &TabGroup{GroupID: groupID}
+// NewGroup returns a new Group node.
+func NewGroup(groupID string) *Group {
+	return &Group{GroupID: groupID}
 }
 
-// A Tab is a single labelled panel inside a TabGroup.
+// A Tab is a single labelled panel inside a Group.
 type Tab struct {
 	ast.BaseBlock
 
