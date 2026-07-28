@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"regexp"
+	"sync"
 	"testing"
 	"time"
 )
@@ -106,5 +107,37 @@ func TestWaitPort(t *testing.T) {
 	err = waitPort(context.Background(), ln.Addr().String(), time.Second)
 	if err != nil {
 		t.Fatalf("waitPort() error = %v", err)
+	}
+}
+
+func TestReserveTestPortUnique(t *testing.T) {
+	const count = 100
+	ports := make(chan string, count)
+	errs := make(chan error, count)
+	var wg sync.WaitGroup
+	for range count {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			port, err := reserveTestPort()
+			ports <- port
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(ports)
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	seen := make(map[string]bool)
+	for port := range ports {
+		if seen[port] {
+			t.Fatalf("reserveTestPort() returned duplicate port %s", port)
+		}
+		seen[port] = true
 	}
 }

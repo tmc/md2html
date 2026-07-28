@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -22,7 +23,13 @@ import (
 	"rsc.io/script/scripttest"
 )
 
-var scriptPortPattern = regexp.MustCompile(`(localhost:|127\.0\.0\.1:|:)([1-9]\d{3,4})\b`)
+var (
+	scriptPortPattern = regexp.MustCompile(`(localhost:|127\.0\.0\.1:|:)([1-9]\d{3,4})\b`)
+	issuedPorts       = struct {
+		sync.Mutex
+		set map[int]bool
+	}{set: make(map[int]bool)}
+)
 
 // WaitPortCmd returns a script command that waits until a TCP port accepts
 // connections.
@@ -363,17 +370,30 @@ func rewriteScriptPorts(script string) (string, error) {
 }
 
 func reserveTestPort() (string, error) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return "", err
-	}
-	defer ln.Close()
+	for {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			return "", err
+		}
+		addr, ok := ln.Addr().(*net.TCPAddr)
+		if !ok {
+			ln.Close()
+			return "", fmt.Errorf("unexpected listener addr type %T", ln.Addr())
+		}
 
-	addr, ok := ln.Addr().(*net.TCPAddr)
-	if !ok {
-		return "", fmt.Errorf("unexpected listener addr type %T", ln.Addr())
+		issuedPorts.Lock()
+		issued := issuedPorts.set[addr.Port]
+		if !issued {
+			issuedPorts.set[addr.Port] = true
+		}
+		issuedPorts.Unlock()
+		if err := ln.Close(); err != nil {
+			return "", err
+		}
+		if !issued {
+			return fmt.Sprintf("%d", addr.Port), nil
+		}
 	}
-	return fmt.Sprintf("%d", addr.Port), nil
 }
 
 // isETXTBSY reports whether err is a "text file busy" error (ETXTBSY).
