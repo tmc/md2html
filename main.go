@@ -953,15 +953,21 @@ func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssCon
 		}
 	}
 
-	title := cfg.Title
-	if docTitle, ok := doc.Frontmatter["title"].(string); ok && docTitle != "" {
-		title = docTitle
-	} else {
-		title = strings.TrimSuffix(filepath.Base(file.RelPath), filepath.Ext(file.RelPath))
-	}
+	title := pageTitle(doc.Frontmatter, file.RelPath, cfg.Title)
 
 	finalHTML := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
 	return os.WriteFile(outputPath, []byte(finalHTML), 0644)
+}
+
+func pageTitle(frontmatter map[string]any, filePath, fallback string) string {
+	if title, ok := frontmatter["title"].(string); ok && title != "" {
+		return title
+	}
+	name := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
+	if name != "" {
+		return name
+	}
+	return fallback
 }
 
 func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Config, opts RenderOptions) error {
