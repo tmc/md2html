@@ -122,12 +122,11 @@ type server struct {
 	versions   []GitVersion
 
 	// Navigation from SUMMARY.md
-	nav                *Navigation
-	lastUpdatedMu      sync.Mutex
-	lastUpdated        map[string]string
-	gitMetadataRoot    string
-	gitMetadataChecked bool
-	gitMetadataOK      bool
+	nav             *Navigation
+	lastUpdatedMu   sync.Mutex
+	lastUpdated     map[string]string
+	gitMetadataOnce map[string]*sync.Once
+	gitMetadataOK   map[string]bool
 }
 
 func (s *server) startWatching() error {
@@ -558,19 +557,26 @@ func (s *server) lastUpdatedFor(filePath string) string {
 
 func (s *server) gitMetadataAvailable(root string) bool {
 	s.lastUpdatedMu.Lock()
-	if s.gitMetadataChecked && s.gitMetadataRoot == root {
-		ok := s.gitMetadataOK
-		s.lastUpdatedMu.Unlock()
-		return ok
+	if s.gitMetadataOnce == nil {
+		s.gitMetadataOnce = make(map[string]*sync.Once)
+		s.gitMetadataOK = make(map[string]bool)
+	}
+	once := s.gitMetadataOnce[root]
+	if once == nil {
+		once = new(sync.Once)
+		s.gitMetadataOnce[root] = once
 	}
 	s.lastUpdatedMu.Unlock()
 
-	ok := gitHasHead(s.ctx, root)
+	once.Do(func() {
+		ok := gitHasHead(s.ctx, root)
+		s.lastUpdatedMu.Lock()
+		s.gitMetadataOK[root] = ok
+		s.lastUpdatedMu.Unlock()
+	})
 
 	s.lastUpdatedMu.Lock()
-	s.gitMetadataRoot = root
-	s.gitMetadataChecked = true
-	s.gitMetadataOK = ok
+	ok := s.gitMetadataOK[root]
 	s.lastUpdatedMu.Unlock()
 	return ok
 }
