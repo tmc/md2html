@@ -1,6 +1,7 @@
 package md2html
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"os"
@@ -35,7 +36,7 @@ func BenchmarkNewServerHomeTmp(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		s := newServer(cfg, logger)
+		s := newServer(context.Background(), cfg, logger)
 		if s == nil {
 			b.Fatal("newServer returned nil")
 		}

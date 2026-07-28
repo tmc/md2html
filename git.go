@@ -2,6 +2,7 @@ package md2html
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -21,16 +22,21 @@ type GitVersion struct {
 // GitVersionManager handles git operations for versioned documentation
 type GitVersionManager struct {
 	repoPath string
+	ctx      context.Context
 }
 
 // NewGitVersionManager creates a new git version manager for the given repository
 func NewGitVersionManager(repoPath string) *GitVersionManager {
-	return &GitVersionManager{repoPath: repoPath}
+	return newGitVersionManager(context.Background(), repoPath)
+}
+
+func newGitVersionManager(ctx context.Context, repoPath string) *GitVersionManager {
+	return &GitVersionManager{repoPath: repoPath, ctx: ctx}
 }
 
 // IsGitRepo checks if the given path is inside a git repository
 func (gvm *GitVersionManager) IsGitRepo() bool {
-	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	cmd := exec.CommandContext(gvm.ctx, "git", "rev-parse", "--git-dir")
 	cmd.Dir = gvm.repoPath
 	return cmd.Run() == nil
 }
@@ -74,7 +80,7 @@ func (gvm *GitVersionManager) listTags(pattern string) ([]GitVersion, error) {
 	}
 	args = append(args, "--sort=-version:refname")
 
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(gvm.ctx, "git", args...)
 	cmd.Dir = gvm.repoPath
 	output, err := cmd.Output()
 	if err != nil {
@@ -107,7 +113,7 @@ func (gvm *GitVersionManager) listTags(pattern string) ([]GitVersion, error) {
 
 // listBranches returns all git branches
 func (gvm *GitVersionManager) listBranches() ([]GitVersion, error) {
-	cmd := exec.Command("git", "branch", "-r", "--format=%(refname:short)")
+	cmd := exec.CommandContext(gvm.ctx, "git", "branch", "-r", "--format=%(refname:short)")
 	cmd.Dir = gvm.repoPath
 	output, err := cmd.Output()
 	if err != nil {
@@ -143,7 +149,7 @@ func (gvm *GitVersionManager) listBranches() ([]GitVersion, error) {
 
 // getCommitHash returns the short commit hash for a given ref
 func (gvm *GitVersionManager) getCommitHash(ref string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--short", ref)
+	cmd := exec.CommandContext(gvm.ctx, "git", "rev-parse", "--short", ref)
 	cmd.Dir = gvm.repoPath
 	output, err := cmd.Output()
 	if err != nil {
@@ -164,7 +170,7 @@ func (gvm *GitVersionManager) GetFileContent(version, filePath string) ([]byte, 
 	}
 
 	// Use git show to get file content
-	cmd := exec.Command("git", "show", ref+":"+filePath)
+	cmd := exec.CommandContext(gvm.ctx, "git", "show", ref+":"+filePath)
 	cmd.Dir = gvm.repoPath
 	output, err := cmd.Output()
 	if err != nil {
@@ -183,7 +189,7 @@ func (gvm *GitVersionManager) ListFiles(version, pattern string) ([]string, erro
 		}
 	}
 
-	cmd := exec.Command("git", "ls-tree", "-r", "--name-only", ref)
+	cmd := exec.CommandContext(gvm.ctx, "git", "ls-tree", "-r", "--name-only", ref)
 	cmd.Dir = gvm.repoPath
 	output, err := cmd.Output()
 	if err != nil {
@@ -215,14 +221,14 @@ func (gvm *GitVersionManager) ListFiles(version, pattern string) ([]string, erro
 // GetCurrentVersion returns the current version (tag or branch)
 func (gvm *GitVersionManager) GetCurrentVersion() (string, error) {
 	// Try to get current tag
-	cmd := exec.Command("git", "describe", "--tags", "--exact-match")
+	cmd := exec.CommandContext(gvm.ctx, "git", "describe", "--tags", "--exact-match")
 	cmd.Dir = gvm.repoPath
 	if output, err := cmd.Output(); err == nil {
 		return strings.TrimSpace(string(output)), nil
 	}
 
 	// Fall back to branch name
-	cmd = exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd = exec.CommandContext(gvm.ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
 	cmd.Dir = gvm.repoPath
 	output, err := cmd.Output()
 	if err != nil {
@@ -232,24 +238,24 @@ func (gvm *GitVersionManager) GetCurrentVersion() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-func gitLastUpdated(repoPath string, files []markdownFile) (map[string]string, error) {
+func gitLastUpdated(ctx context.Context, repoPath string, files []markdownFile) (map[string]string, error) {
 	paths := make([]string, 0, len(files))
 	for _, f := range files {
 		paths = append(paths, filepath.ToSlash(f.RelPath))
 	}
-	return gitLastUpdatedPaths(repoPath, paths)
+	return gitLastUpdatedPaths(ctx, repoPath, paths)
 }
 
-func gitLastUpdatedPaths(repoPath string, paths []string) (map[string]string, error) {
+func gitLastUpdatedPaths(ctx context.Context, repoPath string, paths []string) (map[string]string, error) {
 	if len(paths) == 0 {
 		return map[string]string{}, nil
 	}
-	if !gitHasHead(repoPath) {
+	if !gitHasHead(ctx, repoPath) {
 		return map[string]string{}, nil
 	}
 	args := []string{"log", "--format=%ct", "--name-only", "--"}
 	args = append(args, paths...)
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = repoPath
 	out, err := cmd.Output()
 	if err != nil {
@@ -262,8 +268,8 @@ func gitLastUpdatedPaths(repoPath string, paths []string) (map[string]string, er
 	return parseGitLastUpdated(out, want), nil
 }
 
-func gitHasHead(repoPath string) bool {
-	head := exec.Command("git", "rev-parse", "--verify", "HEAD")
+func gitHasHead(ctx context.Context, repoPath string) bool {
+	head := exec.CommandContext(ctx, "git", "rev-parse", "--verify", "HEAD")
 	head.Dir = repoPath
 	return head.Run() == nil
 }
@@ -315,7 +321,7 @@ func parseUnix(s string) (int64, error) {
 
 // CheckoutVersion checks out a specific version (for local development)
 func (gvm *GitVersionManager) CheckoutVersion(version string) error {
-	cmd := exec.Command("git", "checkout", version)
+	cmd := exec.CommandContext(gvm.ctx, "git", "checkout", version)
 	cmd.Dir = gvm.repoPath
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

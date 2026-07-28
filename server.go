@@ -15,8 +15,9 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-func newServer(cfg Config, logger *slog.Logger) *server {
+func newServer(ctx context.Context, cfg Config, logger *slog.Logger) *server {
 	s := &server{
+		ctx:        ctx,
 		config:     cfg,
 		logger:     logger,
 		clients:    make(map[chan string]bool),
@@ -30,7 +31,7 @@ func newServer(cfg Config, logger *slog.Logger) *server {
 		if err != nil {
 			logger.Error("Error getting working directory", "error", err)
 		} else {
-			s.versionMgr = NewGitVersionManager(wd)
+			s.versionMgr = newGitVersionManager(ctx, wd)
 			if s.versionMgr.IsGitRepo() {
 				versions, err := s.versionMgr.ListVersions(cfg.VersionBranches, cfg.VersionPattern)
 				if err != nil {
@@ -102,6 +103,7 @@ func newServer(cfg Config, logger *slog.Logger) *server {
 }
 
 type server struct {
+	ctx        context.Context
 	config     Config
 	logger     *slog.Logger
 	mu         sync.RWMutex
@@ -522,7 +524,7 @@ func (s *server) lastUpdatedFor(filePath string) string {
 	if !s.gitMetadataAvailable(root) {
 		return ""
 	}
-	times, err := gitLastUpdatedPaths(root, []string{filePath})
+	times, err := gitLastUpdatedPaths(s.ctx, root, []string{filePath})
 	if err != nil {
 		if s.config.Verbose {
 			s.logger.Debug("git metadata unavailable", "error", err)
@@ -546,7 +548,7 @@ func (s *server) gitMetadataAvailable(root string) bool {
 	}
 	s.lastUpdatedMu.Unlock()
 
-	ok := gitHasHead(root)
+	ok := gitHasHead(s.ctx, root)
 
 	s.lastUpdatedMu.Lock()
 	s.gitMetadataRoot = root
@@ -709,7 +711,7 @@ func (s *server) Run(ctx context.Context) error {
 	// Open browser if requested
 	if s.config.Open {
 		go func() {
-			if !openBrowser(displayURL) {
+			if !openBrowser(ctx, displayURL) {
 				s.logger.Warn("Failed to open browser", "url", displayURL)
 			} else {
 				s.logger.Debug("Opened browser", "url", displayURL)

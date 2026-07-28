@@ -272,7 +272,7 @@ func runServer(ctx context.Context, cfg Config, logger *slog.Logger) error {
 	if _, err := watchEnabled(cfg.Watch, cfg.Source); err != nil {
 		return err
 	}
-	s := newServer(cfg, logger)
+	s := newServer(ctx, cfg, logger)
 	return s.Run(ctx)
 }
 
@@ -425,7 +425,7 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 	return files, err
 }
 
-func openBrowser(url string) bool {
+func openBrowser(ctx context.Context, url string) bool {
 	// Skip browser opening if environment variable is set (useful for tests)
 	if os.Getenv("MD2HTML_NO_BROWSER") != "" {
 		return true
@@ -434,11 +434,11 @@ func openBrowser(url string) bool {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("open", url)
+		cmd = exec.CommandContext(ctx, "open", url)
 	case "linux":
-		cmd = exec.Command("xdg-open", url)
+		cmd = exec.CommandContext(ctx, "xdg-open", url)
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", url)
+		cmd = exec.CommandContext(ctx, "cmd", "/c", "start", url)
 	default:
 		return false
 	}
@@ -820,7 +820,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		}
 	}
 	lastUpdated := map[string]string{}
-	if times, err := gitLastUpdated(sourceDir, files); err == nil {
+	if times, err := gitLastUpdated(ctx, sourceDir, files); err == nil {
 		lastUpdated = times
 	} else if cfg.Verbose {
 		logger.Debug("git metadata unavailable", "error", err)
