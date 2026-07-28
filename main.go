@@ -256,7 +256,10 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
 
-		html := markdownToHTMLWithContext(cfg, doc.Content, cfg.Source)
+		html, err := markdownToHTMLWithContext(cfg, doc.Content, cfg.Source)
+		if err != nil {
+			return err
+		}
 		fmt.Fprint(out, html)
 		return nil
 	}
@@ -593,15 +596,14 @@ func resolveMermaidThemes(frontmatter map[string]any) (theme, darkTheme string, 
 	return theme, darkTheme, auto
 }
 
-func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any) string {
+func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any) (string, error) {
 	return renderTemplateWithOptions(cfg, htmlContent, title, customCSS, liveReload, frontmatter, RenderOptions{})
 }
 
-func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any, opts RenderOptions) string {
+func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any, opts RenderOptions) (string, error) {
 	tmpl, err := loadAllTemplates(cfg)
 	if err != nil {
-		log.Printf("Error loading templates: %v", err)
-		return fmt.Sprintf("<p>Template loading error: %v</p>", err)
+		return "", fmt.Errorf("load templates: %w", err)
 	}
 
 	// Choose template based on whether we have navigation
@@ -623,7 +625,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 	}
 
 	if tmpl.Lookup(name) == nil {
-		return "<p>No template found. Expected 'layout' template"
+		return "", fmt.Errorf("no template found: expected layout template")
 	}
 
 	var buf bytes.Buffer
@@ -663,10 +665,9 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
-		log.Printf("Error executing template: %v", err)
-		return fmt.Sprintf("<p>Template execution error: %v</p>", err)
+		return "", fmt.Errorf("execute template %q: %w", name, err)
 	}
-	return buf.String()
+	return buf.String(), nil
 }
 
 type templateData struct {
@@ -934,7 +935,10 @@ func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssCon
 		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 	}
 
-	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, file.RelPath)
+	htmlContent, err := markdownToHTMLWithContext(cfg, doc.Content, file.RelPath)
+	if err != nil {
+		return err
+	}
 	opts.Description = llmsSummary(doc)
 
 	baseName := strings.TrimSuffix(file.RelPath, filepath.Ext(file.RelPath))
@@ -955,7 +959,10 @@ func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssCon
 
 	title := pageTitle(doc.Frontmatter, file.RelPath, cfg.Title)
 
-	finalHTML := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
+	finalHTML, err := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
+	if err != nil {
+		return err
+	}
 	return os.WriteFile(outputPath, []byte(finalHTML), 0644)
 }
 
@@ -986,7 +993,10 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 	if htmlPath == "" {
 		htmlPath = filepath.Base(indexPath)
 	}
-	htmlContent := markdownToHTMLWithContext(cfg, doc.Content, htmlPath)
+	htmlContent, err := markdownToHTMLWithContext(cfg, doc.Content, htmlPath)
+	if err != nil {
+		return err
+	}
 	opts.Description = llmsSummary(doc)
 
 	title := cfg.Title
@@ -994,7 +1004,10 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 		title = docTitle
 	}
 
-	finalHTML := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
+	finalHTML, err := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
+	if err != nil {
+		return err
+	}
 
 	indexOutputPath := filepath.Join(outputDir, "index.html")
 	if cfg.LLMS && opts.FilePath != "" {
@@ -1021,11 +1034,17 @@ func generateTOCIndex(sourceDir, outputDir string, files []markdownFile, cssCont
 	}
 
 	// Convert to HTML
-	htmlContent := markdownToHTMLWithContext(cfg, buf.String(), "")
+	htmlContent, err := markdownToHTMLWithContext(cfg, buf.String(), "")
+	if err != nil {
+		return err
+	}
 
 	// Render with template
 	doc := DocumentData{Content: buf.String(), Frontmatter: make(map[string]any)}
-	finalHTML := renderTemplateWithOptions(cfg, htmlContent, "Directory Listing", cssContent, false, doc.Frontmatter, RenderOptions{Assets: assets})
+	finalHTML, err := renderTemplateWithOptions(cfg, htmlContent, "Directory Listing", cssContent, false, doc.Frontmatter, RenderOptions{Assets: assets})
+	if err != nil {
+		return err
+	}
 
 	// Write index.html
 	indexOutputPath := filepath.Join(outputDir, "index.html")

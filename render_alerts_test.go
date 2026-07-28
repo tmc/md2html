@@ -100,7 +100,7 @@ func TestGitHubAlerts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := markdownToHTMLWithContext(Config{}, tt.in, "")
+			got := mustRenderMarkdown(t, Config{}, tt.in, "")
 			for _, s := range tt.want {
 				if !strings.Contains(got, s) {
 					t.Fatalf("markdownToHTML() missing %q in:\n%s", s, got)

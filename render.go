@@ -101,7 +101,7 @@ func preprocessHTMLBlocks(markdown string) string {
 	return strings.Join(result, "\n")
 }
 
-func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
+func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, error) {
 	if cfg.AllowUnsafe {
 		markdown = rewriteLocalHTMLAttributes(markdown, filePath, cfg.HTMLExt, cfg.Index, cfg.Format)
 		markdown = preprocessHTMLBlocks(markdown)
@@ -179,19 +179,19 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) string {
 		})
 		var buf bytes.Buffer
 		if err := md.Renderer().Render(&buf, source, doc); err != nil {
-			return fmt.Sprintf("<p>Error: %v</p>", err)
+			return "", fmt.Errorf("render markdown: %w", err)
 		}
 		logTabsErrors(pc, filePath)
-		return buf.String()
+		return buf.String(), nil
 	}
 
 	doc := md.Parser().Parse(text.NewReader(source), parser.WithContext(pc))
 	var buf bytes.Buffer
 	if err := md.Renderer().Render(&buf, source, doc); err != nil {
-		return fmt.Sprintf("<p>Error: %v</p>", err)
+		return "", fmt.Errorf("render markdown: %w", err)
 	}
 	logTabsErrors(pc, filePath)
-	return buf.String()
+	return buf.String(), nil
 }
 
 type alertsExtender struct{}

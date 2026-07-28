@@ -16,7 +16,7 @@ func TestRenderTemplateMetadata(t *testing.T) {
 	}
 	opts := RenderOptions{FilePath: "guide/intro.md"}
 
-	got := renderTemplateWithOptions(cfg, "<p>body</p>", "Intro", "", false, frontmatter, opts)
+	got := mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "Intro", "", false, frontmatter, opts)
 	for _, want := range []string{
 		`<meta name="description" content="A useful page summary.">`,
 		`<link rel="canonical" href="https://example.com/docs/guide/intro.html">`,
@@ -38,12 +38,12 @@ func TestRenderTemplateMetadataIndexCanonical(t *testing.T) {
 		Index:   "index.md",
 	}
 
-	got := renderTemplateWithOptions(cfg, "<p>body</p>", "Home", "", false, nil, RenderOptions{FilePath: "index.md"})
+	got := mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "Home", "", false, nil, RenderOptions{FilePath: "index.md"})
 	if !strings.Contains(got, `<link rel="canonical" href="https://example.com/">`) {
 		t.Fatalf("root index canonical not collapsed to site root in:\n%s", got)
 	}
 
-	got = renderTemplateWithOptions(cfg, "<p>body</p>", "Posts", "", false, nil, RenderOptions{FilePath: "posts/index.md"})
+	got = mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "Posts", "", false, nil, RenderOptions{FilePath: "posts/index.md"})
 	if !strings.Contains(got, `<link rel="canonical" href="https://example.com/posts/">`) {
 		t.Fatalf("nested index canonical not collapsed to directory in:\n%s", got)
 	}
@@ -56,7 +56,7 @@ func TestRenderTemplateMetadataFallbackAndAbsence(t *testing.T) {
 		Description: "First paragraph summary.",
 	}
 
-	got := renderTemplateWithOptions(cfg, "<p>body</p>", "Intro", "", false, nil, opts)
+	got := mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "Intro", "", false, nil, opts)
 	if !strings.Contains(got, `<meta name="description" content="First paragraph summary.">`) {
 		t.Fatalf("rendered metadata missing description fallback:\n%s", got)
 	}
@@ -79,7 +79,7 @@ func TestRenderTemplateFooterMetadata(t *testing.T) {
 		LastUpdated: "2026-05-05",
 	}
 
-	got := renderTemplateWithOptions(Config{}, "<p>body</p>", "Intro", "", false, nil, opts)
+	got := mustRenderTemplateWithOptions(t, Config{}, "<p>body</p>", "Intro", "", false, nil, opts)
 	for _, want := range []string{
 		`<div class="last-updated">Last updated: 2026-05-05</div>`,
 		`<a class="edit-link" href="https://example.com/edit/guide/intro.md" target="_blank" rel="noopener">Edit this page</a>`,

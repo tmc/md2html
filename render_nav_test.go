@@ -20,7 +20,7 @@ func TestRenderTemplateNavGroupsAreLabels(t *testing.T) {
 		FilePath:  "install.md",
 	}
 
-	got := renderTemplateWithOptions(Config{HTMLExt: "html"}, "<p>body</p>", "Install", "", false, nil, opts)
+	got := mustRenderTemplateWithOptions(t, Config{HTMLExt: "html"}, "<p>body</p>", "Install", "", false, nil, opts)
 	if strings.Contains(got, `href="#section-`) {
 		t.Fatalf("rendered orphan section anchor:\n%s", got)
 	}

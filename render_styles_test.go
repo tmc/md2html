@@ -6,7 +6,7 @@ import (
 )
 
 func TestRenderTemplateStylesTaskListCheckboxes(t *testing.T) {
-	got := renderTemplateWithOptions(Config{}, "<ul><li><input checked disabled type=\"checkbox\"> Done</li></ul>", "Tasks", "", false, nil, RenderOptions{})
+	got := mustRenderTemplateWithOptions(t, Config{}, "<ul><li><input checked disabled type=\"checkbox\"> Done</li></ul>", "Tasks", "", false, nil, RenderOptions{})
 	for _, want := range []string{
 		`li:has(> input[type="checkbox"][disabled]:first-child)`,
 		`list-style-type: none;`,

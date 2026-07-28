@@ -184,7 +184,7 @@ func TestRewriteLocalMarkdownReference(t *testing.T) {
 func TestMarkdownToHTMLWithContextRewritesRelativeLinks(t *testing.T) {
 	cfg := Config{HTMLExt: "html", Index: "index.md"}
 
-	html := markdownToHTMLWithContext(cfg, "[Install](../install.md)\n", "guides/getting-started.md")
+	html := mustRenderMarkdown(t, cfg, "[Install](../install.md)\n", "guides/getting-started.md")
 	if !strings.Contains(html, `href="../install.html"`) {
 		t.Fatalf("rendered HTML missing rewritten markdown href:\n%s", html)
 	}
@@ -196,14 +196,14 @@ func TestMarkdownToHTMLWithContextRewritesRelativeLinks(t *testing.T) {
 func TestMarkdownToHTMLWithContextRewritesOKFRootLinks(t *testing.T) {
 	cfg := Config{Format: "okf", HTMLExt: "html", Index: "index.md"}
 
-	html := markdownToHTMLWithContext(cfg, "[Orders](/tables/orders.md?view=all#columns)\n", "datasets/sales.md")
+	html := mustRenderMarkdown(t, cfg, "[Orders](/tables/orders.md?view=all#columns)\n", "datasets/sales.md")
 	if !strings.Contains(html, `href="../tables/orders.html?view=all#columns"`) {
 		t.Fatalf("rendered HTML missing rewritten OKF href:\n%s", html)
 	}
 }
 
 func TestMarkdownToHTMLWithContextLeavesRootLinksInDefaultFormat(t *testing.T) {
-	html := markdownToHTMLWithContext(Config{HTMLExt: "html"}, "[Orders](/tables/orders.md)\n", "datasets/sales.md")
+	html := mustRenderMarkdown(t, Config{HTMLExt: "html"}, "[Orders](/tables/orders.md)\n", "datasets/sales.md")
 	if !strings.Contains(html, `href="/tables/orders.md"`) {
 		t.Fatalf("rendered HTML rewrote ordinary root-relative href:\n%s", html)
 	}
@@ -212,7 +212,7 @@ func TestMarkdownToHTMLWithContextLeavesRootLinksInDefaultFormat(t *testing.T) {
 func TestMarkdownToHTMLWithContextRewritesUnsafeHTMLLinks(t *testing.T) {
 	cfg := Config{AllowUnsafe: true, HTMLExt: "html", Index: "index.md"}
 
-	html := markdownToHTMLWithContext(cfg, `<div><a href="../install.md#x">Install</a></div>`, "guides/getting-started.md")
+	html := mustRenderMarkdown(t, cfg, `<div><a href="../install.md#x">Install</a></div>`, "guides/getting-started.md")
 	if !strings.Contains(html, `href="../install.html#x"`) {
 		t.Fatalf("rendered HTML missing rewritten raw HTML href:\n%s", html)
 	}
@@ -223,7 +223,7 @@ func TestMarkdownToHTMLWithContextRewritesUnsafeHTMLLinks(t *testing.T) {
 
 func TestMarkdownToHTMLWithContextLeavesFencedHTMLLinks(t *testing.T) {
 	md := "Prose: <a href=\"./other.md\">x</a>\n\n```html\n<a href=\"./other.md\">in fence</a>\n```\n"
-	html := markdownToHTMLWithContext(Config{HTMLExt: "html", AllowUnsafe: true}, md, "docs/page.md")
+	html := mustRenderMarkdown(t, Config{HTMLExt: "html", AllowUnsafe: true}, md, "docs/page.md")
 
 	// Split at the code block: syntax highlighting tokenizes the fenced HTML
 	// into spans, so href="..." is not contiguous there. Compare regions
@@ -248,7 +248,7 @@ func TestMarkdownToHTMLWithContextLeavesFencedHTMLLinks(t *testing.T) {
 func TestMarkdownToHTMLWithContextRewritesUnsafeOKFRootLinks(t *testing.T) {
 	cfg := Config{AllowUnsafe: true, Format: "okf", HTMLExt: "html", Index: "index.md"}
 
-	html := markdownToHTMLWithContext(cfg, `<div><a href="/tables/orders.md#columns">Orders</a></div>`, "datasets/sales.md")
+	html := mustRenderMarkdown(t, cfg, `<div><a href="/tables/orders.md#columns">Orders</a></div>`, "datasets/sales.md")
 	if !strings.Contains(html, `href="../tables/orders.html#columns"`) {
 		t.Fatalf("rendered HTML missing rewritten OKF raw HTML href:\n%s", html)
 	}

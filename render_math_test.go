@@ -45,7 +45,7 @@ func TestRenderTemplateLoadsMathJaxOnlyForMath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			html := renderTemplate(Config{}, tt.content, "test", "", false, nil)
+			html := mustRenderTemplate(t, Config{}, tt.content, "test", "", false, nil)
 			got := strings.Contains(html, `id="MathJax-script"`)
 			if got != tt.want {
 				t.Fatalf("MathJax included = %v, want %v:\n%s", got, tt.want, html)

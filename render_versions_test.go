@@ -30,7 +30,7 @@ func TestRenderTemplateThreadsVersionData(t *testing.T) {
 		},
 	}
 
-	got := renderTemplateWithOptions(cfg, "<p>body</p>", "title", "", false, map[string]any{}, opts)
+	got := mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "title", "", false, map[string]any{}, opts)
 
 	want := `<v>v1.2.3</v><x name="v1.2.3" ref="refs/tags/v1.2.3" tag="true"/><x name="main" ref="refs/heads/main" tag="false"/>`
 	if !strings.Contains(got, want) {
@@ -48,7 +48,7 @@ func TestRenderTemplateEmptyVersionsByDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := Config{TemplateDir: dir}
-	got := renderTemplateWithOptions(cfg, "", "", "", false, map[string]any{}, RenderOptions{})
+	got := mustRenderTemplateWithOptions(t, cfg, "", "", "", false, map[string]any{}, RenderOptions{})
 	if !strings.Contains(got, `<v></v><n>0</n>`) {
 		t.Fatalf("expected empty version payload, got: %s", got)
 	}

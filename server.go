@@ -330,7 +330,11 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Error parsing frontmatter in %s: %v", s.config.Index, err)
 				doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
 			}
-			html := s.renderDocumentWithVersion(doc, s.config.Index, css, s.config.Index, requestedVersion)
+			html, err := s.renderDocumentWithVersion(doc, s.config.Index, css, s.config.Index, requestedVersion)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Write([]byte(html))
 			return
@@ -383,7 +387,11 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 					log.Printf("Error parsing frontmatter in %s: %v", candidate, err)
 					doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
 				}
-				html := s.renderDocumentWithVersion(doc, candidate, css, candidate, requestedVersion)
+				html, err := s.renderDocumentWithVersion(doc, candidate, css, candidate, requestedVersion)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				w.Write([]byte(html))
 				return
@@ -429,7 +437,11 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Error parsing frontmatter in %s: %v", file, err)
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
-		html := s.renderDocumentWithVersion(doc, file, css, file, requestedVersion)
+		html, err := s.renderDocumentWithVersion(doc, file, css, file, requestedVersion)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write([]byte(html))
 		return
@@ -450,7 +462,11 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 
 		doc := DocumentData{Content: listing, Frontmatter: make(map[string]any)}
-		html := s.renderDocumentWithVersion(doc, "Directory Listing", css, "", "")
+		html, err := s.renderDocumentWithVersion(doc, "Directory Listing", css, "", "")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write([]byte(html))
 		return
@@ -461,14 +477,21 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error parsing frontmatter: %v", err)
 		doc = DocumentData{Content: content, Frontmatter: make(map[string]any)}
 	}
-	html := s.renderDocumentWithVersion(doc, s.config.Title, css, "", "")
+	html, err := s.renderDocumentWithVersion(doc, s.config.Title, css, "", "")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html))
 }
 
 // renderDocumentWithVersion renders a document with version information
-func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, filePath, version string) string {
-	html := markdownToHTMLWithContext(s.config, doc.Content, filePath)
+func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, filePath, version string) (string, error) {
+	html, err := markdownToHTMLWithContext(s.config, doc.Content, filePath)
+	if err != nil {
+		return "", err
+	}
 	if s.config.RenderFrontmatter {
 		html = renderFrontmatterHTML(doc.Frontmatter) + html
 	}
@@ -598,7 +621,11 @@ func (s *server) handleRaw(w http.ResponseWriter, r *http.Request) {
 	content := s.content
 	s.mu.RUnlock()
 
-	html := markdownToHTMLWithContext(s.config, content, "")
+	html, err := markdownToHTMLWithContext(s.config, content, "")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html))
 }
