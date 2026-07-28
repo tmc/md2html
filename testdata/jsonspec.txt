@@ -1,6 +1,6 @@
 # Test JSON discriminator detection and badge rendering.
 
-md2html -html output -html-ext html -jsonspec-prefixes ascf/ -jsonspec-badge-url 'schemas.html#%s' -jsonspec-badge-label '%s schema' testsite
+md2html -html output -html-ext html -jsonspec testsite/jsonspec testsite
 exists output/README.html
 
 # Discriminator block gets wrapping div with data-schema-type.
@@ -23,6 +23,13 @@ grep 'hypothesis schema</a>' output/README.html
 grep 'class="chroma"' output/README.html
 
 rm -rf testsite output
+
+-- testsite/jsonspec/jsonspec.json --
+{
+  "prefixes": ["ascf/"],
+  "badge_url": "schemas.html#%s",
+  "badge_label": "%s schema"
+}
 
 -- testsite/README.md --
 # ASCF Examples

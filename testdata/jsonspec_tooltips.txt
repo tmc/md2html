@@ -1,7 +1,7 @@
 # Test that a configured schema directory produces an inline bundle
 # payload the client script can consume for tooltips.
 
-md2html -html output -html-ext html -jsonspec-prefixes ascf/ -jsonspec-badge-url 'schemas.html#%s' -jsonspec-schemas testsite/schema testsite
+md2html -html output -html-ext html -jsonspec testsite/jsonspec testsite
 exists output/README.html
 
 # Bundle is embedded as an inline JSON payload.
@@ -15,7 +15,8 @@ grep '"local_search"' output/README.html
 grep '"required":true' output/README.html
 
 # Client script is wired in.
-grep 'enrichBlock' output/README.html
+grep 'js/jsonspec.js' output/README.html
+grep 'enrichBlock' output/js/jsonspec.js
 
 # Wrapper div still present so the script has something to find.
 grep 'class="md-jsonspec" data-schema-type="hypothesis"' output/README.html
@@ -33,7 +34,13 @@ rm -rf testsite output
 }
 ```
 
--- testsite/schema/hypothesis.schema.json --
+-- testsite/jsonspec/jsonspec.json --
+{
+  "prefixes": ["ascf/"],
+  "badge_url": "schemas.html#%s"
+}
+
+-- testsite/jsonspec/hypothesis.schema.json --
 {
   "$id": "https://ascf.dev/schema/0.2/hypothesis.schema.json",
   "title": "Hypothesis",

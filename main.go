@@ -17,6 +17,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/tmc/md2html/internal/jsonspec"
 )
 
 type Config struct {
@@ -63,24 +65,13 @@ type Config struct {
 	// logged and skipped — vet must never block rendering.
 	VetChecks string
 
-	// JSONSpecPrefixes is a comma-separated list of type-discriminator
-	// prefixes (for example "ascf/") that mark fenced JSON blocks for
-	// schema-badge enrichment. When empty, the jsonspec extension is a
-	// no-op.
-	JSONSpecPrefixes string
-	// JSONSpecBadgeURL is a printf-style URL template used to link each
-	// badge to its schema documentation page. %s is replaced with the
-	// discriminator suffix (for example "hypothesis" from "ascf/hypothesis").
-	JSONSpecBadgeURL string
-	// JSONSpecBadgeLabel is a printf-style template for the badge label
-	// text. %s is replaced with the discriminator suffix. Defaults to
-	// a clipboard icon plus the suffix when empty.
-	JSONSpecBadgeLabel string
-	// JSONSpecSchemas is a directory of *.schema.json files. When set,
-	// the server loads each schema into a bundle (keyed by filename
-	// stem) and exposes it to the rendered page so client-side code can
-	// attach tooltips to fields in tagged JSON blocks.
-	JSONSpecSchemas string
+	// JSONSpec is a directory containing jsonspec.json and any
+	// *.schema.json files used for JSON discriminator enrichment.
+	JSONSpec string
+
+	jsonSpecConfig jsonspec.Config
+	jsonSpecBundle template.JS
+	jsonSpecReady  bool
 }
 
 // NewFlagSet returns a FlagSet configured for the md2html CLI.
@@ -112,10 +103,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.String("watch", "auto", "live reload file watching: auto, true, or false")
 	fs.Bool("drafts", false, "render pages marked draft: true instead of skipping them")
 	fs.String("format", "", "structured Markdown format: okf")
-	fs.String("jsonspec-prefixes", "", "comma-separated JSON type-discriminator prefixes to enrich (e.g. 'ascf/')")
-	fs.String("jsonspec-badge-url", "", "URL template for schema badges; %s is the discriminator suffix (e.g. 'schemas.html#%s')")
-	fs.String("jsonspec-badge-label", "", "label template for schema badges; %s is the discriminator suffix")
-	fs.String("jsonspec-schemas", "", "directory of *.schema.json files; loads a bundle used by client-side tooltips")
+	fs.String("jsonspec", "", "directory containing jsonspec.json and *.schema.json files")
 	fs.Bool("vet", false, "run mdvet checks on source markdown and report diagnostics (does not block rendering)")
 	fs.String("vet-checks", "", "comma-separated mdvet check names to run with -vet (default: all)")
 	return fs
@@ -124,38 +112,35 @@ func NewFlagSet(name string) *flag.FlagSet {
 // ConfigFromFlags creates a Config from an initialized FlagSet.
 func ConfigFromFlags(fs *flag.FlagSet) Config {
 	return Config{
-		HTTP:               flagString(fs, "http"),
-		HTML:               flagString(fs, "html"),
-		Open:               flagBool(fs, "open"),
-		Verbose:            flagBool(fs, "v"),
-		Title:              flagString(fs, "title"),
-		CSS:                flagString(fs, "css"),
-		Depth:              flagInt(fs, "depth"),
-		TOC:                flagBool(fs, "toc"),
-		AllowUnsafe:        flagBool(fs, "allow-unsafe"),
-		TemplateDir:        flagString(fs, "templates"),
-		DataJSON:           flagString(fs, "data-json"),
-		RenderFrontmatter:  flagBool(fs, "render-frontmatter"),
-		Index:              flagString(fs, "index"),
-		HTMLExt:            flagString(fs, "html-ext"),
-		Versions:           flagBool(fs, "versions"),
-		VersionPattern:     flagString(fs, "version-pattern"),
-		VersionBranches:    flagBool(fs, "version-branches"),
-		VersionDefault:     flagString(fs, "version-default"),
-		Search:             flagBool(fs, "search"),
-		LLMS:               flagBool(fs, "llms"),
-		SiteURL:            flagString(fs, "site-url"),
-		EditURL:            flagString(fs, "edit-url"),
-		Nav:                flagBool(fs, "nav"),
-		Watch:              flagString(fs, "watch"),
-		Drafts:             flagBool(fs, "drafts"),
-		Format:             flagString(fs, "format"),
-		JSONSpecPrefixes:   flagString(fs, "jsonspec-prefixes"),
-		JSONSpecBadgeURL:   flagString(fs, "jsonspec-badge-url"),
-		JSONSpecBadgeLabel: flagString(fs, "jsonspec-badge-label"),
-		JSONSpecSchemas:    flagString(fs, "jsonspec-schemas"),
-		Vet:                flagBool(fs, "vet"),
-		VetChecks:          flagString(fs, "vet-checks"),
+		HTTP:              flagString(fs, "http"),
+		HTML:              flagString(fs, "html"),
+		Open:              flagBool(fs, "open"),
+		Verbose:           flagBool(fs, "v"),
+		Title:             flagString(fs, "title"),
+		CSS:               flagString(fs, "css"),
+		Depth:             flagInt(fs, "depth"),
+		TOC:               flagBool(fs, "toc"),
+		AllowUnsafe:       flagBool(fs, "allow-unsafe"),
+		TemplateDir:       flagString(fs, "templates"),
+		DataJSON:          flagString(fs, "data-json"),
+		RenderFrontmatter: flagBool(fs, "render-frontmatter"),
+		Index:             flagString(fs, "index"),
+		HTMLExt:           flagString(fs, "html-ext"),
+		Versions:          flagBool(fs, "versions"),
+		VersionPattern:    flagString(fs, "version-pattern"),
+		VersionBranches:   flagBool(fs, "version-branches"),
+		VersionDefault:    flagString(fs, "version-default"),
+		Search:            flagBool(fs, "search"),
+		LLMS:              flagBool(fs, "llms"),
+		SiteURL:           flagString(fs, "site-url"),
+		EditURL:           flagString(fs, "edit-url"),
+		Nav:               flagBool(fs, "nav"),
+		Watch:             flagString(fs, "watch"),
+		Drafts:            flagBool(fs, "drafts"),
+		Format:            flagString(fs, "format"),
+		JSONSpec:          flagString(fs, "jsonspec"),
+		Vet:               flagBool(fs, "vet"),
+		VetChecks:         flagString(fs, "vet-checks"),
 	}
 }
 
@@ -190,6 +175,11 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	defer stop()
 
 	if err := validateFormat(cfg.Format); err != nil {
+		return err
+	}
+	var err error
+	cfg, err = prepareJSONSpec(cfg, logger)
+	if err != nil {
 		return err
 	}
 
@@ -493,6 +483,9 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 			}
 			return name
 		},
+		"jsonSpec": func() template.JS {
+			return cfg.jsonSpecBundle
+		},
 	}).ParseFS(templates, "templates/*.html", "templates/*/*.html")
 
 	if err != nil {
@@ -660,7 +653,6 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		LastUpdated:      meta.LastUpdated,
 		EditURL:          opts.EditURL,
 		Assets:           opts.Assets,
-		JSONSpec:         jsonSpecBundleJSON(cfg),
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -701,7 +693,6 @@ type templateData struct {
 	LastUpdated    string
 	EditURL        string
 	Assets         map[string]string
-	JSONSpec       template.JS
 }
 
 type renderMetadata struct {
@@ -813,6 +804,11 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		logger.Debug("git metadata unavailable", "error", err)
 	}
 	assets := map[string]string{}
+	if cfg.jsonSpecBundle != "" {
+		if err := writeJSONSpecAsset(outputDir); err != nil {
+			return err
+		}
+	}
 	if cfg.Search {
 		body, n, err := buildSearchIndexJS(sourceDir, cfg)
 		if err != nil {

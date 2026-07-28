@@ -10,7 +10,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"sync"
 
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/styles"
@@ -328,72 +327,8 @@ func renderAlertBlockquote(w util.BufWriter, source []byte, n ast.Node, entering
 	return ast.WalkContinue, nil
 }
 
-// jsonSpecConfig derives the jsonspec extension configuration from the
-// top-level md2html Config. It parses the comma-separated prefixes list
-// and trims whitespace so "ascf/, other/" behaves the same as
-// "ascf/,other/".
 func jsonSpecConfig(cfg Config) jsonspec.Config {
-	raw := strings.TrimSpace(cfg.JSONSpecPrefixes)
-	if raw == "" {
-		return jsonspec.Config{}
-	}
-	var prefixes []string
-	for p := range strings.SplitSeq(raw, ",") {
-		if p = strings.TrimSpace(p); p != "" {
-			prefixes = append(prefixes, p)
-		}
-	}
-	return jsonspec.Config{
-		DiscriminatorPrefixes: prefixes,
-		BadgeURLTemplate:      cfg.JSONSpecBadgeURL,
-		BadgeLabelTemplate:    cfg.JSONSpecBadgeLabel,
-	}
-}
-
-// jsonSpecBundleCache memoises schema-bundle loads keyed by directory
-// path so a long-running server does not re-read the files on every
-// rendered page. The cache is keyed by absolute directory and assumes
-// schemas are static for the lifetime of the process; the file watcher
-// restarts the server on source changes, which matches the existing
-// lifecycle for templates and CSS.
-var (
-	jsonSpecBundleMu    sync.Mutex
-	jsonSpecBundleCache = map[string]template.JS{}
-)
-
-// jsonSpecBundleJSON returns the serialised schema bundle as a
-// template.JS value suitable for embedding inside an inline
-// <script type="application/json"> tag. It returns an empty value when
-// no schemas directory is configured or when the directory cannot be
-// read; errors are logged but do not abort rendering.
-func jsonSpecBundleJSON(cfg Config) template.JS {
-	dir := strings.TrimSpace(cfg.JSONSpecSchemas)
-	if dir == "" {
-		return ""
-	}
-	jsonSpecBundleMu.Lock()
-	defer jsonSpecBundleMu.Unlock()
-	if js, ok := jsonSpecBundleCache[dir]; ok {
-		return js
-	}
-	bundle, warns, err := jsonspec.LoadBundle(dir)
-	if err != nil {
-		slog.Default().Warn("jsonspec: load bundle failed", "dir", dir, "error", err)
-		jsonSpecBundleCache[dir] = ""
-		return ""
-	}
-	for _, w := range warns {
-		slog.Default().Warn("jsonspec: schema load warning", "dir", dir, "error", w)
-	}
-	raw, err := bundle.Marshal()
-	if err != nil {
-		slog.Default().Warn("jsonspec: marshal bundle failed", "dir", dir, "error", err)
-		jsonSpecBundleCache[dir] = ""
-		return ""
-	}
-	js := template.JS(raw)
-	jsonSpecBundleCache[dir] = js
-	return js
+	return cfg.jsonSpecConfig
 }
 
 // logTabsErrors surfaces parse diagnostics recorded by the tabs

@@ -43,11 +43,11 @@ func (s *server) handleVersionsAPI(w http.ResponseWriter, r *http.Request) {
 // <script id="md-jsonspec-schemas"> tag, so tools or lazy-loading JS
 // can fetch it without scraping HTML.
 func (s *server) handleJSONSpecSchemas(w http.ResponseWriter, r *http.Request) {
-	if strings.TrimSpace(s.config.JSONSpecSchemas) == "" {
+	if strings.TrimSpace(s.config.JSONSpec) == "" {
 		http.Error(w, "jsonspec schemas not configured", http.StatusNotFound)
 		return
 	}
-	payload := jsonSpecBundleJSON(s.config)
+	payload := s.config.jsonSpecBundle
 	if payload == "" {
 		http.Error(w, "schema bundle unavailable", http.StatusInternalServerError)
 		return

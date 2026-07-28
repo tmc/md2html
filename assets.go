@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-//go:embed static/js/minisearch.min.js static/js/search.js
+//go:embed static/js/minisearch.min.js static/js/search.js static/js/jsonspec.js
 var searchAssets embed.FS
 
 // searchAssetFiles lists the embedded client-side search assets that ship
@@ -27,6 +27,21 @@ var searchAssetFiles = []string{
 // readSearchAsset returns the bytes of an embedded asset by its embed path.
 func readSearchAsset(name string) ([]byte, error) {
 	return searchAssets.ReadFile(name)
+}
+
+func writeJSONSpecAsset(outputDir string) error {
+	body, err := fs.ReadFile(searchAssets, "static/js/jsonspec.js")
+	if err != nil {
+		return fmt.Errorf("read embedded jsonspec.js: %w", err)
+	}
+	jsDir := filepath.Join(outputDir, "js")
+	if err := os.MkdirAll(jsDir, 0755); err != nil {
+		return fmt.Errorf("create js dir: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(jsDir, "jsonspec.js"), body, 0644); err != nil {
+		return fmt.Errorf("write jsonspec.js: %w", err)
+	}
+	return nil
 }
 
 func writeFingerprintedSearchAssets(outputDir string, searchIndex []byte) (map[string]string, error) {

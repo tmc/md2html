@@ -68,7 +68,6 @@ func TestPublicContractFields(t *testing.T) {
 				{"LastUpdated", "string"},
 				{"EditURL", "string"},
 				{"Assets", "map[string]string"},
-				{"JSONSpec", "template.JS"},
 			},
 		},
 	}

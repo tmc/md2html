@@ -1,6 +1,6 @@
 # Test the /_jsonspec/schemas.json server endpoint returns the loaded bundle.
 
-md2html -http :8182 -jsonspec-prefixes ascf/ -jsonspec-schemas schema doc.md &
+md2html -http :8182 -jsonspec schema doc.md &
 wait-port :8182
 
 # Bundle is served as application/json.
@@ -9,7 +9,7 @@ stdout '"hypothesis"'
 stdout '"strategy_tag"'
 stdout '"local_search"'
 
-# Without -jsonspec-schemas the endpoint 404s. Start a second server
+# Without -jsonspec the endpoint 404s. Start a second server
 # on a different port.
 md2html -http :8183 doc.md &
 wait-port :8183
@@ -22,6 +22,11 @@ stdout '404'
 ```json
 {"type": "ascf/hypothesis"}
 ```
+
+-- schema/jsonspec.json --
+{
+  "prefixes": ["ascf/"]
+}
 
 -- schema/hypothesis.schema.json --
 {

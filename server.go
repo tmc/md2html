@@ -15,6 +15,11 @@ import (
 )
 
 func newServer(ctx context.Context, cfg Config, logger *slog.Logger) *server {
+	if prepared, err := prepareJSONSpec(cfg, logger); err != nil {
+		logger.Error("Error preparing JSON schemas", "error", err)
+	} else {
+		cfg = prepared
+	}
 	s := &server{
 		ctx:        ctx,
 		config:     cfg,
@@ -725,6 +730,9 @@ func (s *server) Run(ctx context.Context) error {
 		mux.HandleFunc("/js/minisearch.min.js", handleSearchAsset("static/js/minisearch.min.js"))
 		mux.HandleFunc("/js/search.js", handleSearchAsset("static/js/search.js"))
 		mux.HandleFunc("/search-index.js", s.handleSearchIndex)
+	}
+	if s.config.jsonSpecBundle != "" {
+		mux.HandleFunc("/js/jsonspec.js", handleSearchAsset("static/js/jsonspec.js"))
 	}
 
 	srv := &http.Server{

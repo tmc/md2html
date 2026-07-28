@@ -3,7 +3,8 @@
 {{template "mermaid-script" .}}
 {{template "copy-code-script" .}}
 {{template "tabs-script" .}}
-{{if .JSONSpec}}{{template "jsonspec-script" .}}{{end}}
+{{with jsonSpec}}<script type="application/json" id="md-jsonspec-schemas">{{.}}</script>
+<script src="{{$.AssetBase}}js/jsonspec.js"></script>{{end}}
 {{if .LiveReload}}{{template "livereload-script" .}}{{end}}
 {{if .Versions}}{{template "version-switcher-script" .}}{{end}}
 {{end}}
@@ -308,147 +309,6 @@
     .md-tab-panel > p:first-child { margin-top: 0; }
     .md-tab-panel > pre:last-child,
     .md-tab-panel > p:last-child { margin-bottom: 0; }
-</style>
-{{end}}
-
-{{define "jsonspec-script"}}
-<script type="application/json" id="md-jsonspec-schemas">{{.JSONSpec}}</script>
-<script>
-    (function() {
-        function parseBundle() {
-            var tag = document.getElementById('md-jsonspec-schemas');
-            if (!tag) return null;
-            try {
-                return JSON.parse(tag.textContent);
-            } catch (e) {
-                console.warn('jsonspec: bundle parse failed', e);
-                return null;
-            }
-        }
-
-        // formatField renders the tooltip body for a JSON key. It is
-        // kept text-only because it is attached via the title attribute
-        // (which does not render markup). Lines separated by "\n" show
-        // up as soft wraps in most browsers.
-        function formatField(name, field) {
-            if (!field) return name + ' (undocumented)';
-            var lines = [name];
-            var head = [];
-            if (field.type) head.push(field.type);
-            if (field.format) head.push('format: ' + field.format);
-            head.push(field.required ? 'required' : 'optional');
-            lines.push('  ' + head.join(' · '));
-            if (field.description) {
-                lines.push('');
-                lines.push(field.description);
-            }
-            if (field.enum && field.enum.length) {
-                lines.push('');
-                lines.push('one of: ' + field.enum.map(String).join(' | '));
-            }
-            if (field.pattern) {
-                lines.push('');
-                lines.push('pattern: ' + field.pattern);
-            }
-            return lines.join('\n');
-        }
-
-        // formatEnumValue annotates a JSON string value that appears
-        // under an enum-typed key: the tooltip shows the full set of
-        // allowed values for quick reference.
-        function formatEnumValue(value, field) {
-            if (!field || !field.enum || !field.enum.length) return null;
-            return 'one of: ' + field.enum.map(String).join(' | ');
-        }
-
-        function unquote(s) {
-            if (!s) return '';
-            // Chroma renders JSON strings with surrounding quotes as
-            // part of the token text. Strip them for name lookup.
-            if (s.length >= 2 && s.charAt(0) === '"' && s.charAt(s.length - 1) === '"') {
-                return s.substring(1, s.length - 1);
-            }
-            return s;
-        }
-
-        function enrichBlock(block, schema) {
-            if (!schema || !schema.fields) return;
-            var code = block.querySelector('pre code');
-            if (!code) return;
-            var spans = code.querySelectorAll('span.nt, span.s2');
-            var lastKeyField = null;
-            for (var i = 0; i < spans.length; i++) {
-                var sp = spans[i];
-                if (sp.classList.contains('nt')) {
-                    var name = unquote(sp.textContent);
-                    var field = schema.fields[name];
-                    lastKeyField = field || null;
-                    sp.setAttribute('title', formatField(name, field));
-                    sp.classList.add('md-jsonspec-key');
-                    if (field && field.required) sp.classList.add('md-jsonspec-required');
-                } else if (sp.classList.contains('s2')) {
-                    var enumTip = formatEnumValue(unquote(sp.textContent), lastKeyField);
-                    if (enumTip) {
-                        sp.setAttribute('title', enumTip);
-                        sp.classList.add('md-jsonspec-enum');
-                    }
-                    // A value consumes its preceding key context so a
-                    // later bare value is not mis-attributed.
-                    lastKeyField = null;
-                }
-            }
-        }
-
-        function run() {
-            var bundle = parseBundle();
-            if (!bundle || !bundle.schemas) return;
-            var blocks = document.querySelectorAll('.md-jsonspec');
-            for (var i = 0; i < blocks.length; i++) {
-                var b = blocks[i];
-                var type = b.getAttribute('data-schema-type');
-                if (!type) continue;
-                enrichBlock(b, bundle.schemas[type]);
-            }
-        }
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', run);
-        } else {
-            run();
-        }
-    })();
-</script>
-<style>
-    .md-jsonspec {
-        position: relative;
-    }
-    .md-jsonspec-badge {
-        display: inline-block;
-        font-size: 12px;
-        padding: 2px 8px;
-        margin-bottom: 6px;
-        border: 1px solid var(--border, #d0d7de);
-        border-radius: 999px;
-        color: var(--fg-muted, #656d76);
-        text-decoration: none;
-        background: var(--bg, transparent);
-    }
-    .md-jsonspec-badge:hover {
-        color: var(--accent, #0969da);
-        border-color: var(--accent, #0969da);
-        text-decoration: none;
-    }
-    .md-jsonspec-key {
-        cursor: help;
-        border-bottom: 1px dotted var(--fg-muted, #656d76);
-    }
-    .md-jsonspec-key.md-jsonspec-required {
-        border-bottom-style: solid;
-    }
-    .md-jsonspec-enum {
-        cursor: help;
-        border-bottom: 1px dotted var(--fg-muted, #656d76);
-    }
 </style>
 {{end}}
 
