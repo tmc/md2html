@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/tmc/md2html/internal/anchor"
 	"github.com/yuin/goldmark/ast"
 )
 
@@ -103,7 +104,7 @@ func (DuplicateAnchorCheck) Check(doc *Document) ([]Diagnostic, error) {
 			return ast.WalkContinue, nil
 		}
 		text := headingText(h, doc.Source)
-		slug := goldmarkSlug(text)
+		slug := anchor.ID(text)
 		if slug == "" {
 			slug = "heading"
 		}
@@ -124,31 +125,6 @@ func (DuplicateAnchorCheck) Check(doc *Document) ([]Diagnostic, error) {
 		return nil, err
 	}
 	return diags, nil
-}
-
-// goldmarkSlug reproduces goldmark's heading-id algorithm before
-// dedup-suffixing. Keep this in sync with parser/parser.go ids.Generate
-// in github.com/yuin/goldmark.
-func goldmarkSlug(s string) string {
-	var b strings.Builder
-	b.Grow(len(s))
-	for i := 0; i < len(s); i++ {
-		v := s[i]
-		// Pass through multi-byte UTF-8 untouched.
-		if v >= 0x80 {
-			b.WriteByte(v)
-			continue
-		}
-		switch {
-		case v >= 'A' && v <= 'Z':
-			b.WriteByte(v + ('a' - 'A'))
-		case v >= 'a' && v <= 'z', v >= '0' && v <= '9':
-			b.WriteByte(v)
-		case v == ' ' || v == '\t' || v == '-' || v == '_':
-			b.WriteByte('-')
-		}
-	}
-	return strings.Trim(b.String(), " \t")
 }
 
 func headingText(h *ast.Heading, source []byte) string {

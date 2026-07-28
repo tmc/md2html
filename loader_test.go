@@ -174,29 +174,6 @@ func TestLoaderParseMDHeadings(t *testing.T) {
 	}
 }
 
-func TestToAnchorID(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"Hello World", "hello-world"},
-		{"Getting Started", "getting-started"},
-		{"API Reference", "api-reference"},
-		{"Section 1.2", "section-12"},
-		{"  Spaces  ", "spaces"},
-		{"Special!@#Characters", "specialcharacters"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := toAnchorID(tt.input)
-			if got != tt.want {
-				t.Errorf("toAnchorID(%q) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestLoaderLoadJSON(t *testing.T) {
 	_ = NewLoader("testdata/gitbook-sample", ".html")
 

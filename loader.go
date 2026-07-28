@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/tmc/md2html/internal/anchor"
 	"github.com/yuin/goldmark"
 	meta "github.com/yuin/goldmark-meta"
 	"github.com/yuin/goldmark/ast"
@@ -184,7 +185,7 @@ func (l *Loader) extractStructure(doc *MarkdownDoc, tree ast.Node, source []byte
 			heading := Heading{
 				Level: node.Level,
 				Text:  string(node.Text(source)),
-				ID:    toAnchorID(string(node.Text(source))),
+				ID:    anchor.ID(string(node.Text(source))),
 			}
 			doc.Headings = append(doc.Headings, heading)
 
@@ -279,21 +280,6 @@ func buildListTree(items []ListItem) []ListItem {
 	}
 
 	return roots
-}
-
-// toAnchorID converts heading text to a URL-safe anchor ID.
-func toAnchorID(text string) string {
-	text = strings.ToLower(text)
-	text = strings.Map(func(r rune) rune {
-		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '_' {
-			return r
-		}
-		if r == ' ' {
-			return '-'
-		}
-		return -1
-	}, text)
-	return strings.Trim(text, "-")
 }
 
 // readFile reads a file relative to the loader's base directory.
