@@ -420,6 +420,43 @@ func rewriteLocalHTMLAttributes(content, filePath, htmlExt, indexFile, format st
 		return content
 	}
 
+	var out strings.Builder
+	inFence := false
+	fence := byte(0)
+	fenceLen := 0
+	for line := range strings.SplitAfterSeq(content, "\n") {
+		trimmed := strings.TrimLeft(line, " ")
+		if marker, n := markdownFence(trimmed); n >= 3 {
+			if !inFence {
+				inFence, fence, fenceLen = true, marker, n
+			} else if marker == fence && n >= fenceLen {
+				inFence = false
+			}
+			out.WriteString(line)
+			continue
+		}
+		if inFence || strings.HasPrefix(line, "\t") || strings.HasPrefix(line, "    ") {
+			out.WriteString(line)
+			continue
+		}
+		out.WriteString(rewriteHTMLAttributes(line, filePath, htmlExt, indexFile, format))
+	}
+	return out.String()
+}
+
+func markdownFence(line string) (byte, int) {
+	if line == "" || line[0] != '`' && line[0] != '~' {
+		return 0, 0
+	}
+	marker := line[0]
+	n := 1
+	for n < len(line) && line[n] == marker {
+		n++
+	}
+	return marker, n
+}
+
+func rewriteHTMLAttributes(content, filePath, htmlExt, indexFile, format string) string {
 	return htmlLinkAttrPattern.ReplaceAllStringFunc(content, func(attr string) string {
 		match := htmlLinkAttrPattern.FindStringSubmatch(attr)
 		if len(match) != 4 {

@@ -221,6 +221,30 @@ func TestMarkdownToHTMLWithContextRewritesUnsafeHTMLLinks(t *testing.T) {
 	}
 }
 
+func TestMarkdownToHTMLWithContextLeavesFencedHTMLLinks(t *testing.T) {
+	md := "Prose: <a href=\"./other.md\">x</a>\n\n```html\n<a href=\"./other.md\">in fence</a>\n```\n"
+	html := markdownToHTMLWithContext(Config{HTMLExt: "html", AllowUnsafe: true}, md, "docs/page.md")
+
+	// Split at the code block: syntax highlighting tokenizes the fenced HTML
+	// into spans, so href="..." is not contiguous there. Compare regions
+	// instead of matching an attribute string across the whole document.
+	i := strings.Index(html, "<code")
+	if i < 0 {
+		t.Fatalf("no code block rendered:\n%s", html)
+	}
+	prose, fence := html[:i], html[i:]
+
+	if !strings.Contains(prose, `href="other.html"`) {
+		t.Errorf("prose href not rewritten to other.html:\n%s", prose)
+	}
+	if !strings.Contains(fence, "./other.md") {
+		t.Errorf("fenced href lost its original ./other.md:\n%s", fence)
+	}
+	if strings.Contains(fence, "other.html") {
+		t.Errorf("fenced href was rewritten; code blocks must be left alone:\n%s", fence)
+	}
+}
+
 func TestMarkdownToHTMLWithContextRewritesUnsafeOKFRootLinks(t *testing.T) {
 	cfg := Config{AllowUnsafe: true, Format: "okf", HTMLExt: "html", Index: "index.md"}
 
