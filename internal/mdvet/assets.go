@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tmc/md2html/internal/media"
+	"github.com/tmc/md2html/internal/markdown/media"
 	"github.com/yuin/goldmark/ast"
 )
 

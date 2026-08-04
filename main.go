@@ -18,7 +18,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tmc/md2html/internal/jsonspec"
+	"github.com/tmc/md2html/internal/markdown/jsonspec"
 )
 
 type Config struct {

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tmc/md2html/internal/jsonspec"
+	"github.com/tmc/md2html/internal/markdown/jsonspec"
 )
 
 type jsonSpecFile struct {
