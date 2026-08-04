@@ -148,7 +148,10 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, e
 		parserOpts = append(parserOpts, parser.WithAttribute())
 	}
 
-	rendererOpts := []renderer.Option{html.WithXHTML(), html.WithHardWraps()}
+	// Hard wraps are deliberately off: GFM treats a single newline as a
+	// space, so prose reflows to the viewport instead of breaking at the
+	// column the author happened to wrap the source at.
+	rendererOpts := []renderer.Option{html.WithXHTML()}
 	if cfg.AllowUnsafe {
 		rendererOpts = append(rendererOpts, html.WithUnsafe())
 	}
