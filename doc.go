@@ -25,6 +25,27 @@
 //
 // For navigation and structured parsing, use ParseSummary and Loader.
 //
+// # Markdown dialect
+//
+// Rendering follows GFM: a single newline is a space, so paragraphs reflow
+// to the viewport rather than breaking where the source was wrapped.
+// Beyond GFM, the supported syntax is footnotes, GitHub alerts
+// ("> [!NOTE]"), admonitions, tabs, media and component blocks, and
+// Mermaid fences.
+//
+// Subscript ("H~2~O"), superscript ("X^2^"), and definition lists are not
+// supported; a single tilde is GFM strikethrough, and the other two render
+// literally.
+//
+// Raw HTML in Markdown is dropped by default and replaced with an HTML
+// comment, because rendered pages may come from untrusted Markdown. The
+// -allow-unsafe flag ([Config.AllowUnsafe]) passes it through and also
+// enables attribute syntax and local link rewriting inside HTML blocks.
+//
+// Mermaid and MathJax are loaded from a CDN, so pages containing diagrams
+// or math need network access on first view. When a loader fails the page
+// shows a warning rather than silently leaving the source unrendered.
+//
 // # Compatibility
 //
 // The stable public API is [Config], [ConfigFromFlags], [NewFlagSet],
