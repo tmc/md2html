@@ -36,6 +36,12 @@ Markdown supports GitHub-style alerts such as "> \[!NOTE]" and fenced admonition
 
 Rendering follows GFM, so a single newline is a space and paragraphs reflow to the viewport. Subscript ("H\~2\~O"), superscript ("X^2^"), and definition lists are not supported. Raw HTML is dropped by default; `-allow-unsafe` passes it through, along with attribute syntax and link rewriting inside HTML blocks.
 
+Docs that link to themselves with root-absolute paths, such as `/docs/quickstart`, only resolve when the tree is served under the prefix those links assume. Use `-base` to preview such a subtree:
+
+	cd docs && md2html -http :8080 -base /docs
+
+Pages are then served under `/docs/`, and a request outside the prefix redirects into it. Serving the parent directory instead works whenever the directory name already matches the prefix.
+
 Served pages take their title from the frontmatter `title`, then the first heading, then the file name. A directory URL serves that directory's index file (`index.md` or `README.md`, or the file named by `-index`) and otherwise a listing of the Markdown files beneath it, to `-depth` levels.
 
 Mermaid diagrams and TeX math are rendered in the browser by scripts loaded from a CDN, so those pages need network access on first view. When a script fails to load the page says so rather than leaving the block unrendered.

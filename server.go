@@ -757,6 +757,27 @@ func (s *server) notifyClients() {
 }
 
 // Run starts the server and handles graceful shutdown
+// registerEndpoints registers the routes the rendered pages call by
+// absolute URL: live reload, raw Markdown, the versions API, and the
+// embedded search and JSON schema assets. The search assets are
+// registered ahead of handleIndex so they win over any js/ directory or
+// stale search-index.js in the source tree.
+func (s *server) registerEndpoints(mux *http.ServeMux) {
+	mux.HandleFunc("/events", s.handleSSE)
+	mux.HandleFunc("/raw", s.handleRaw)
+	mux.HandleFunc("/api/versions", s.handleVersionsAPI)
+	mux.HandleFunc("/_jsonspec/schemas.json", s.handleJSONSpecSchemas)
+
+	if s.config.Search {
+		mux.HandleFunc("/js/minisearch.min.js", handleSearchAsset("static/js/minisearch.min.js"))
+		mux.HandleFunc("/js/search.js", handleSearchAsset("static/js/search.js"))
+		mux.HandleFunc("/search-index.js", s.handleSearchIndex)
+	}
+	if s.config.jsonSpecBundle != "" {
+		mux.HandleFunc("/js/jsonspec.js", handleSearchAsset("static/js/jsonspec.js"))
+	}
+}
+
 func (s *server) Run(ctx context.Context) error {
 	// Set up file watching
 	if watch, err := watchEnabled(s.config.Watch, s.config.Source); err != nil {
@@ -767,32 +788,23 @@ func (s *server) Run(ctx context.Context) error {
 		}
 	}
 
+	base, err := normalizeBasePath(s.config.Base)
+	if err != nil {
+		return err
+	}
+
 	// Setup HTTP handlers
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleIndex)
-	mux.HandleFunc("/events", s.handleSSE)
-	mux.HandleFunc("/raw", s.handleRaw)
-	mux.HandleFunc("/api/versions", s.handleVersionsAPI)
-	mux.HandleFunc("/_jsonspec/schemas.json", s.handleJSONSpecSchemas)
-
-	// Register search routes ahead of handleIndex so the embedded assets win
-	// over any js/ directory or stale search-index.js in the source tree.
-	if s.config.Search {
-		mux.HandleFunc("/js/minisearch.min.js", handleSearchAsset("static/js/minisearch.min.js"))
-		mux.HandleFunc("/js/search.js", handleSearchAsset("static/js/search.js"))
-		mux.HandleFunc("/search-index.js", s.handleSearchIndex)
-	}
-	if s.config.jsonSpecBundle != "" {
-		mux.HandleFunc("/js/jsonspec.js", handleSearchAsset("static/js/jsonspec.js"))
-	}
+	s.registerEndpoints(mux)
 
 	srv := &http.Server{
 		Addr:    s.config.HTTP,
-		Handler: mux,
+		Handler: mountAt(base, mux, s.registerEndpoints),
 	}
 
 	// Format URL for display and browser opening
-	displayURL := formatServerURL(s.config.HTTP)
+	displayURL := formatServerURL(s.config.HTTP) + base + "/"
 
 	// Open browser if requested
 	if s.config.Open {

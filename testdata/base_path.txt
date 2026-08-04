@@ -1,0 +1,34 @@
+# Test serving a tree under a URL prefix with -base
+
+cd testdir
+
+md2html -http :8095 -base /docs &
+wait-port :8095
+
+# Pages are served under the prefix, so root-absolute links written for
+# the published site resolve
+curl -s http://localhost:8095/docs/guide
+stdout '<h1.*>Guide</h1>'
+
+curl -s http://localhost:8095/docs/
+stdout '<h1.*>Welcome</h1>'
+
+# A request outside the prefix redirects into it
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost:8095/guide
+stdout '307 http://localhost:8095/docs/guide'
+
+# Live reload is reachable at the root, where the rendered pages call it
+# by absolute URL. The stream never ends, so the request times out after
+# the first event rather than exiting cleanly.
+! curl -sN --max-time 1 http://localhost:8095/events
+stdout 'data: connected'
+
+-- testdir/index.md --
+# Welcome
+
+See the [guide](/docs/guide).
+
+-- testdir/guide.md --
+# Guide
+
+Back to the [index](/docs/).

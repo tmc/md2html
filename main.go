@@ -48,6 +48,10 @@ type Config struct {
 	EditURL           string
 	Nav               bool
 	Watch             string
+	// Base is the URL path prefix the served tree is published under,
+	// such as "/docs". It lets root-absolute links written for the
+	// published site resolve when previewing a subtree. Server mode only.
+	Base string
 	// Drafts renders pages whose frontmatter sets draft: true instead of
 	// skipping them. Drafts stay excluded from llms.txt either way;
 	// templates can check .Frontmatter.draft to mark rendered drafts.
@@ -109,6 +113,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.String("edit-url", "", "URL template for edit links; {path} is replaced with the source path")
 	fs.Bool("nav", false, "render docs navigation from SUMMARY.md or the markdown tree")
 	fs.String("watch", "auto", "live reload file watching: auto, true, or false")
+	fs.String("base", "", "URL path prefix the tree is served under (e.g. /docs), for previewing a subtree of a published site")
 	fs.Bool("drafts", false, "render pages marked draft: true instead of skipping them")
 	fs.String("format", "", "structured Markdown format: okf")
 	fs.String("jsonspec", "", "directory containing jsonspec.json and *.schema.json files")
@@ -145,6 +150,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		EditURL:           flagString(fs, "edit-url"),
 		Nav:               flagBool(fs, "nav"),
 		Watch:             flagString(fs, "watch"),
+		Base:              flagString(fs, "base"),
 		Drafts:            flagBool(fs, "drafts"),
 		Format:            flagString(fs, "format"),
 		JSONSpec:          flagString(fs, "jsonspec"),
@@ -229,6 +235,9 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 
 	// If -html flag is provided, generate static HTML
 	if cfg.HTML != "" {
+		if cfg.Base != "" {
+			return fmt.Errorf("-base applies to server mode; static output is served at whatever prefix the host uses")
+		}
 		// Default to .html extension for static builds so files are
 		// served with the correct Content-Type by standard HTTP servers.
 		if cfg.HTMLExt == "" {
