@@ -1,0 +1,21 @@
+{{define "asset-fallback"}}
+    <script>
+        // md2html loads Mermaid and MathJax from a CDN. When the network is
+        // unavailable those scripts fail silently and the affected blocks stay
+        // as raw source, which is indistinguishable from a rendering bug. The
+        // loaders call this to leave a visible note instead.
+        window.md2htmlAssetUnavailable = window.md2htmlAssetUnavailable || function(name, consequence) {
+            var id = 'md2html-asset-warning';
+            var box = document.getElementById(id);
+            if (!box) {
+                box = document.createElement('div');
+                box.id = id;
+                box.className = 'admonition adm-warning';
+                document.body.insertBefore(box, document.body.firstChild);
+            }
+            var p = document.createElement('p');
+            p.textContent = name + ' could not be loaded (offline?) — ' + consequence + '.';
+            box.appendChild(p);
+        };
+    </script>
+{{end}}

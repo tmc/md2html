@@ -1,6 +1,8 @@
 {{define "mathjax-scripts"}}
-    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    {{template "asset-fallback" .}}
     <script>
+        // MathJax 3 reads window.MathJax as it loads, so the configuration
+        // must be in place before the loader script runs.
         window.MathJax = {
             tex: {
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
@@ -8,4 +10,6 @@
             }
         };
     </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+            onerror="md2htmlAssetUnavailable('MathJax', 'formulas stay as raw TeX')"></script>
 {{end}}

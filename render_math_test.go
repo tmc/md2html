@@ -53,3 +53,34 @@ func TestRenderTemplateLoadsMathJaxOnlyForMath(t *testing.T) {
 		})
 	}
 }
+
+// TestMathJaxConfigPrecedesLoader checks that window.MathJax is assigned
+// before the loader script tag. MathJax 3 reads the configuration as it
+// loads, so the reverse order makes the delimiter setup a race.
+func TestMathJaxConfigPrecedesLoader(t *testing.T) {
+	got := mustRenderTemplate(t, Config{}, "<p>$x$</p>", "Math", "", false, nil)
+	config := strings.Index(got, "window.MathJax = {")
+	loader := strings.Index(got, `id="MathJax-script"`)
+	if config < 0 || loader < 0 {
+		t.Fatalf("MathJax scripts missing: config=%d loader=%d", config, loader)
+	}
+	if config > loader {
+		t.Errorf("window.MathJax is assigned after the loader (config=%d, loader=%d)", config, loader)
+	}
+}
+
+// TestCDNAssetsReportFailure checks that the CDN-loaded scripts announce a
+// load failure instead of silently leaving diagrams and math unrendered.
+func TestCDNAssetsReportFailure(t *testing.T) {
+	got := mustRenderTemplate(t, Config{}, "<p>$x$</p>", "Math", "", false, nil)
+	for _, want := range []string{
+		`onerror="md2htmlAssetUnavailable('MathJax'`,
+		`onerror="md2htmlAssetUnavailable('Mermaid'`,
+		"window.md2htmlAssetUnavailable = window.md2htmlAssetUnavailable ||",
+		"if (typeof mermaid === 'undefined')",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("rendered page missing %q", want)
+		}
+	}
+}
