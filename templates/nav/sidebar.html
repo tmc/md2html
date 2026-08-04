@@ -11,6 +11,9 @@
 {{range .Items}}
   {{if .IsGroup}}
     <li class="nav-group">{{.Title}}</li>
+    {{if .Children}}
+      {{template "nav-items" (dict "Items" .Children "Current" $.Current "FilePath" $.FilePath "HTMLExt" $.HTMLExt "IndexFile" $.IndexFile)}}
+    {{end}}
   {{else if .IsSep}}
     <li class="nav-sep"><hr></li>
   {{else}}

@@ -24,7 +24,35 @@ func TestRenderTemplateNavGroupsAreLabels(t *testing.T) {
 	if strings.Contains(got, `href="#section-`) {
 		t.Fatalf("rendered orphan section anchor:\n%s", got)
 	}
-	if !strings.Contains(got, `<span class="top-nav-link">Getting Started</span>`) {
+	if !strings.Contains(got, `<li class="nav-group">Getting Started</li>`) {
 		t.Fatalf("rendered nav missing group label:\n%s", got)
+	}
+	// The bar above the sidebar names the site, not every group.
+	if !strings.Contains(got, `<span class="top-nav-title">Docs</span>`) {
+		t.Fatalf("rendered nav missing site title in the top bar:\n%s", got)
+	}
+}
+
+// TestRenderTemplateNavGroupChildren checks that the pages inside a group
+// are rendered. A group whose children were dropped left the sidebar with
+// nothing but headings.
+func TestRenderTemplateNavGroupChildren(t *testing.T) {
+	install := &NavItem{Title: "Install", Path: "install.md", URL: "install.html", Level: 1}
+	nav := &Navigation{
+		Items: []*NavItem{{Title: "Getting Started", IsGroup: true, Children: []*NavItem{install}}},
+	}
+	nav.buildIndexes()
+	opts := RenderOptions{
+		Nav:       nav.ForPage("install.md"),
+		SiteTitle: "Docs",
+		FilePath:  "install.md",
+	}
+
+	got := mustRenderTemplateWithOptions(t, Config{HTMLExt: "html"}, "<p>body</p>", "Install", "", false, nil, opts)
+	if !strings.Contains(got, `<li class="nav-group">Getting Started</li>`) {
+		t.Fatalf("rendered nav missing group label:\n%s", got)
+	}
+	if !strings.Contains(got, ">\n        Install\n      </a>") && !strings.Contains(got, ">Install<") {
+		t.Fatalf("rendered nav missing the page inside the group:\n%s", got)
 	}
 }
