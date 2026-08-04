@@ -27,6 +27,7 @@ func runVet(cfg Config, logger *slog.Logger) {
 	if normalizedFormat(cfg.Format) == "okf" {
 		checks = withoutVetCheck(checks, "frontmatter")
 	}
+	checks = withVetComponents(cfg, checks)
 
 	diags, err := mdvet.Run([]string{src}, checks)
 	if err != nil {
@@ -44,6 +45,23 @@ func runVet(cfg Config, logger *slog.Logger) {
 	if len(diags) > 0 {
 		logger.Info("vet: completed with diagnostics", "count", len(diags))
 	}
+}
+
+// withVetComponents points the components check at the same registry
+// used for rendering, so that -vet and -components agree about which
+// component names exist.
+func withVetComponents(cfg Config, checks []mdvet.Check) []mdvet.Check {
+	if cfg.componentRegistry == nil {
+		return checks
+	}
+	out := make([]mdvet.Check, len(checks))
+	copy(out, checks)
+	for i, c := range out {
+		if _, ok := c.(mdvet.ComponentCheck); ok {
+			out[i] = mdvet.ComponentCheck{Registry: cfg.componentRegistry, Configured: true}
+		}
+	}
+	return out
 }
 
 func withoutVetCheck(checks []mdvet.Check, name string) []mdvet.Check {

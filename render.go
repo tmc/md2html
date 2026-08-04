@@ -354,7 +354,11 @@ func logExtensionErrors(pc parser.Context, filePath string) {
 		warn("tabs", e.Line, e.Msg)
 	}
 	for _, e := range components.Errors(pc) {
-		warn("components", e.Line, e.Msg)
+		msg := e.Msg
+		if e.UnknownComponent {
+			msg += " (known: " + strings.Join(e.Known, ", ") + ")"
+		}
+		warn("components", e.Line, msg)
 	}
 }
 

@@ -15,6 +15,13 @@ import (
 type ParseError struct {
 	Line int
 	Msg  string
+
+	// UnknownComponent reports that the failure was an unregistered
+	// component name, and Known lists the names that were registered.
+	// Callers use this to explain how the registry is configured, which
+	// the parser itself has no way to know.
+	UnknownComponent bool
+	Known            []string
 }
 
 func (e *ParseError) Error() string {
@@ -34,9 +41,12 @@ func Errors(pc parser.Context) []*ParseError {
 }
 
 func appendError(pc parser.Context, line int, format string, args ...any) {
+	addError(pc, &ParseError{Line: line, Msg: fmt.Sprintf(format, args...)})
+}
+
+func addError(pc parser.Context, e *ParseError) {
 	errs, _ := pc.Get(errorsContextKey).([]*ParseError)
-	errs = append(errs, &ParseError{Line: line, Msg: fmt.Sprintf(format, args...)})
-	pc.Set(errorsContextKey, errs)
+	pc.Set(errorsContextKey, append(errs, e))
 }
 
 // The open-tag stack tracks which component is innermost, so that a
@@ -231,8 +241,12 @@ func (p *blockParser) Open(parent ast.Node, reader text.Reader, pc parser.Contex
 	}
 	comp, known := p.registry.Lookup(name)
 	if !known {
-		appendError(pc, currentLine(reader), "unknown component <%s> (registered: %s)",
-			name, strings.Join(p.registry.Names(), ", "))
+		addError(pc, &ParseError{
+			Line:             currentLine(reader),
+			Msg:              fmt.Sprintf("unknown component <%s>", name),
+			UnknownComponent: true,
+			Known:            p.registry.Names(),
+		})
 		return nil, parser.NoChildren
 	}
 	attrs, err := parseAttrs(attrText)

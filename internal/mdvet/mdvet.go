@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tmc/md2html/internal/markdown/components"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
@@ -43,6 +44,9 @@ type Document struct {
 	Source []byte   // raw file bytes
 	Tree   ast.Node // parsed AST root
 	env    *env     // shared per-Run state for cross-file lookups
+
+	// ctx holds the diagnostics extensions recorded while parsing.
+	ctx parser.Context
 }
 
 // Check is a single vet rule.
@@ -67,6 +71,7 @@ func AllChecks() []Check {
 		CodeFenceLangCheck{},
 		HeadingSkipCheck{},
 		CaseCheck{},
+		ComponentCheck{},
 	}
 }
 
@@ -103,17 +108,20 @@ func Run(paths []string, checks []Check) ([]Diagnostic, error) {
 	}
 	e := newEnv()
 	assetMode := hasCheck(checks, "assets")
+	registry := componentRegistry(checks)
 	var diags []Diagnostic
 	for _, f := range files {
 		src, err := os.ReadFile(f)
 		if err != nil {
 			return nil, err
 		}
+		tree, pc := parseTreeWith(src, registry)
 		doc := &Document{
 			File:   f,
 			Source: src,
-			Tree:   parseTree(src),
+			Tree:   tree,
 			env:    e,
+			ctx:    pc,
 		}
 		for _, c := range checks {
 			if assetMode && legacyAssetCheck(c.Name()) {
@@ -156,14 +164,29 @@ func legacyAssetCheck(name string) bool {
 }
 
 // parseTree parses Markdown source with the same options used by md2html
-// when rendering, so checks see the same AST shape.
-func parseTree(source []byte) ast.Node {
+// when rendering, so checks see the same AST shape. Registering the
+// components extension also puts links and images inside component
+// bodies in reach of the checks that look for them.
+//
+// The parser context is returned alongside the tree because extensions
+// record their diagnostics there during parsing.
+func parseTreeWith(source []byte, reg components.Registry) (ast.Node, parser.Context) {
 	md := goldmark.New(
-		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithExtensions(
+			extension.GFM,
+			components.Extender{Registry: reg},
+		),
 		goldmark.WithParserOptions(parser.WithAutoHeadingID()),
 	)
-	reader := text.NewReader(source)
-	return md.Parser().Parse(reader, parser.WithContext(parser.NewContext()))
+	pc := parser.NewContext()
+	return md.Parser().Parse(text.NewReader(source), parser.WithContext(pc)), pc
+}
+
+// parseTree parses source with the built-in components, for callers
+// that only need the tree.
+func parseTree(source []byte) ast.Node {
+	tree, _ := parseTreeWith(source, components.DefaultRegistry)
+	return tree
 }
 
 func collectFiles(paths []string) ([]string, error) {

@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/tmc/md2html/internal/markdown/components"
 	"github.com/tmc/md2html/internal/mdvet"
 )
 
@@ -23,12 +24,21 @@ func run(args []string, stdout, stderr *os.File) int {
 	checksFlag := fs.String("c", "", "comma-separated list of checks to run (default: all)")
 	checksAliasFlag := fs.String("checks", "", "comma-separated list of checks to run (default: all)")
 	listFlag := fs.Bool("list", false, "print the available checks and exit")
+	componentsFlag := fs.String("components", "", "directory of component definitions, as passed to md2html")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 
 	all := mdvet.AllChecks()
+	if *componentsFlag != "" {
+		reg, err := components.LoadRegistry(*componentsFlag)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+		all = withComponentRegistry(all, reg)
+	}
 	if *listFlag {
 		for _, c := range all {
 			fmt.Fprintln(stdout, c.Name())
@@ -72,4 +82,17 @@ func run(args []string, stdout, stderr *os.File) int {
 		return 1
 	}
 	return 0
+}
+
+// withComponentRegistry points the components check at a loaded
+// registry so that a site's own components are not reported as unknown.
+func withComponentRegistry(checks []mdvet.Check, reg components.Registry) []mdvet.Check {
+	out := make([]mdvet.Check, len(checks))
+	copy(out, checks)
+	for i, c := range out {
+		if _, ok := c.(mdvet.ComponentCheck); ok {
+			out[i] = mdvet.ComponentCheck{Registry: reg, Configured: true}
+		}
+	}
+	return out
 }
