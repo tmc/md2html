@@ -6,7 +6,8 @@
 //	NewLoader parses Markdown into headings, links, lists, and frontmatter.
 //	Run drives the server and static-site modes used by the md2html command.
 //
-// Rendering uses Goldmark with GFM extensions, syntax highlighting, admonitions,
+// Rendering uses Goldmark with GFM extensions, syntax highlighting,
+// admonitions, MDX-style layout components,
 // optional table-of-contents generation, and relative-link rewriting for Markdown
 // source trees.
 //

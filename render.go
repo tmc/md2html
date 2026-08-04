@@ -14,6 +14,7 @@ import (
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/styles"
 	admonitions "github.com/stefanfritsch/goldmark-admonitions"
+	"github.com/tmc/md2html/internal/markdown/components"
 	"github.com/tmc/md2html/internal/markdown/jsonspec"
 	"github.com/tmc/md2html/internal/markdown/media"
 	"github.com/tmc/md2html/internal/markdown/tabs"
@@ -129,6 +130,7 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, e
 		&admonitions.Extender{},
 		alertsExtender{},
 		tabs.Extender{},
+		components.Extender{},
 		media.Extender{},
 		jsonspec.Extension(jscfg),
 	}
@@ -180,7 +182,7 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, e
 		if err := md.Renderer().Render(&buf, source, doc); err != nil {
 			return "", fmt.Errorf("render markdown: %w", err)
 		}
-		logTabsErrors(pc, filePath)
+		logExtensionErrors(pc, filePath)
 		return buf.String(), nil
 	}
 
@@ -189,7 +191,7 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, e
 	if err := md.Renderer().Render(&buf, source, doc); err != nil {
 		return "", fmt.Errorf("render markdown: %w", err)
 	}
-	logTabsErrors(pc, filePath)
+	logExtensionErrors(pc, filePath)
 	return buf.String(), nil
 }
 
@@ -331,22 +333,25 @@ func jsonSpecConfig(cfg Config) jsonspec.Config {
 	return cfg.jsonSpecConfig
 }
 
-// logTabsErrors surfaces parse diagnostics recorded by the tabs
-// extension. Tab parse errors never abort rendering; they log at warn
-// level so misformed fences are visible without breaking the build.
-func logTabsErrors(pc parser.Context, filePath string) {
-	errs := tabs.Errors(pc)
-	if len(errs) == 0 {
-		return
-	}
+// logExtensionErrors surfaces parse diagnostics recorded by the tabs and
+// components extensions. These never abort rendering; they log at warn
+// level so a misformed fence or an unknown component tag is visible
+// without breaking the build.
+func logExtensionErrors(pc parser.Context, filePath string) {
 	logger := slog.Default()
-	for _, e := range errs {
-		attrs := []any{"line", e.Line}
+	warn := func(source string, line int, msg string) {
+		attrs := []any{"line", line}
 		if filePath != "" {
 			attrs = append(attrs, "file", filePath)
 		}
-		attrs = append(attrs, "msg", e.Msg)
-		logger.Warn("tabs: parse error", attrs...)
+		attrs = append(attrs, "msg", msg)
+		logger.Warn(source+": parse error", attrs...)
+	}
+	for _, e := range tabs.Errors(pc) {
+		warn("tabs", e.Line, e.Msg)
+	}
+	for _, e := range components.Errors(pc) {
+		warn("components", e.Line, e.Msg)
 	}
 }
 

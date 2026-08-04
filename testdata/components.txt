@@ -1,0 +1,96 @@
+# Test MDX-style layout components.
+
+md2html -html output -html-ext html testsite
+exists output/README.html
+
+# Group wrapper carries the column count from the brace expression.
+grep 'class="md-card-group" data-cols="3"' output/README.html
+
+# Cards render with their titles, and an href wraps the title in a link.
+grep 'class="md-card"' output/README.html
+grep '<div class="md-card-title">Install</div>' output/README.html
+grep 'class="md-card-link" href="/install"' output/README.html
+
+# Card bodies are Markdown, not raw text.
+grep '<code>go install</code>' output/README.html
+grep '<strong>config.yaml</strong>' output/README.html
+grep '<li>one</li>' output/README.html
+
+# A card without cols falls back to the default group width.
+grep 'data-cols="2"' output/README.html
+
+# CSS for the components ships with the page.
+grep '\.md-card-group ' output/README.html
+
+rm -rf testsite output
+
+# Invalid component usage warns and is skipped, without aborting the
+# render or emitting unstyled markup.
+md2html -html output -html-ext html badsite
+exists output/README.html
+
+grep 'later content' output/README.html
+! grep 'class="md-card"' output/README.html
+
+stderr 'components: parse error'
+stderr 'file=README.md'
+stderr 'unknown component <Widget>'
+stderr 'missing required attribute'
+stderr 'no attribute'
+
+rm -rf badsite output
+
+# An unclosed component is reported but still renders, closing at end of
+# input the way an unclosed HTML element does, so the body is not lost.
+md2html -html output -html-ext html unclosed
+exists output/README.html
+
+stderr 'unclosed <Card>, expected </Card>'
+stderr 'line=3'
+grep 'class="md-card"' output/README.html
+grep 'body text' output/README.html
+
+rm -rf unclosed output
+
+-- testsite/README.md --
+# Components
+
+<CardGroup cols={3}>
+
+<Card title="Install" href="/install">
+Run `go install` to get started.
+</Card>
+
+<Card title="Configure">
+Edit **config.yaml**.
+
+- one
+- two
+</Card>
+
+</CardGroup>
+
+<CardGroup>
+
+<Card title="Defaults">
+two columns
+</Card>
+
+</CardGroup>
+
+-- badsite/README.md --
+# Bad components
+
+<Widget/>
+
+<Card/>
+
+<Card title="a" titel="b"/>
+
+later content
+
+-- unclosed/README.md --
+# Unclosed
+
+<Card title="never closed">
+body text
