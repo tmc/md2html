@@ -306,10 +306,23 @@ func AutoNavigationFromDir(sourceDir string) (*Navigation, error) {
 // LoadNavigationOrAutoFromDir loads SUMMARY.md when present, otherwise builds
 // navigation from the markdown tree.
 func LoadNavigationOrAutoFromDir(sourceDir, htmlExt string) (*Navigation, error) {
+	nav, _, err := navigationForDir(sourceDir, htmlExt)
+	return nav, err
+}
+
+// navigationForDir resolves navigation for a source tree, preferring an
+// explicit SUMMARY.md, then a Mintlify docs.json covering the tree, then
+// the shape of the tree itself. It also reports the site name when the
+// source it used carries one.
+func navigationForDir(sourceDir, htmlExt string) (*Navigation, string, error) {
 	if nav := LoadNavigationFromDir(sourceDir, htmlExt); nav != nil && len(nav.Items) > 0 {
-		return nav, nil
+		return nav, "", nil
 	}
-	return autoNavigationFromDir(sourceDir, htmlExt)
+	if nav, name, ok := loadDocsJSON(sourceDir, htmlExt); ok {
+		return nav, name, nil
+	}
+	nav, err := autoNavigationFromDir(sourceDir, htmlExt)
+	return nav, "", err
 }
 
 type autoNavFile struct {

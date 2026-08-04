@@ -93,7 +93,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.String("html", "", "output directory for static HTML generation (disables server mode)")
 	fs.Bool("open", false, "automatically open browser")
 	fs.Bool("v", false, "verbose logging")
-	fs.String("title", "Markdown Preview", "HTML title")
+	fs.String("title", defaultTitle, "HTML title")
 	fs.String("css", "", "path to custom CSS file")
 	fs.Int("depth", 2, "directory traversal depth for listings (minimum 2)")
 	fs.Bool("toc", false, "generate table of contents")
@@ -828,10 +828,12 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			htmlExt = "." + cfg.HTMLExt
 		}
 		var err error
-		nav, err = LoadNavigationOrAutoFromDir(sourceDir, htmlExt)
+		var siteName string
+		nav, siteName, err = navigationForDir(sourceDir, htmlExt)
 		if err != nil {
 			logger.Error("Error loading navigation", "error", err)
 		} else if nav != nil && len(nav.Items) > 0 {
+			cfg.Title = siteTitle(cfg.Title, siteName)
 			logger.Info("Loaded navigation", "pages", len(nav.Flat))
 		}
 	}

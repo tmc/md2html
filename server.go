@@ -70,11 +70,12 @@ func newServer(ctx context.Context, cfg Config, logger *slog.Logger) *server {
 			if cfg.HTMLExt != "" {
 				htmlExt = "." + cfg.HTMLExt
 			}
-			nav, err := LoadNavigationOrAutoFromDir(root, htmlExt)
+			nav, siteName, err := navigationForDir(root, htmlExt)
 			if err != nil {
 				logger.Error("Error loading navigation", "error", err)
 			} else if nav != nil && len(nav.Items) > 0 {
 				s.nav = nav
+				s.config.Title = siteTitle(s.config.Title, siteName)
 				logger.Info("Loaded navigation", "pages", len(nav.Flat))
 			}
 		}

@@ -1,0 +1,58 @@
+# Test navigation built from a Mintlify docs.json
+
+# The server runs inside docs/, while docs.json sits at the site root and
+# names pages relative to it.
+cd docs
+
+md2html -http :8096 -base /docs -nav &
+wait-port :8096
+
+curl -s http://localhost:8096/docs/quickstart
+
+# Groups appear in docs.json order with their pages beneath them
+stdout 'Start here'
+stdout 'Reference'
+stdout 'href="[^"]*index"[^>]*>\s*Home'
+stdout 'href="[^"]*commands"'
+
+# Page titles come from frontmatter, falling back to the first heading
+stdout '>\s*Quickstart\s*<'
+
+# The site name from docs.json titles the site
+stdout '<title>Quickstart</title>'
+stdout 'example docs'
+
+# Prev/next follow docs.json order, not the file system
+stdout 'Home'
+
+-- docs.json --
+{
+  "name": "example docs",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start here",
+        "pages": ["docs/index", "docs/quickstart"]
+      },
+      {
+        "group": "Reference",
+        "pages": ["docs/commands"]
+      }
+    ]
+  }
+}
+
+-- docs/index.md --
+---
+title: Home
+---
+
+# Welcome
+
+-- docs/quickstart.md --
+# Quickstart
+
+Install it.
+
+-- docs/commands.md --
+# Command reference

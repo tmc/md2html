@@ -2,9 +2,8 @@
 {{if and .Nav .Nav.HasNav}}
 <nav class="top-nav">
     <div class="top-nav-left">
-        {{range .Nav.Items}}{{if .IsGroup}}
-        <span class="top-nav-link">{{.Title}}</span>
-        {{end}}{{end}}
+        {{/* Groups belong to the sidebar; the bar names the site. */}}
+        <span class="top-nav-title">{{if .SiteTitle}}{{.SiteTitle}}{{else}}Documentation{{end}}</span>
     </div>
     <div class="top-nav-right">
         {{if .LiveReload}}<div id="status" class="connection-status">Connected</div>{{end}}
