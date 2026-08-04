@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -333,7 +334,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 				s.logger.Error("Error parsing frontmatter", "file", s.config.Index, "error", err)
 				doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
 			}
-			html, err := s.renderDocumentWithVersion(doc, s.config.Index, css, s.config.Index, requestedVersion)
+			html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, s.config.Index, s.config.Title), css, s.config.Index, requestedVersion)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -390,7 +391,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 					s.logger.Error("Error parsing frontmatter", "file", candidate, "error", err)
 					doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
 				}
-				html, err := s.renderDocumentWithVersion(doc, candidate, css, candidate, requestedVersion)
+				html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, candidate, s.config.Title), css, candidate, requestedVersion)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
@@ -401,10 +402,21 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Fall back to serving the path as a static asset relative to the source root.
+		// Fall back to serving the path as a static asset relative to the
+		// source root, or as a directory page when it names a directory.
 		fullPath, joinErr := secureJoin(root, filepath.FromSlash(cleanPath))
 		if joinErr == nil {
-			if info, statErr := os.Stat(fullPath); statErr == nil && !info.IsDir() {
+			if info, statErr := os.Stat(fullPath); statErr == nil {
+				if info.IsDir() {
+					// Listing links are relative to the directory, so the
+					// URL needs its trailing slash for them to resolve.
+					if !strings.HasSuffix(r.URL.Path, "/") {
+						http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
+						return
+					}
+					s.serveDirectory(w, fullPath, strings.TrimSuffix(cleanPath, "/"), css, requestedVersion)
+					return
+				}
 				_ = s.watchOpenedPath(fullPath)
 				http.ServeFile(w, r, fullPath)
 				return
@@ -440,7 +452,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			s.logger.Error("Error parsing frontmatter", "file", file, "error", err)
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
-		html, err := s.renderDocumentWithVersion(doc, file, css, file, requestedVersion)
+		html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, file, s.config.Title), css, file, requestedVersion)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -450,28 +462,15 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If no input file specified and content is empty, show directory listing
+	// If no input file specified and content is empty, serve the root
+	// directory: its index file if it has one, otherwise a listing.
 	if s.inputPath == "" && content == "" {
 		wd, err := os.Getwd()
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error getting working directory: %v", err), http.StatusInternalServerError)
 			return
 		}
-
-		listing, err := generateDirectoryListing(s.config, wd)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Error generating directory listing: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		doc := DocumentData{Content: listing, Frontmatter: make(map[string]any)}
-		html, err := s.renderDocumentWithVersion(doc, "Directory Listing", css, "", "")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(html))
+		s.serveDirectory(w, wd, "", css, "")
 		return
 	}
 
@@ -481,6 +480,58 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		doc = DocumentData{Content: content, Frontmatter: make(map[string]any)}
 	}
 	html, err := s.renderDocumentWithVersion(doc, s.config.Title, css, "", "")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(html))
+}
+
+// dirIndexNames are the file names tried, in order, when a request resolves
+// to a directory. The configured index file wins when one is set.
+func (s *server) dirIndexNames() []string {
+	names := []string{"index.md", "index.markdown", "README.md", "readme.md"}
+	if s.config.Index != "" {
+		names = append([]string{s.config.Index}, names...)
+	}
+	return names
+}
+
+// serveDirectory serves the directory at dir, whose path relative to the
+// served root is relDir. A directory with an index file renders that file;
+// one without renders a listing of the Markdown files beneath it.
+func (s *server) serveDirectory(w http.ResponseWriter, dir, relDir, css, version string) {
+	for _, name := range s.dirIndexNames() {
+		indexPath := filepath.Join(dir, filepath.FromSlash(name))
+		content, err := os.ReadFile(indexPath)
+		if err != nil {
+			continue
+		}
+		_ = s.watchOpenedPath(indexPath)
+		relIndex := path.Join(filepath.ToSlash(relDir), name)
+		doc, err := parseFrontmatter(string(content))
+		if err != nil {
+			s.logger.Error("Error parsing frontmatter", "file", relIndex, "error", err)
+			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
+		}
+		html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, relIndex, s.config.Title), css, relIndex, version)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(html))
+		return
+	}
+
+	listing, err := generateDirectoryListing(s.config, dir, relDir)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error generating directory listing: %v", err), http.StatusInternalServerError)
+		return
+	}
+	doc := DocumentData{Content: listing, Frontmatter: make(map[string]any)}
+	html, err := s.renderDocumentWithVersion(doc, listingTitle(relDir), css, "", "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -16,7 +16,7 @@ rm -rf output
 rm INDEX.md README.md
 md2html -html output
 exists output/index.html
-grep -q 'Directory Listing' output/index.html
+grep -q 'Index of /' output/index.html
 
 # Clean up
 rm -rf output

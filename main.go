@@ -291,7 +291,22 @@ func formatServerURL(addr string) string {
 	return addr
 }
 
-func generateDirectoryListing(cfg Config, dir string) (string, error) {
+// listingTitle names a generated directory listing. The label is the
+// directory's path relative to the served root; the filesystem location of
+// the root is not part of the served page.
+func listingTitle(relDir string) string {
+	relDir = filepath.ToSlash(relDir)
+	if relDir == "" || relDir == "." {
+		return "Index of /"
+	}
+	return "Index of /" + strings.TrimSuffix(relDir, "/")
+}
+
+// generateDirectoryListing renders a Markdown listing of the Markdown files
+// under dir. relDir is dir's path relative to the served root and is used for
+// the heading. A directory's index file, if any, is served in place of the
+// listing rather than being concatenated with it.
+func generateDirectoryListing(cfg Config, dir, relDir string) (string, error) {
 	files, err := findMarkdownFiles(dir, cfg.Depth)
 	if err != nil {
 		return "", err
@@ -303,11 +318,7 @@ func generateDirectoryListing(cfg Config, dir string) (string, error) {
 
 	var buf strings.Builder
 
-	if content, err := os.ReadFile(filepath.Join(dir, "index.md")); err == nil {
-		buf.WriteString(string(content) + "\n\n---\n\n")
-	}
-
-	buf.WriteString(fmt.Sprintf("# Directory Listing: %s\n\n", dir))
+	buf.WriteString(fmt.Sprintf("# %s\n\n", listingTitle(relDir)))
 
 	if len(files) == 0 {
 		buf.WriteString("*No markdown files found.*\n")
@@ -879,7 +890,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		}
 	} else {
 		// Generate table of contents as index.html
-		if err := generateTOCIndex(sourceDir, outputDir, files, cssContent, cfg, assets); err != nil {
+		if err := generateTOCIndex(outputDir, files, cssContent, cfg, assets); err != nil {
 			logger.Error("Error generating TOC index", "error", err)
 		} else {
 			logger.Debug("Generated TOC index")
@@ -972,6 +983,23 @@ func pageTitle(frontmatter map[string]any, filePath, fallback string) string {
 	return fallback
 }
 
+// documentTitle names a rendered page. Frontmatter wins, then the document's
+// first heading, then the file name, then fallback. The heading is preferred
+// over the file name because it is what the reader sees at the top of the
+// page.
+func documentTitle(doc DocumentData, filePath, fallback string) string {
+	if title, ok := doc.Frontmatter["title"].(string); ok && title != "" {
+		return title
+	}
+	if heading := firstHeading(doc.Content); heading != "" {
+		return heading
+	}
+	if name := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath)); name != "" && name != "." {
+		return name
+	}
+	return fallback
+}
+
 func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Config, opts RenderOptions) error {
 	content, err := os.ReadFile(indexPath)
 	if err != nil {
@@ -1013,10 +1041,10 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 	return os.WriteFile(indexOutputPath, []byte(finalHTML), 0644)
 }
 
-func generateTOCIndex(sourceDir, outputDir string, files []markdownFile, cssContent string, cfg Config, assets map[string]string) error {
+func generateTOCIndex(outputDir string, files []markdownFile, cssContent string, cfg Config, assets map[string]string) error {
 	// Generate table of contents markdown
 	var buf strings.Builder
-	buf.WriteString(fmt.Sprintf("# Directory Listing: %s\n\n", sourceDir))
+	buf.WriteString(fmt.Sprintf("# %s\n\n", listingTitle("")))
 
 	if len(files) == 0 {
 		buf.WriteString("*No markdown files found.*\n")
@@ -1036,7 +1064,7 @@ func generateTOCIndex(sourceDir, outputDir string, files []markdownFile, cssCont
 
 	// Render with template
 	doc := DocumentData{Content: buf.String(), Frontmatter: make(map[string]any)}
-	finalHTML, err := renderTemplateWithOptions(cfg, htmlContent, "Directory Listing", cssContent, false, doc.Frontmatter, RenderOptions{Assets: assets})
+	finalHTML, err := renderTemplateWithOptions(cfg, htmlContent, listingTitle(""), cssContent, false, doc.Frontmatter, RenderOptions{Assets: assets})
 	if err != nil {
 		return err
 	}

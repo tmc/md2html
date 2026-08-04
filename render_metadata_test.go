@@ -89,3 +89,21 @@ func TestRenderTemplateFooterMetadata(t *testing.T) {
 		}
 	}
 }
+
+// TestDescriptionExcludesFrontmatter checks that the summary used for the
+// description meta tags is taken from the document body, not from the raw
+// source, which would otherwise emit the YAML block and its delimiters.
+func TestDescriptionExcludesFrontmatter(t *testing.T) {
+	source := "---\ntitle: Quickstart\n---\n\n# Quickstart\n\nInstall the tools.\n"
+	doc, err := parseFrontmatter(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := llmsSummary(doc)
+	if strings.Contains(got, "---") || strings.Contains(got, "title:") {
+		t.Fatalf("summary leaked frontmatter: %q", got)
+	}
+	if want := "Install the tools."; got != want {
+		t.Fatalf("llmsSummary() = %q, want %q", got, want)
+	}
+}

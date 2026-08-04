@@ -9,21 +9,31 @@ md2html -http :8092 &
 # Wait for server
 wait-port :8092
 
-# Test directory listing appears
+# A directory with an index file serves that file, not a listing
 curl -s http://localhost:8092/
-stdout 'Directory Listing'
-stdout 'file1\.md'
-stdout 'file2\.md'
-
-# Test index.md content is included at top
 stdout '<h1.*>Welcome</h1>'
+stdout '<title>Welcome</title>'
+! stdout 'Index of'
+
+# A directory without an index file serves a listing of its markdown files,
+# named relative to the served root rather than by its location on disk
+curl -s http://localhost:8092/subdir/
+stdout 'Index of /subdir'
+stdout 'nested\.md'
+
+# A directory URL without a trailing slash redirects to one, so that the
+# relative links in the listing resolve
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost:8092/subdir
+stdout '301 http://localhost:8092/subdir/'
 
 # Test individual file access via clean URLs
 curl -s http://localhost:8092/file1
 stdout '<h1.*>File One</h1>'
 
+# The page title comes from the first heading when there is no frontmatter
 curl -s http://localhost:8092/file2
 stdout '<h1.*>File Two</h1>'
+stdout '<title>File Two</title>'
 
 # Clean up background process
 
