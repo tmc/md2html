@@ -26,6 +26,53 @@ type Renderer struct {
 // RegisterFuncs implements renderer.NodeRenderer.
 func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(KindComponent, r.render)
+	reg.Register(KindInlineComponent, r.renderInline)
+}
+
+func (r *Renderer) renderInline(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		return ast.WalkContinue, nil
+	}
+	n := node.(*Inline)
+	prefix, suffix, err := r.split(n.Name, n.Attrs)
+	if err != nil {
+		return ast.WalkStop, err
+	}
+	switch {
+	case n.SelfClosing:
+		w.WriteString(prefix)
+		w.WriteString(suffix)
+	case n.Closing:
+		w.WriteString(suffix)
+	default:
+		w.WriteString(prefix)
+	}
+	return ast.WalkContinue, nil
+}
+
+// split executes a component template around its body placeholder,
+// returning the markup that precedes and follows the body.
+func (r *Renderer) split(name string, attrs map[string]string) (prefix, suffix string, err error) {
+	comp, ok := r.registry.Lookup(name)
+	if !ok {
+		// The parser only builds nodes for registered names, so this
+		// means the registry changed between parse and render.
+		return "", "", fmt.Errorf("components: <%s> is not registered", name)
+	}
+	var buf bytes.Buffer
+	data := Data{Attrs: attrs, Content: template.HTML(contentPlaceholder)}
+	if err := comp.Template.Execute(&buf, data); err != nil {
+		return "", "", fmt.Errorf("components: render <%s>: %w", name, err)
+	}
+	out := buf.String()
+	prefix, suffix, found := strings.Cut(out, contentPlaceholder)
+	if !found {
+		return "", "", fmt.Errorf("components: template for <%s> does not reference .Content", name)
+	}
+	if strings.Contains(suffix, contentPlaceholder) {
+		return "", "", fmt.Errorf("components: template for <%s> references .Content more than once", name)
+	}
+	return prefix, suffix, nil
 }
 
 func (r *Renderer) render(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -35,24 +82,9 @@ func (r *Renderer) render(w util.BufWriter, source []byte, node ast.Node, enteri
 		return ast.WalkContinue, nil
 	}
 
-	comp, ok := r.registry.Lookup(n.Name)
-	if !ok {
-		// The parser only builds nodes for registered names, so this
-		// means the registry changed between parse and render.
-		return ast.WalkStop, fmt.Errorf("components: <%s> is not registered", n.Name)
-	}
-	var buf bytes.Buffer
-	data := Data{Attrs: n.Attrs, Content: template.HTML(contentPlaceholder)}
-	if err := comp.Template.Execute(&buf, data); err != nil {
-		return ast.WalkStop, fmt.Errorf("components: render <%s>: %w", n.Name, err)
-	}
-	out := buf.String()
-	prefix, suffix, found := strings.Cut(out, contentPlaceholder)
-	if !found {
-		return ast.WalkStop, fmt.Errorf("components: template for <%s> does not reference .Content", n.Name)
-	}
-	if strings.Contains(suffix, contentPlaceholder) {
-		return ast.WalkStop, fmt.Errorf("components: template for <%s> references .Content more than once", n.Name)
+	prefix, suffix, err := r.split(n.Name, n.Attrs)
+	if err != nil {
+		return ast.WalkStop, err
 	}
 	if n.SelfClosing {
 		w.WriteString(prefix)

@@ -249,6 +249,11 @@ func (p *blockParser) Open(parent ast.Node, reader text.Reader, pc parser.Contex
 		})
 		return nil, parser.NoChildren
 	}
+	if comp.Inline {
+		// Inline components belong to a line of text, so leave the tag
+		// for the inline parser even when it opens a line.
+		return nil, parser.NoChildren
+	}
 	attrs, err := parseAttrs(attrText)
 	if err != nil {
 		appendError(pc, currentLine(reader), "<%s>: %v", name, err)

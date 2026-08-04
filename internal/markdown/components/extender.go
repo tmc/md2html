@@ -27,6 +27,10 @@ func (e Extender) Extend(md goldmark.Markdown) {
 			// which would otherwise claim the tag line first.
 			util.Prioritized(&blockParser{registry: reg}, 100),
 		),
+		parser.WithInlineParsers(
+			// Ahead of goldmark's raw inline HTML parser at 500.
+			util.Prioritized(&inlineParser{registry: reg}, 100),
+		),
 	)
 	md.Renderer().AddOptions(
 		renderer.WithNodeRenderers(

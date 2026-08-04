@@ -1,0 +1,51 @@
+# Test components that appear within a line of text.
+
+md2html -html output -html-ext html testsite
+exists output/README.html
+
+# A badge renders inside the paragraph, not as a block of its own.
+grep '<p>Status: <span class="md-badge" data-color="green"' output/README.html
+grep '>stable</span> and' output/README.html
+
+# The body between the tags keeps its Markdown meaning.
+grep '<strong>bold</strong></span>' output/README.html
+
+# Boolean attributes are read as booleans, not as non-empty strings.
+grep 'data-stroke="true"' output/README.html
+
+# Tooltips use the title attribute, so the hint needs no JavaScript.
+grep '<span class="md-tooltip" title="a hint">this phrase</span>' output/README.html
+
+# Prose that merely looks like a tag produces no component diagnostics.
+# Goldmark still drops <String> as raw HTML, which is its long-standing
+# behavior for unsafe HTML and not something components change.
+grep '<p>Generic types like List' output/README.html
+! stderr 'components: parse error'
+
+rm -rf testsite output
+
+# Misuse of a registered component is still reported.
+md2html -html output -html-ext html badsite
+exists output/README.html
+
+stderr 'components: parse error'
+stderr 'missing required attribute'
+stderr 'must stand alone on its own line'
+
+rm -rf badsite output
+
+-- testsite/README.md --
+# Inline
+
+Status: <Badge color="green">stable</Badge> and <Badge stroke>**bold**</Badge>.
+
+Hover <Tooltip tip="a hint">this phrase</Tooltip> for detail.
+
+Generic types like List<String> and <PLACEHOLDER> stay as written.
+
+-- badsite/README.md --
+# Bad
+
+Hover <Tooltip>no tip</Tooltip> here.
+
+A card <Card title="x"/> in a sentence.

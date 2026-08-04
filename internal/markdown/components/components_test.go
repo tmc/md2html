@@ -275,3 +275,143 @@ func TestDataBool(t *testing.T) {
 		}
 	}
 }
+
+func TestInlineComponents(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{
+			name: "badge in a sentence",
+			in:   "Status: <Badge color=\"green\">stable</Badge> today.\n",
+			want: []string{
+				`<p>Status: <span class="md-badge" data-color="green"`,
+				">stable</span> today.</p>",
+			},
+		},
+		{
+			name: "badge body keeps markdown meaning",
+			in:   "<Badge>**bold** `code`</Badge>\n",
+			want: []string{"<strong>bold</strong>", "<code>code</code>"},
+		},
+		{
+			name: "badge defaults",
+			in:   "<Badge>x</Badge>\n",
+			want: []string{`data-color="gray"`, `data-size="sm"`, `data-shape="rounded"`},
+		},
+		{
+			name: "badge flags",
+			in:   "<Badge stroke disabled>x</Badge>\n",
+			want: []string{`data-stroke="true"`, `data-disabled="true"`},
+		},
+		{
+			name: "tooltip uses the title attribute",
+			in:   "See <Tooltip tip=\"a hint\">this</Tooltip>.\n",
+			want: []string{`<span class="md-tooltip" title="a hint">this</span>`},
+		},
+		{
+			name: "tooltip with a link",
+			in:   "<Tooltip tip=\"go\" href=\"/x\" cta=\"more\">text</Tooltip>\n",
+			want: []string{
+				`<a class="md-tooltip" href="/x" title="go">text`,
+				`<span class="md-tooltip-cta">more</span></a>`,
+			},
+		},
+		{
+			name: "two badges on one line",
+			in:   "<Badge>a</Badge> and <Badge>b</Badge>\n",
+			want: []string{">a</span> and <span", ">b</span>"},
+		},
+		{
+			name: "inline component inside a block component",
+			in:   "<Card title=\"T\">\nStatus <Badge>new</Badge>\n</Card>\n",
+			want: []string{`<div class="md-card">`, `class="md-badge"`, ">new</span>"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, errs := render(t, tt.in)
+			if len(errs) > 0 {
+				t.Fatalf("unexpected parse errors: %v", errs)
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(got, want) {
+					t.Errorf("output missing %q\ngot:\n%s", want, got)
+				}
+			}
+		})
+	}
+}
+
+func TestInlineParseErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"missing required", "text <Tooltip>x</Tooltip>\n", `missing required attribute "tip"`},
+		{"unknown attribute", "<Badge colour=\"red\">x</Badge>\n", `no attribute "colour"`},
+		{"block component inline", "text <Card title=\"a\"/> more\n", "must stand alone on its own line"},
+		{"unmatched close", "text </Badge>\n", "has no matching <Badge>"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, errs := render(t, tt.in)
+			var msgs []string
+			for _, e := range errs {
+				msgs = append(msgs, e.Msg)
+			}
+			if !strings.Contains(strings.Join(msgs, "\n"), tt.want) {
+				t.Errorf("want error containing %q, got %v", tt.want, msgs)
+			}
+		})
+	}
+}
+
+// TestInlineLeavesOrdinaryHTMLAlone keeps lowercase inline tags and
+// stray comparisons flowing to goldmark unchanged.
+func TestInlineLeavesOrdinaryHTMLAlone(t *testing.T) {
+	for _, in := range []string{
+		"text <em>emphasis</em> more\n",
+		"a < b and c > d\n",
+		"generics like Foo<Bar> in prose\n",
+	} {
+		if _, errs := render(t, in); len(errs) > 0 {
+			t.Errorf("%q produced errors: %v", in, errs)
+		}
+	}
+}
+
+// TestInlineAttributesAreEscaped guards the tooltip title, which is the
+// one place an attribute lands in an HTML attribute unescaped by the
+// Markdown pipeline.
+func TestInlineAttributesAreEscaped(t *testing.T) {
+	got, _ := render(t, "<Tooltip tip='\" onmouseover=alert(1) x=\"'>hover</Tooltip>\n")
+	// The quotes must be entity-escaped so the value cannot end the
+	// attribute and start a new one.
+	if strings.Contains(got, `" onmouseover=`) {
+		t.Errorf("tooltip tip escaped out of its attribute\n%s", got)
+	}
+	if !strings.Contains(got, "&#34; onmouseover=alert(1)") {
+		t.Errorf("tooltip tip was not entity-escaped\n%s", got)
+	}
+}
+
+// TestInlineUnknownNamesAreQuiet keeps prose that merely looks like a
+// tag from producing diagnostics.
+func TestInlineUnknownNamesAreQuiet(t *testing.T) {
+	for _, in := range []string{
+		"a List<String> value\n",
+		"pass <YourToken> here\n",
+		"text <Nope>x</Nope> more\n",
+	} {
+		got, errs := render(t, in)
+		if len(errs) > 0 {
+			t.Errorf("%q produced errors: %v", in, errs)
+		}
+		if !strings.Contains(got, "<p>") {
+			t.Errorf("%q did not render as a paragraph:\n%s", in, got)
+		}
+	}
+}

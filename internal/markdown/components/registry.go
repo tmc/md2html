@@ -22,6 +22,11 @@ type Component struct {
 	// must reference .Content exactly once so that the Markdown body
 	// has a single home in the output.
 	Template *template.Template
+
+	// Inline marks a component that appears within a line of text
+	// rather than standing alone as a block, such as a badge. Its body
+	// is inline Markdown, so it cannot contain paragraphs or lists.
+	Inline bool
 }
 
 // Data is the value passed to a component's template.
@@ -137,6 +142,32 @@ var DefaultRegistry = Registry{
 	},
 	"Accordion":  accordion("Accordion"),
 	"Expandable": accordion("Expandable"),
+
+	"Badge": {
+		Attrs:  []string{"color", "size", "shape", "icon", "stroke", "disabled"},
+		Inline: true,
+		Template: template.Must(template.New("Badge").Parse(
+			`<span class="md-badge" data-color="{{or .Attrs.color "gray"}}"` +
+				` data-size="{{or .Attrs.size "sm"}}" data-shape="{{or .Attrs.shape "rounded"}}"` +
+				`{{if .Bool "stroke"}} data-stroke="true"{{end}}` +
+				`{{if .Bool "disabled"}} data-disabled="true"{{end}}>` +
+				`{{with .Attrs.icon}}<span class="md-badge-icon" aria-hidden="true">{{.}}</span>{{end}}` +
+				`{{.Content}}</span>`)),
+	},
+	// Tooltip uses the title attribute so the hint is available without
+	// JavaScript, and to assistive technology, rather than being drawn
+	// by a script that may not run.
+	"Tooltip": {
+		Attrs:    []string{"tip", "cta", "href"},
+		Required: []string{"tip"},
+		Inline:   true,
+		Template: template.Must(template.New("Tooltip").Parse(
+			`{{if .Attrs.href}}<a class="md-tooltip" href="{{.Attrs.href}}" title="{{.Attrs.tip}}">` +
+				`{{else}}<span class="md-tooltip" title="{{.Attrs.tip}}">{{end}}` +
+				`{{.Content}}` +
+				`{{with .Attrs.cta}}<span class="md-tooltip-cta">{{.}}</span>{{end}}` +
+				`{{if .Attrs.href}}</a>{{else}}</span>{{end}}`)),
+	},
 
 	"Frame": {
 		Attrs: []string{"caption", "hint"},
