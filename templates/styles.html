@@ -406,6 +406,92 @@
     .md-card-body > :first-child { margin-top: 0; }
     .md-card-body > :last-child { margin-bottom: 0; }
 
+    .md-steps {
+        list-style: none;
+        counter-reset: md-step;
+        margin: 16px 0;
+        padding-left: 0;
+    }
+    .md-step {
+        counter-increment: md-step;
+        position: relative;
+        padding-left: 40px;
+        padding-bottom: 16px;
+        border-left: 1px solid var(--border, #d0d7de);
+        margin-left: 12px;
+    }
+    .md-step:last-child {
+        border-left-color: transparent;
+        padding-bottom: 0;
+    }
+    .md-step::before {
+        content: counter(md-step);
+        position: absolute;
+        left: -13px;
+        top: 0;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--bg-subtle, #f6f8fa);
+        border: 1px solid var(--border, #d0d7de);
+        color: var(--fg-muted, #656d76);
+        font-size: 13px;
+        line-height: 24px;
+        text-align: center;
+    }
+    .md-step-title { font-weight: 600; }
+    .md-step-icon { margin-right: 6px; }
+    .md-steps[data-title-size="h2"] .md-step-title { font-size: 1.5em; }
+    .md-steps[data-title-size="h3"] .md-step-title { font-size: 1.25em; }
+    .md-steps[data-title-size="h4"] .md-step-title { font-size: 1em; }
+    .md-step-body > :first-child { margin-top: 0; }
+    .md-step-body > :last-child { margin-bottom: 0; }
+
+    .md-accordion {
+        border: 1px solid var(--border, #d0d7de);
+        border-radius: 6px;
+        padding: 8px 16px;
+        margin: 8px 0;
+    }
+    .md-accordion-summary {
+        cursor: pointer;
+        font-weight: 600;
+    }
+    .md-accordion-icon { margin-right: 6px; }
+    .md-accordion-description {
+        display: block;
+        font-weight: 400;
+        color: var(--fg-muted, #656d76);
+        font-size: 0.9em;
+    }
+    .md-accordion-body { padding-top: 8px; }
+    .md-accordion-body > :first-child { margin-top: 0; }
+    .md-accordion-body > :last-child { margin-bottom: 0; }
+    .md-accordion-group .md-accordion { border-radius: 0; margin: -1px 0 0; }
+    .md-accordion-group .md-accordion:first-child { border-radius: 6px 6px 0 0; margin-top: 0; }
+    .md-accordion-group .md-accordion:last-child { border-radius: 0 0 6px 6px; }
+
+    .md-frame {
+        margin: 16px 0;
+        text-align: center;
+    }
+    .md-frame-body {
+        border: 1px solid var(--border, #d0d7de);
+        border-radius: 6px;
+        padding: 8px;
+        background: var(--bg-subtle, #f6f8fa);
+        overflow-x: auto;
+    }
+    .md-frame-body > :first-child { margin-top: 0; }
+    .md-frame-body > :last-child { margin-bottom: 0; }
+    .md-frame-hint,
+    .md-frame-caption {
+        color: var(--fg-muted, #656d76);
+        font-size: 0.9em;
+    }
+    .md-frame-hint { margin-bottom: 6px; }
+    .md-frame-caption { margin-top: 6px; }
+
     {{.CustomCSS}}
     {{.ChromaCSS}}
 </style>

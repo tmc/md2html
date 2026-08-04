@@ -1,0 +1,81 @@
+# Test the bundled Steps, Accordion, Frame, and Columns components.
+
+md2html -html output -html-ext html testsite
+exists output/README.html
+
+# Steps render as a real ordered list, so numbering is the browser's job
+# and an explicit stepNumber is just the li value attribute.
+grep '<ol class="md-steps" data-title-size="h3">' output/README.html
+grep '<li class="md-step">' output/README.html
+grep '<li class="md-step" value="7">' output/README.html
+grep '<div class="md-step-title">Install</div>' output/README.html
+grep '<code>go install</code>' output/README.html
+
+# Accordions are details elements, so expanding needs no JavaScript.
+grep '<details class="md-accordion" open>' output/README.html
+grep '<summary class="md-accordion-summary">' output/README.html
+grep '<span class="md-accordion-description">the reason</span>' output/README.html
+
+# A false defaultOpen stays closed rather than being read as a non-empty
+# string.
+! grep '<details class="md-accordion" id="closed" open>' output/README.html
+
+# Expandable is the same disclosure under Mintlify's other name.
+grep 'child fields' output/README.html
+
+# Frames caption above and below.
+grep '<div class="md-frame-hint">Figure 1</div>' output/README.html
+grep '<figcaption class="md-frame-caption">A diagram</figcaption>' output/README.html
+
+# Columns is an accepted spelling of CardGroup.
+grep '<div class="md-card-group" data-cols="4">' output/README.html
+
+# Styles for the new components ship with the page.
+grep '\.md-steps ' output/README.html
+grep '\.md-accordion ' output/README.html
+grep '\.md-frame ' output/README.html
+
+rm -rf testsite output
+
+-- testsite/README.md --
+# Components
+
+<Steps titleSize="h3">
+
+<Step title="Install">
+Run `go install`.
+</Step>
+
+<Step title="Later" stepNumber="7">
+then this
+</Step>
+
+</Steps>
+
+<AccordionGroup>
+
+<Accordion title="Why" description="the reason" defaultOpen={true}>
+Because.
+</Accordion>
+
+<Accordion title="Closed" id="closed" defaultOpen="false">
+Hidden.
+</Accordion>
+
+</AccordionGroup>
+
+<Expandable title="child fields">
+Nested detail.
+</Expandable>
+
+<Frame caption="A diagram" hint="Figure 1">
+![alt](x.png)
+</Frame>
+
+<Columns cols={4}>
+
+<Card title="One">
+first
+</Card>
+
+</Columns>

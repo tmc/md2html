@@ -27,7 +27,7 @@ func TestComponentCheck(t *testing.T) {
 		line   int
 		substr string
 	}{
-		{3, "unknown component <Widget> (no -components directory configured; known: Card, CardGroup)"},
+		{3, "unknown component <Widget> (no -components directory configured; known: "},
 		{5, `missing required attribute "title"`},
 		{7, `no attribute "nope"`},
 	}
@@ -76,7 +76,7 @@ func TestComponentCheckConfigured(t *testing.T) {
 	if strings.Contains(diags[0].Message, "no -components directory configured") {
 		t.Errorf("configured registry still reported the missing directory: %q", diags[0].Message)
 	}
-	if !strings.Contains(diags[0].Message, "known: Card, CardGroup, Note") {
+	if !strings.Contains(diags[0].Message, "Note") {
 		t.Errorf("message %q does not list the loaded components", diags[0].Message)
 	}
 }

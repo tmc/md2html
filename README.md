@@ -48,7 +48,7 @@ Served pages take their title from the frontmatter `title`, then the first headi
 
 Mermaid diagrams and TeX math are rendered in the browser by scripts loaded from a CDN, so those pages need network access on first view. When a script fails to load the page says so rather than leaving the block unrendered.
 
-MDX-style layout components are supported for `Card` and `CardGroup`:
+MDX-style layout components are supported for `Card`, `CardGroup` (also spelled `Columns`), `Steps`/`Step`, `Accordion`/`AccordionGroup` (`Expandable` is the same disclosure), and `Frame`:
 
 	<CardGroup cols={2}>
 

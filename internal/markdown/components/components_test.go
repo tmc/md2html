@@ -167,3 +167,111 @@ func TestTemplatesReferenceContentOnce(t *testing.T) {
 		}
 	}
 }
+
+func TestBuiltinComponents(t *testing.T) {
+	tests := []struct {
+		name   string
+		in     string
+		want   []string
+		absent []string
+	}{
+		{
+			name: "steps are an ordered list",
+			in:   "<Steps>\n<Step title=\"First\">\ndo a thing\n</Step>\n<Step title=\"Second\" stepNumber=\"7\">\nthen this\n</Step>\n</Steps>\n",
+			want: []string{
+				`<ol class="md-steps" data-title-size="p">`,
+				`<li class="md-step">`,
+				`<div class="md-step-title">First</div>`,
+				`<li class="md-step" value="7">`,
+				"<p>do a thing</p>",
+			},
+		},
+		{
+			name: "steps title size",
+			in:   "<Steps titleSize=\"h3\">\n<Step title=\"A\">\nx\n</Step>\n</Steps>\n",
+			want: []string{`data-title-size="h3"`},
+		},
+		{
+			name: "accordion is a details element",
+			in:   "<Accordion title=\"More\" description=\"detail\">\nhidden *body*\n</Accordion>\n",
+			want: []string{
+				`<details class="md-accordion">`,
+				`<span class="md-accordion-title">More</span>`,
+				`<span class="md-accordion-description">detail</span>`,
+				"<em>body</em>",
+			},
+			absent: []string{" open"},
+		},
+		{
+			name:   "defaultOpen false stays closed",
+			in:     "<Accordion title=\"A\" defaultOpen=\"false\">\nx\n</Accordion>\n",
+			absent: []string{" open>"},
+		},
+		{
+			name: "defaultOpen true opens",
+			in:   "<Accordion title=\"A\" defaultOpen={true}>\nx\n</Accordion>\n",
+			want: []string{" open>"},
+		},
+		{
+			name: "bare defaultOpen opens",
+			in:   "<Accordion title=\"A\" defaultOpen>\nx\n</Accordion>\n",
+			want: []string{" open>"},
+		},
+		{
+			name: "expandable is a disclosure too",
+			in:   "<Expandable title=\"child fields\">\nx\n</Expandable>\n",
+			want: []string{`<details class="md-accordion">`, "child fields"},
+		},
+		{
+			name: "accordion group wraps",
+			in:   "<AccordionGroup>\n<Accordion title=\"A\">\nx\n</Accordion>\n</AccordionGroup>\n",
+			want: []string{`<div class="md-accordion-group">`, `<details class="md-accordion">`},
+		},
+		{
+			name: "frame captions",
+			in:   "<Frame caption=\"Below\" hint=\"Above\">\n![alt](x.png)\n</Frame>\n",
+			want: []string{
+				`<figure class="md-frame">`,
+				`<div class="md-frame-hint">Above</div>`,
+				`<figcaption class="md-frame-caption">Below</figcaption>`,
+			},
+		},
+		{
+			name: "columns is an alias of card group",
+			in:   "<Columns cols={4}>\n<Card title=\"A\">\na\n</Card>\n</Columns>\n",
+			want: []string{`<div class="md-card-group" data-cols="4">`},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, errs := render(t, tt.in)
+			if len(errs) > 0 {
+				t.Fatalf("unexpected parse errors: %v", errs)
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(got, want) {
+					t.Errorf("output missing %q\ngot:\n%s", want, got)
+				}
+			}
+			for _, absent := range tt.absent {
+				if strings.Contains(got, absent) {
+					t.Errorf("output unexpectedly contains %q\ngot:\n%s", absent, got)
+				}
+			}
+		})
+	}
+}
+
+func TestDataBool(t *testing.T) {
+	d := Data{Attrs: map[string]string{"a": "true", "b": "TRUE", "c": "1", "d": "false", "e": "", "f": "no"}}
+	for _, name := range []string{"a", "b", "c"} {
+		if !d.Bool(name) {
+			t.Errorf("Bool(%q) = false, want true", name)
+		}
+	}
+	for _, name := range []string{"d", "e", "f", "missing"} {
+		if d.Bool(name) {
+			t.Errorf("Bool(%q) = true, want false", name)
+		}
+	}
+}

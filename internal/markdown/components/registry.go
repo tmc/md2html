@@ -35,6 +35,17 @@ type Data struct {
 	Content template.HTML
 }
 
+// Bool reports whether the named attribute is set to a true value.
+// Templates need this because every attribute is a string, and a bare
+// {{if .Attrs.defaultOpen}} would treat defaultOpen="false" as true.
+func (d Data) Bool(name string) bool {
+	switch strings.ToLower(d.Attrs[name]) {
+	case "true", "yes", "1":
+		return true
+	}
+	return false
+}
+
 // A Registry maps component names to their contracts.
 type Registry map[string]Component
 
@@ -95,9 +106,72 @@ var DefaultRegistry = Registry{
 				`<div class="md-card-body">{{.Content}}</div>` +
 				`</div>`)),
 	},
-	"CardGroup": {
-		Attrs: []string{"cols"},
-		Template: template.Must(template.New("CardGroup").Parse(
-			`<div class="md-card-group" data-cols="{{or .Attrs.cols "2"}}">{{.Content}}</div>`)),
+	"CardGroup": cardGroup,
+
+	// Columns is what Mintlify's current documentation calls the card
+	// grouping wrapper; CardGroup is the older spelling. Both are
+	// accepted so either dialect renders.
+	"Columns": cardGroup,
+
+	"Steps": {
+		Attrs: []string{"titleSize"},
+		Template: template.Must(template.New("Steps").Parse(
+			`<ol class="md-steps" data-title-size="{{or .Attrs.titleSize "p"}}">{{.Content}}</ol>`)),
 	},
+	"Step": {
+		Attrs:    []string{"title", "icon", "stepNumber", "id", "noAnchor"},
+		Required: []string{"title"},
+		Template: template.Must(template.New("Step").Parse(
+			`<li class="md-step"{{with .Attrs.stepNumber}} value="{{.}}"{{end}}` +
+				`{{with .Attrs.id}} id="{{.}}"{{end}}>` +
+				`<div class="md-step-title">` +
+				`{{with .Attrs.icon}}<span class="md-step-icon" aria-hidden="true">{{.}}</span>{{end}}` +
+				`{{.Attrs.title}}</div>` +
+				`<div class="md-step-body">{{.Content}}</div>` +
+				`</li>`)),
+	},
+
+	"AccordionGroup": {
+		Template: template.Must(template.New("AccordionGroup").Parse(
+			`<div class="md-accordion-group">{{.Content}}</div>`)),
+	},
+	"Accordion":  accordion("Accordion"),
+	"Expandable": accordion("Expandable"),
+
+	"Frame": {
+		Attrs: []string{"caption", "hint"},
+		Template: template.Must(template.New("Frame").Parse(
+			`<figure class="md-frame">` +
+				`{{with .Attrs.hint}}<div class="md-frame-hint">{{.}}</div>{{end}}` +
+				`<div class="md-frame-body">{{.Content}}</div>` +
+				`{{with .Attrs.caption}}<figcaption class="md-frame-caption">{{.}}</figcaption>{{end}}` +
+				`</figure>`)),
+	},
+}
+
+// cardGroup backs both CardGroup and Columns.
+var cardGroup = Component{
+	Attrs: []string{"cols"},
+	Template: template.Must(template.New("CardGroup").Parse(
+		`<div class="md-card-group" data-cols="{{or .Attrs.cols "2"}}">{{.Content}}</div>`)),
+}
+
+// accordion builds a disclosure component. It renders as <details>, so
+// expanding and collapsing works without JavaScript and a printed page
+// or a reader with scripts blocked still shows the open sections.
+func accordion(name string) Component {
+	return Component{
+		Attrs:    []string{"title", "description", "defaultOpen", "id", "icon"},
+		Required: []string{"title"},
+		Template: template.Must(template.New(name).Parse(
+			`<details class="md-accordion"{{with .Attrs.id}} id="{{.}}"{{end}}` +
+				`{{if .Bool "defaultOpen"}} open{{end}}>` +
+				`<summary class="md-accordion-summary">` +
+				`{{with .Attrs.icon}}<span class="md-accordion-icon" aria-hidden="true">{{.}}</span>{{end}}` +
+				`<span class="md-accordion-title">{{.Attrs.title}}</span>` +
+				`{{with .Attrs.description}}<span class="md-accordion-description">{{.}}</span>{{end}}` +
+				`</summary>` +
+				`<div class="md-accordion-body">{{.Content}}</div>` +
+				`</details>`)),
+	}
 }
