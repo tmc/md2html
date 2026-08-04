@@ -52,6 +52,20 @@ MDX-style layout components are supported for `Card` and `CardGroup`:
 
 A tag must stand alone on its line, and its body is ordinary Markdown. This is not MDX: there is no JavaScript, so `import` and `export` are unsupported and brace expressions accept only JSON scalars. Unknown component names, unknown attributes, and missing required attributes are reported as warnings and left unrendered.
 
+Define your own with `-components dir`, where `dir` holds a `components.json` naming each component's attributes and its `html/template` file:
+
+	{
+	  "components": {
+	    "Note": {
+	      "attrs": ["title"],
+	      "required": ["title"],
+	      "template": "note.html"
+	    }
+	  }
+	}
+
+Each template must reference `{{.Content}}` exactly once, where the Markdown body goes, and reaches attribute values through `{{.Attrs.title}}`. Templates are configuration and may emit any markup; attribute values come from Markdown and are always escaped. A definition may reuse a built-in name to replace it. Pass the same directory to `mdvet -components` so it agrees about which components exist.
+
 Use `-format=okf` when rendering an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) bundle. It rewrites OKF root-relative Markdown links such as `/tables/orders.md` for the rendered site. It is presentation support only; validate bundles with an OKF-aware tool such as `specmd validate`.
 
 The command is a thin wrapper around package github.com/tmc/md2html.

@@ -1,0 +1,87 @@
+# Test user-supplied components loaded from a directory.
+
+md2html -components comp -html output -html-ext html testsite
+exists output/README.html
+
+# The custom component renders through its own template, with a
+# Markdown body.
+grep '<aside class="note">' output/README.html
+grep '<h4>Heads up</h4>' output/README.html
+grep '<code>code</code>' output/README.html
+
+# A custom definition replaces the built-in of the same name.
+grep '<div class="custom-card">' output/README.html
+! grep '<div class="md-card">' output/README.html
+
+# Built-ins the directory does not mention stay available.
+grep 'class="md-card-group"' output/README.html
+
+# Attribute rules from the manifest are enforced.
+stderr '<Note> is missing required attribute'
+stderr '<Note> has no attribute'
+
+rm -rf output
+
+# A component template with no place for the body is a configuration
+# error, reported before any page is written.
+! md2html -components broken -html output -html-ext html testsite
+stderr 'load components'
+stderr 'does not reference'
+! exists output
+
+-- testsite/README.md --
+# Custom components
+
+<Note title="Heads up">
+Body with `code`.
+</Note>
+
+<Note/>
+
+<Note title="ok" colour="red"/>
+
+<Card title="Overridden">
+card body
+</Card>
+
+<CardGroup>
+
+<Card title="Grouped">
+grouped body
+</Card>
+
+</CardGroup>
+
+-- comp/components.json --
+{
+  "components": {
+    "Note": {
+      "attrs": ["title"],
+      "required": ["title"],
+      "template": "note.html"
+    },
+    "Card": {
+      "attrs": ["title"],
+      "template": "card.html"
+    }
+  }
+}
+
+-- comp/note.html --
+<aside class="note"><h4>{{.Attrs.title}}</h4>{{.Content}}</aside>
+
+-- comp/card.html --
+<div class="custom-card">{{.Content}}</div>
+
+-- broken/components.json --
+{
+  "components": {
+    "Note": {
+      "attrs": ["title"],
+      "template": "note.html"
+    }
+  }
+}
+
+-- broken/note.html --
+<aside>this template has no body slot</aside>

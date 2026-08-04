@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tmc/md2html/internal/markdown/components"
 	"github.com/tmc/md2html/internal/markdown/jsonspec"
 )
 
@@ -69,6 +70,13 @@ type Config struct {
 	// *.schema.json files used for JSON discriminator enrichment.
 	JSONSpec string
 
+	// Components is a directory containing components.json and the
+	// html/template files it names, defining layout components in
+	// addition to the built-in ones.
+	Components string
+
+	componentRegistry components.Registry
+
 	jsonSpecConfig jsonspec.Config
 	jsonSpecBundle template.JS
 	jsonSpecReady  bool
@@ -104,6 +112,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.Bool("drafts", false, "render pages marked draft: true instead of skipping them")
 	fs.String("format", "", "structured Markdown format: okf")
 	fs.String("jsonspec", "", "directory containing jsonspec.json and *.schema.json files")
+	fs.String("components", "", "directory containing components.json and component templates")
 	fs.Bool("vet", false, "run mdvet checks on source markdown and report diagnostics (does not block rendering)")
 	fs.String("vet-checks", "", "comma-separated mdvet check names to run with -vet (default: all)")
 	return fs
@@ -139,6 +148,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		Drafts:            flagBool(fs, "drafts"),
 		Format:            flagString(fs, "format"),
 		JSONSpec:          flagString(fs, "jsonspec"),
+		Components:        flagString(fs, "components"),
 		Vet:               flagBool(fs, "vet"),
 		VetChecks:         flagString(fs, "vet-checks"),
 	}
@@ -179,6 +189,14 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	}
 	var err error
 	cfg, err = prepareJSONSpec(cfg, logger)
+	if err != nil {
+		return err
+	}
+	cfg, err = prepareComponents(cfg)
+	if err != nil {
+		return err
+	}
+	cfg, err = prepareComponents(cfg)
 	if err != nil {
 		return err
 	}
