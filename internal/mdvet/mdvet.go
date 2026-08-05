@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tmc/md2html/internal/anchor"
 	"github.com/tmc/md2html/internal/markdown/components"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -186,7 +187,7 @@ func parseTreeWith(source []byte, reg components.Registry) (ast.Node, parser.Con
 		),
 		goldmark.WithParserOptions(parser.WithAutoHeadingID()),
 	)
-	pc := parser.NewContext()
+	pc := parser.NewContext(parser.WithIDs(anchor.NewIDs()))
 	return md.Parser().Parse(text.NewReader(source), parser.WithContext(pc)), pc
 }
 

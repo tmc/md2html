@@ -14,6 +14,7 @@ import (
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/styles"
 	admonitions "github.com/stefanfritsch/goldmark-admonitions"
+	"github.com/tmc/md2html/internal/anchor"
 	"github.com/tmc/md2html/internal/markdown/components"
 	"github.com/tmc/md2html/internal/markdown/jsonspec"
 	"github.com/tmc/md2html/internal/markdown/media"
@@ -165,7 +166,7 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, e
 	)
 
 	source := []byte(markdown)
-	pc := parser.NewContext()
+	pc := parser.NewContext(parser.WithIDs(anchor.NewIDs()))
 
 	if filePath != "" {
 		doc := md.Parser().Parse(text.NewReader(source), parser.WithContext(pc))
@@ -454,7 +455,7 @@ func loadJSONFile(filename string) (any, error) {
 func parseFrontmatter(content string) (DocumentData, error) {
 	// Use goldmark to parse frontmatter
 	md := goldmark.New(goldmark.WithExtensions(meta.Meta))
-	context := parser.NewContext()
+	context := parser.NewContext(parser.WithIDs(anchor.NewIDs()))
 
 	// Parse to extract metadata
 	source := []byte(content)

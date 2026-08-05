@@ -141,7 +141,7 @@ func (l *Loader) ParseMD(content string) (*MarkdownDoc, error) {
 	)
 
 	// Parse the document
-	ctx := parser.NewContext()
+	ctx := parser.NewContext(parser.WithIDs(anchor.NewIDs()))
 	source := []byte(content)
 	reader := text.NewReader(source)
 	tree := md.Parser().Parse(reader, parser.WithContext(ctx))
