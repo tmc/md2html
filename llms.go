@@ -19,6 +19,7 @@ type llmsPage struct {
 	Title   string
 	Summary string
 	Content string
+	Group   string // navigation group, "" when the page is in none
 }
 
 func generateLLMSFiles(sourceDir, outputDir string, files []markdownFile, nav *Navigation, cfg Config) (int, error) {
@@ -44,6 +45,8 @@ func collectLLMSPages(sourceDir string, files []markdownFile, nav *Navigation, c
 		}
 		byPath[rel] = f
 	}
+
+	groups := navGroups(nav)
 
 	var ordered []markdownFile
 	used := make(map[string]bool)
@@ -81,43 +84,128 @@ func collectLLMSPages(sourceDir string, files []markdownFile, nav *Navigation, c
 			doc = DocumentData{Content: string(content), Frontmatter: map[string]any{}}
 		}
 		title := llmsTitle(f.RelPath, doc)
+		rel := normalizeSourcePath(f.RelPath)
 		pages = append(pages, llmsPage{
-			Path:    normalizeSourcePath(f.RelPath),
+			Path:    rel,
 			URL:     renderedPathForSource(f.RelPath, cfg.HTMLExt, cfg.Index),
 			Title:   title,
 			Summary: llmsSummary(doc),
 			Content: string(content),
+			Group:   groups[rel],
 		})
 	}
 	return pages, nil
 }
 
-func writeLLMSSummary(outputDir string, cfg Config, pages []llmsPage) error {
+// navGroups maps each page path to the title of the navigation group
+// holding it. Nested groups report the outermost one, which is the level
+// llms.txt sections are meant to describe.
+func navGroups(nav *Navigation) map[string]string {
+	groups := make(map[string]string)
+	if nav == nil {
+		return groups
+	}
+	// The two navigation sources shape groups differently. docs.json
+	// nests pages inside their group; SUMMARY.md writes "## Name" as a
+	// sibling that opens a section running until the next one. Handle
+	// both: recurse into children, and carry an open heading sideways.
+	var walk func(items []*NavItem, group string)
+	walk = func(items []*NavItem, group string) {
+		open := group
+		for _, item := range items {
+			switch {
+			case item.IsSep:
+				open = group
+			case item.IsGroup:
+				name := group
+				if name == "" {
+					name = item.Title
+				}
+				open = name
+				walk(item.Children, name)
+			default:
+				if item.Path != "" && open != "" {
+					groups[normalizeSourcePath(item.Path)] = open
+				}
+				walk(item.Children, open)
+			}
+		}
+	}
+	walk(nav.Items, "")
+	return groups
+}
+
+// buildLLMSSummary renders the llms.txt index described at llmstxt.org:
+// an H1 naming the site, an optional blockquote summary, then H2
+// sections of Markdown links with a one-line description each. The
+// format is Markdown on purpose — a model reading it should not have to
+// guess where a URL ends.
+func buildLLMSSummary(cfg Config, pages []llmsPage) string {
 	var b strings.Builder
 	title := strings.TrimSpace(cfg.Title)
-	if title == "" && len(pages) > 0 {
-		title = firstHeading(pages[0].Content)
-		if title == "" {
-			title = pages[0].Title
+	if title == "" || title == defaultTitle {
+		if len(pages) > 0 {
+			if h := firstHeading(pages[0].Content); h != "" {
+				title = h
+			} else {
+				title = pages[0].Title
+			}
 		}
 	}
 	if title == "" {
 		title = "Documentation"
 	}
-	b.WriteString(title)
-	b.WriteString("\n\n")
-	for _, p := range pages {
-		b.WriteString(p.URL)
-		b.WriteString(" — ")
-		b.WriteString(p.Title)
-		if p.Summary != "" {
-			b.WriteString(" — ")
-			b.WriteString(p.Summary)
-		}
-		b.WriteByte('\n')
+	fmt.Fprintf(&b, "# %s\n", title)
+
+	// The first page's own summary describes the site better than
+	// anything md2html could synthesise.
+	if len(pages) > 0 && pages[0].Summary != "" {
+		fmt.Fprintf(&b, "\n> %s\n", pages[0].Summary)
 	}
-	b.WriteByte('\n')
-	return os.WriteFile(filepath.Join(outputDir, "llms.txt"), []byte(b.String()), 0644)
+
+	// Sections follow navigation order. A tree with no groups still needs
+	// one heading for the links to sit under, and calling that "Other"
+	// would imply a main section that does not exist.
+	ungrouped := "Other"
+	grouped := false
+	for _, p := range pages {
+		if p.Group != "" {
+			grouped = true
+			break
+		}
+	}
+	if !grouped {
+		ungrouped = "Pages"
+	}
+
+	var sections []string
+	bySection := make(map[string][]llmsPage)
+	for _, p := range pages {
+		group := p.Group
+		if group == "" {
+			group = ungrouped
+		}
+		if _, seen := bySection[group]; !seen {
+			sections = append(sections, group)
+		}
+		bySection[group] = append(bySection[group], p)
+	}
+
+	for _, name := range sections {
+		fmt.Fprintf(&b, "\n## %s\n\n", name)
+		for _, p := range bySection[name] {
+			fmt.Fprintf(&b, "- [%s](%s)", p.Title, p.URL)
+			if p.Summary != "" {
+				fmt.Fprintf(&b, ": %s", p.Summary)
+			}
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
+}
+
+func writeLLMSSummary(outputDir string, cfg Config, pages []llmsPage) error {
+	return os.WriteFile(filepath.Join(outputDir, "llms.txt"), []byte(buildLLMSSummary(cfg, pages)), 0644)
 }
 
 func writeLLMSFull(outputDir string, pages []llmsPage, maxBytes int) error {

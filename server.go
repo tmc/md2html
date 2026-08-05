@@ -3,6 +3,7 @@ package md2html
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -714,6 +715,59 @@ func (s *server) handleSearchIndex(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
+// llmsPages gathers the pages behind llms.txt and llms-full.txt. Like
+// the search index it is rebuilt per request, so an edit shows up
+// without restarting the server.
+func (s *server) llmsPages() ([]llmsPage, error) {
+	root, err := sourceRoot(s.inputPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve source root: %w", err)
+	}
+	files, err := findMarkdownFiles(root, s.config.Depth)
+	if err != nil {
+		return nil, fmt.Errorf("find markdown files: %w", err)
+	}
+	htmlExt := ""
+	if s.config.HTMLExt != "" {
+		htmlExt = "." + s.config.HTMLExt
+	}
+	nav, _, err := navigationForDir(root, htmlExt)
+	if err != nil {
+		// Without navigation the pages are still listed, just ungrouped.
+		nav = nil
+	}
+	return collectLLMSPages(root, files, nav, s.config)
+}
+
+func (s *server) handleLLMS(w http.ResponseWriter, r *http.Request) {
+	pages, err := s.llmsPages()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	io.WriteString(w, buildLLMSSummary(s.config, pages))
+}
+
+func (s *server) handleLLMSFull(w http.ResponseWriter, r *http.Request) {
+	pages, err := s.llmsPages()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	// The server has no reason to split: nothing here is being uploaded
+	// to a host with a file-size limit.
+	for i, p := range pages {
+		if i > 0 {
+			io.WriteString(w, "\n\n")
+		}
+		fmt.Fprintf(w, "--- %s\n\n%s", p.URL, p.Content)
+	}
+}
+
 func (s *server) handleRaw(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	content := s.content
@@ -802,6 +856,8 @@ func (s *server) notifyClients() {
 func (s *server) registerEndpoints(mux *http.ServeMux) {
 	mux.HandleFunc("/events", s.handleSSE)
 	mux.HandleFunc("/raw", s.handleRaw)
+	mux.HandleFunc("/llms.txt", s.handleLLMS)
+	mux.HandleFunc("/llms-full.txt", s.handleLLMSFull)
 	mux.HandleFunc("/api/versions", s.handleVersionsAPI)
 	mux.HandleFunc("/_jsonspec/schemas.json", s.handleJSONSpecSchemas)
 

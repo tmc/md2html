@@ -17,18 +17,45 @@ grep '^--- guide.html$' out/llms-full.txt
 grep '^--- z-extra.html$' out/llms-full.txt
 grep '<link rel="alternate" type="text/markdown" href="./README.md">' out/README.html
 
+# The dev server answers the same two URLs, built from the tree as it is
+# now rather than from a previous static build.
+md2html -http :8098 -nav src &
+wait-port :8098
+
+curl -s http://localhost:8098/llms.txt
+stdout '^# Home$'
+stdout '^> Frontmatter description wins\.$'
+stdout '^## Start here$'
+stdout '^- \[Home\]\(README\): Frontmatter description wins\.$'
+stdout '^## Reference$'
+stdout '^- \[Extra\]\(z-extra\): Extra summary outside navigation\.$'
+
+curl -s http://localhost:8098/llms-full.txt
+stdout '^--- README$'
+stdout 'This paragraph should not be used'
+stdout '^--- z-extra$'
+
 -- want-llms.txt --
-Docs
+# Docs
 
-README.html — Home — Frontmatter description wins.
-guide.html — Guide — Guide summary comes from the first paragraph.
-z-extra.html — Extra — Extra summary outside navigation.
+> Frontmatter description wins.
 
+## Pages
+
+- [Home](README.html): Frontmatter description wins.
+- [Guide](guide.html): Guide summary comes from the first paragraph.
+- [Extra](z-extra.html): Extra summary outside navigation.
 -- src/SUMMARY.md --
 # Summary
 
+## Start here
+
 * [Home](README.md)
 * [Guide](guide.md)
+
+## Reference
+
+* [z-extra](z-extra.md)
 
 -- src/README.md --
 ---
