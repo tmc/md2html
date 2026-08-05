@@ -38,6 +38,7 @@ func TestFormatStars(t *testing.T) {
 }
 
 func TestFetchStars(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/repos/tmc/cdp":
@@ -50,17 +51,13 @@ func TestFetchStars(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	old := githubAPI
-	githubAPI = srv.URL
-	defer func() { githubAPI = old }()
-
-	if got, err := fetchStars(context.Background(), "tmc/cdp"); err != nil || got != 42 {
+	if got, err := fetchStars(context.Background(), srv.URL, "tmc/cdp"); err != nil || got != 42 {
 		t.Errorf("fetchStars() = %d, %v, want 42, nil", got, err)
 	}
 	// A repository that cannot be read is an error, never a zero count
 	// rendered as if it were real.
 	for _, repo := range []string{"tmc/private", "tmc/garbage", ""} {
-		if _, err := fetchStars(context.Background(), repo); err == nil {
+		if _, err := fetchStars(context.Background(), srv.URL, repo); err == nil {
 			t.Errorf("fetchStars(%q) succeeded, want an error", repo)
 		}
 	}
@@ -70,27 +67,25 @@ func TestFetchStars(t *testing.T) {
 // and that a failure leaves the link without a count rather than
 // failing the render.
 func TestRepoStarsOptIn(t *testing.T) {
+	t.Parallel()
 	var hits int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits++
 		json.NewEncoder(w).Encode(map[string]any{"stargazers_count": 7})
 	}))
 	defer srv.Close()
-	old := githubAPI
-	githubAPI = srv.URL
-	defer func() { githubAPI = old }()
-
 	logger := discardLogger()
-	if got := repoStars(context.Background(), Config{}, "tmc/cdp", logger); got != "" {
+	stars := Config{Stars: true, starsAPI: srv.URL}
+	if got := repoStars(context.Background(), Config{starsAPI: srv.URL}, "tmc/cdp", logger); got != "" {
 		t.Errorf("repoStars() = %q without -github-stars, want empty", got)
 	}
 	if hits != 0 {
 		t.Errorf("made %d requests without -github-stars, want 0", hits)
 	}
-	if got := repoStars(context.Background(), Config{Stars: true}, "", logger); got != "" {
+	if got := repoStars(context.Background(), stars, "", logger); got != "" {
 		t.Errorf("repoStars() = %q with no repository, want empty", got)
 	}
-	if got := repoStars(context.Background(), Config{Stars: true}, "tmc/cdp", logger); got != "7" {
+	if got := repoStars(context.Background(), stars, "tmc/cdp", logger); got != "7" {
 		t.Errorf("repoStars() = %q, want %q", got, "7")
 	}
 }

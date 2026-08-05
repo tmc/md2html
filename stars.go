@@ -21,23 +21,28 @@ type starCount struct {
 	Stargazers int `json:"stargazers_count"`
 }
 
-// githubAPI is the host repository counts are read from. It is a
-// variable so tests can point it at a local server.
-var githubAPI = "https://api.github.com"
+// githubAPI is the host repository counts are read from. A caller can
+// point somewhere else through [Config.starsAPI]; it is a parameter
+// rather than a package variable so tests do not have to mutate shared
+// state to redirect it, and can therefore run in parallel.
+const githubAPI = "https://api.github.com"
 
 // fetchStars reports the star count of an "owner/name" repository.
 //
 // Anything that goes wrong — no network, a rate limit, a repository that
 // is private or gone — reports an error, and the caller renders the link
 // without a count rather than failing the build over decoration.
-func fetchStars(ctx context.Context, repo string) (int, error) {
+func fetchStars(ctx context.Context, api, repo string) (int, error) {
 	if repo == "" {
 		return 0, fmt.Errorf("no repository")
+	}
+	if api == "" {
+		api = githubAPI
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	url := githubAPI + "/repos/" + repo
+	url := api + "/repos/" + repo
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return 0, err
@@ -89,7 +94,7 @@ func repoStars(ctx context.Context, cfg Config, repo string, logger *slog.Logger
 	if !cfg.Stars || repo == "" {
 		return ""
 	}
-	n, err := fetchStars(ctx, repo)
+	n, err := fetchStars(ctx, cfg.starsAPI, repo)
 	if err != nil {
 		logger.Warn("Could not fetch repository stars", "repo", repo, "error", err)
 		return ""

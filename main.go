@@ -91,6 +91,9 @@ type Config struct {
 
 	componentRegistry components.Registry
 	iconSet           map[string]template.HTML
+	// starsAPI overrides the host star counts are read from. Only tests
+	// set it; the empty value means the real API.
+	starsAPI string
 
 	jsonSpecConfig jsonspec.Config
 	jsonSpecBundle template.JS
