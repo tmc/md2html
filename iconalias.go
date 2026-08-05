@@ -2,59 +2,62 @@ package md2html
 
 import "html/template"
 
-// iconAliases maps an icon name to the other names that draw the same
-// glyph, tried in order when the icon directory has no file under the
-// name a page asked for.
+// iconGroups collects the names different icon sets give the same glyph.
 //
 // Documentation written for Mintlify names Font Awesome icons, while the
-// icon sets that can be unpacked into a directory and shipped with a
-// site are usually Lucide or Tabler. The three agree on most names
-// ("rocket", "terminal", "download"); this table covers the ones where
-// they disagree, so the same Markdown renders with whichever set the
-// author happens to have.
+// sets that can be unpacked into an -icons directory are usually Lucide
+// or Tabler. The three agree on most names ("rocket", "terminal",
+// "download") and disagree on these, so the same Markdown renders with
+// whichever set the author happens to have.
 //
-// A name belongs here only when the glyphs mean the same thing. Where no
-// set has a counterpart, the name is left out: an entry has to be right
-// for every set it might resolve against, and no icon reads better than
-// a wrong one.
-var iconAliases = map[string][]string{
-	// Font Awesome name first, then the sets that spell it differently.
-	"circle-question":      {"circle-help", "help-circle", "help"},
-	"circle-exclamation":   {"circle-alert", "alert-circle"},
-	"triangle-exclamation": {"triangle-alert", "alert-triangle"},
-	"circle-info":          {"info", "info-circle"},
-	"circle-check":         {"check-circle", "circle-check-big"},
-	"circle-play":          {"play-circle", "play"},
-	"code-compare":         {"git-compare", "git-compare-arrows"},
-	"diagram-project":      {"workflow", "sitemap", "git-fork"},
-	"network-wired":        {"network", "share-2"},
-	"shield-halved":        {"shield-half", "shield-check", "shield"},
-	"magnifying-glass":     {"search", "zoom-in"},
-	"screwdriver-wrench":   {"wrench", "tool", "settings-2"},
-	"file-lines":           {"file-text", "file"},
-	"gauge-high":           {"gauge", "gauge-circle"},
-	"square-check":         {"check-square", "check"},
-	"rectangle-terminal":   {"square-terminal", "terminal"},
-	"flask":                {"flask-conical", "beaker"},
-	"vial":                 {"test-tube", "flask-conical", "beaker"},
-	"gear":                 {"settings", "cog"},
-	"gears":                {"settings", "cog"},
-	"bolt":                 {"zap"},
-	"box":                  {"package"},
-	"house":                {"home"},
+// Each group is written most-specific first, which is the order the
+// names are tried in. A name belongs to a group only when the glyph
+// means the same thing: where a set has no counterpart, it is left out,
+// because no icon reads better than a wrong one. A name may appear in
+// only one group, since a name in two would resolve differently
+// depending on which was consulted first; [TestIconGroupsAreDisjoint]
+// enforces that.
+var iconGroups = [][]string{
+	{"diagram-project", "workflow", "sitemap", "git-fork"},
+	{"network-wired", "network", "share-2"},
+	{"circle-question", "circle-help", "help-circle"},
+	{"circle-exclamation", "circle-alert", "alert-circle"},
+	{"triangle-exclamation", "triangle-alert", "alert-triangle"},
+	{"circle-info", "info", "info-circle"},
+	{"circle-check", "check-circle", "circle-check-big"},
+	{"circle-play", "play-circle", "play"},
+	{"code-compare", "git-compare", "git-compare-arrows"},
+	{"shield-halved", "shield-half", "shield-check", "shield"},
+	{"magnifying-glass", "search", "zoom-in"},
+	{"screwdriver-wrench", "wrench", "tool", "settings-2"},
+	{"file-lines", "file-text", "file"},
+	{"gauge-high", "gauge", "gauge-circle"},
+	{"square-check", "check-square", "check"},
+	{"rectangle-terminal", "square-terminal", "terminal"},
+	{"vial", "test-tube", "flask", "flask-conical", "beaker"},
+	{"gear", "gears", "settings", "cog"},
+	{"bolt", "zap"},
+	{"box", "package"},
+	{"house", "home"},
+}
 
-	// The reverse direction, so a page written against Lucide still
-	// resolves against a Font Awesome directory.
-	"circle-help":    {"circle-question"},
-	"circle-alert":   {"circle-exclamation"},
-	"triangle-alert": {"triangle-exclamation"},
-	"flask-conical":  {"flask", "vial"},
-	"test-tube":      {"vial", "flask"},
-	"git-compare":    {"code-compare"},
-	"settings":       {"gear", "cog"},
-	"zap":            {"bolt"},
-	"home":           {"house"},
-	"search":         {"magnifying-glass"},
+// iconAliases maps each name to the other names for the same glyph, in
+// the order they are tried. It is derived from [iconGroups] so the two
+// directions cannot drift: a page naming the Font Awesome spelling
+// resolves against a Lucide directory and the other way round.
+var iconAliases = buildIconAliases()
+
+func buildIconAliases() map[string][]string {
+	aliases := make(map[string][]string)
+	for _, group := range iconGroups {
+		for i, name := range group {
+			others := make([]string, 0, len(group)-1)
+			others = append(others, group[i+1:]...)
+			others = append(others, group[:i]...)
+			aliases[name] = others
+		}
+	}
+	return aliases
 }
 
 // resolveIcon reports the markup for the icon a page asked for, trying

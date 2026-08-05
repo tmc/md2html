@@ -147,3 +147,64 @@ func TestIconAliasesAreNotSelfReferential(t *testing.T) {
 		}
 	}
 }
+
+// TestIconGroupsAreDisjoint checks that no name appears in two groups.
+// A name in two would resolve to a different glyph depending on which
+// group was consulted first.
+func TestIconGroupsAreDisjoint(t *testing.T) {
+	seen := make(map[string]int)
+	for i, group := range iconGroups {
+		if len(group) < 2 {
+			t.Errorf("group %d has %d names; a group needs at least two to alias anything", i, len(group))
+		}
+		for _, name := range group {
+			if prev, dup := seen[name]; dup {
+				t.Errorf("%q appears in groups %d and %d", name, prev, i)
+				continue
+			}
+			seen[name] = i
+		}
+	}
+}
+
+// TestIconAliasesAreSymmetric checks that every name in a group reaches
+// every other one. Aliases used to be written by hand in one direction,
+// so "diagram-project" found a Lucide "workflow" while a page naming
+// "workflow" found nothing in a Font Awesome directory.
+func TestIconAliasesAreSymmetric(t *testing.T) {
+	for _, group := range iconGroups {
+		for _, from := range group {
+			for _, to := range group {
+				if from == to {
+					continue
+				}
+				set := map[string]template.HTML{to: template.HTML("<svg>" + to + "</svg>")}
+				want := template.HTML("<svg>" + to + "</svg>")
+				if got := resolveIcon(set, from); got != want {
+					t.Errorf("resolveIcon(%q) against a set holding only %q = %q, want %q", from, to, got, want)
+				}
+			}
+		}
+	}
+}
+
+// TestResolveIconDiagramProject pins the case that prompted grouping:
+// the same page renders against a Font Awesome, Lucide, or Tabler
+// directory.
+func TestResolveIconDiagramProject(t *testing.T) {
+	sets := map[string]string{
+		"font awesome": "diagram-project",
+		"lucide":       "workflow",
+		"tabler":       "sitemap",
+	}
+	for setName, file := range sets {
+		for _, asked := range []string{"diagram-project", "workflow", "sitemap"} {
+			t.Run(setName+"/"+asked, func(t *testing.T) {
+				set := map[string]template.HTML{file: "<svg/>"}
+				if got := resolveIcon(set, asked); got != "<svg/>" {
+					t.Errorf("icon %q against the %s set = %q, want the glyph", asked, setName, got)
+				}
+			})
+		}
+	}
+}
