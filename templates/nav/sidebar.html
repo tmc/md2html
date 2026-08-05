@@ -19,7 +19,7 @@
   {{else}}
     <li class="nav-item level-{{.Level}}">
       <a href="{{navHref $.FilePath .Path $.HTMLExt $.IndexFile}}"{{if and $.Current (eq .Path $.Current.Path)}} class="active" aria-current="page"{{end}}>
-        {{if .Icon}}<span class="nav-icon" data-icon="{{.Icon}}" aria-hidden="true"></span>{{end}}
+        {{if .Icon}}<span class="nav-icon" data-icon="{{.Icon}}" aria-hidden="true">{{navIcon .Icon}}</span>{{end}}
         {{.Title}}
       </a>
       {{if .Children}}

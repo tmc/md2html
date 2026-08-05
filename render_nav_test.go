@@ -73,10 +73,44 @@ func TestRenderTemplateNavIcons(t *testing.T) {
 	}
 
 	got := mustRenderTemplateWithOptions(t, Config{HTMLExt: "html"}, "<p>body</p>", "Install", "", false, nil, opts)
-	if !strings.Contains(got, `<span class="nav-icon" data-icon="rocket" aria-hidden="true"></span>`) {
+	if !strings.Contains(got, `<span class="nav-icon" data-icon="rocket" aria-hidden="true">`) {
 		t.Fatalf("rendered nav missing icon marker:\n%s", got)
 	}
 	if strings.Count(got, `class="nav-icon"`) != 1 {
 		t.Fatalf("icon marker rendered for an item without an icon:\n%s", got)
+	}
+}
+
+// TestRenderTemplateNavIconSVG checks that a configured icon set reaches
+// the page. Without a set the marker is empty, so the glyph arriving is
+// what distinguishes a working icon directory from a missing one.
+func TestRenderTemplateNavIconSVG(t *testing.T) {
+	dir := writeIconSet(t, map[string]string{
+		"rocket": `<svg viewBox="0 0 24 24"><path d="M12 15v5"/></svg>`,
+	})
+	cfg, err := prepareIcons(Config{HTMLExt: "html", Icons: dir})
+	if err != nil {
+		t.Fatalf("prepareIcons() error = %v", err)
+	}
+
+	install := &NavItem{Title: "Install", Path: "install.md", URL: "install.html", Icon: "rocket"}
+	absent := &NavItem{Title: "Absent", Path: "absent.md", URL: "absent.html", Icon: "no-such-icon"}
+	nav := &Navigation{Items: []*NavItem{install, absent}}
+	nav.buildIndexes()
+	opts := RenderOptions{Nav: nav.ForPage("install.md"), SiteTitle: "Docs", FilePath: "install.md"}
+
+	got := mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "Install", "", false, nil, opts)
+	if !strings.Contains(got, `<path d="M12 15v5"/>`) {
+		t.Fatalf("rendered nav did not inline the icon:\n%s", got)
+	}
+	// The SVG is markup, not text: an escaped angle bracket would mean
+	// the glyph is displayed as source instead of drawn.
+	if strings.Contains(got, "&lt;svg") {
+		t.Fatalf("icon was escaped instead of inlined:\n%s", got)
+	}
+	// A name the set does not have leaves an empty marker rather than
+	// failing the render.
+	if !strings.Contains(got, `data-icon="no-such-icon" aria-hidden="true"></span>`) {
+		t.Fatalf("unknown icon name did not render an empty marker:\n%s", got)
 	}
 }

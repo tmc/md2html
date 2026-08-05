@@ -79,7 +79,13 @@ type Config struct {
 	// addition to the built-in ones.
 	Components string
 
+	// Icons is a directory of .svg files, one per icon name, drawn on
+	// by pages that name an icon in their frontmatter. Empty means
+	// pages render without icons.
+	Icons string
+
 	componentRegistry components.Registry
+	iconSet           map[string]template.HTML
 
 	jsonSpecConfig jsonspec.Config
 	jsonSpecBundle template.JS
@@ -118,6 +124,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.String("format", "", "structured Markdown format: okf")
 	fs.String("jsonspec", "", "directory containing jsonspec.json and *.schema.json files")
 	fs.String("components", "", "directory containing components.json and component templates")
+	fs.String("icons", "", "directory of .svg files named for the icons pages request in frontmatter")
 	fs.Bool("vet", false, "run mdvet checks on source markdown and report diagnostics (does not block rendering)")
 	fs.String("vet-checks", "", "comma-separated mdvet check names to run with -vet (default: all)")
 	return fs
@@ -155,6 +162,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		Format:            flagString(fs, "format"),
 		JSONSpec:          flagString(fs, "jsonspec"),
 		Components:        flagString(fs, "components"),
+		Icons:             flagString(fs, "icons"),
 		Vet:               flagBool(fs, "vet"),
 		VetChecks:         flagString(fs, "vet-checks"),
 	}
@@ -202,7 +210,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	if err != nil {
 		return err
 	}
-	cfg, err = prepareComponents(cfg)
+	cfg, err = prepareIcons(cfg)
 	if err != nil {
 		return err
 	}
@@ -513,6 +521,7 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 		"navHref": func(currentFile, targetFile, htmlExt, indexFile string) string {
 			return relativeRenderedLink(currentFile, targetFile, htmlExt, indexFile)
 		},
+		"navIcon": cfg.navIcon,
 		"asset": func(assets map[string]string, name string) string {
 			if assets != nil {
 				if v := assets[name]; v != "" {

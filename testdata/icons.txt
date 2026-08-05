@@ -1,0 +1,65 @@
+# Test navigation icons supplied by an -icons directory.
+
+md2html -html output -html-ext html -nav -icons icons site
+exists output/index.html
+
+# The icon a page named in its frontmatter is inlined into the sidebar.
+grep 'data-icon="rocket"' output/quickstart.html
+grep 'M12 15v5' output/quickstart.html
+
+# A page that names no icon gets no marker.
+! grep 'data-icon="plain"' output/quickstart.html
+
+# A name the icon set does not carry leaves an empty marker rather than
+# failing the build.
+grep 'data-icon="no-such-icon" aria-hidden="true"></span>' output/quickstart.html
+
+rm -rf output
+
+# Without -icons, pages still record what they asked for and render
+# without a glyph.
+md2html -html output -html-ext html -nav site
+grep 'data-icon="rocket" aria-hidden="true"></span>' output/quickstart.html
+
+rm -rf output
+
+# A directory holding no SVG files is a configuration error, not a
+# silent build with every icon missing.
+! md2html -html output -html-ext html -nav -icons empty site
+stderr 'load icons'
+
+-- site/index.md --
+---
+title: Home
+---
+
+# Home
+
+-- site/quickstart.md --
+---
+title: Quickstart
+icon: rocket
+---
+
+# Quickstart
+
+-- site/plain.md --
+---
+title: Plain
+---
+
+# Plain
+
+-- site/missing.md --
+---
+title: Missing
+icon: no-such-icon
+---
+
+# Missing
+
+-- icons/rocket.svg --
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 15v5"/></svg>
+
+-- empty/readme.txt --
+not an icon
