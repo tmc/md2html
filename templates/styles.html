@@ -266,6 +266,14 @@
         border-top-right-radius: 0;
     }
 
+    /* Chroma ships its own page-coloured background with every theme.
+       Left alone it paints a rectangle a shade off from the block around
+       it; the syntax colours are what we want from it, not the canvas. */
+    .md-code pre.chroma,
+    .md-code .chroma {
+        background: transparent;
+    }
+
     pre {
         margin: 1.4rem 0;
         padding: 1rem 1.1rem;
@@ -432,15 +440,22 @@
         margin: 0 auto;
     }
 
-    /* GitHub alerts and fenced admonitions */
+    /*
+     * GitHub alerts and fenced admonitions.
+     *
+     * A callout is an aside, not a billboard: a filled panel behind a
+     * thick coloured bar pulls the eye off the sentence that sent the
+     * reader there. The colour is carried by a hairline rule and a
+     * barely-there wash, so the kind is legible without the block
+     * shouting over the prose around it.
+     */
     .admonition {
         --adm: var(--line-strong);
-        --adm-bg: var(--surface);
         margin: 1.5rem 0;
-        padding: 0.9rem 1.1rem;
-        background: var(--adm-bg);
-        border: 1px solid var(--line);
-        border-left: 3px solid var(--adm);
+        padding: 0.8rem 1rem;
+        background: color-mix(in srgb, var(--adm) 4%, transparent);
+        border: 1px solid color-mix(in srgb, var(--adm) 20%, var(--line));
+        border-left: 2px solid color-mix(in srgb, var(--adm) 65%, transparent);
         border-radius: var(--radius-sm);
         font-size: 0.95rem;
     }
@@ -448,11 +463,12 @@
     .admonition > :first-child { margin-top: 0; }
     .admonition > :last-child { margin-bottom: 0; }
 
-    .adm-note { --adm: var(--note); --adm-bg: var(--note-bg); }
-    .adm-tip { --adm: var(--success); --adm-bg: var(--success-bg); }
-    .adm-important { --adm: var(--important); --adm-bg: var(--important-bg); }
-    .adm-warning { --adm: var(--warning); --adm-bg: var(--warning-bg); }
-    .adm-danger, .adm-caution { --adm: var(--danger); --adm-bg: var(--danger-bg); }
+    /* Each kind sets one colour; the rule and wash are derived from it. */
+    .adm-note { --adm: var(--note); }
+    .adm-tip { --adm: var(--success); }
+    .adm-important { --adm: var(--important); }
+    .adm-warning { --adm: var(--warning); }
+    .adm-danger, .adm-caution { --adm: var(--danger); }
 
     /* Header bar shown when there is no navigation */
     .header-bar {
