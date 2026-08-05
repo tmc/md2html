@@ -36,6 +36,19 @@ type docsJSON struct {
 	Name       string             `json:"name"`
 	Colors     docsJSONColors     `json:"colors"`
 	Navigation docsJSONNavigation `json:"navigation"`
+	Navbar     docsJSONNavbar     `json:"navbar"`
+}
+
+// docsJSONNavbar is the bar above the page. Mintlify puts a single
+// "primary" call to action in it, which for a source project is a link
+// to the repository.
+type docsJSONNavbar struct {
+	Primary docsJSONNavbarLink `json:"primary"`
+}
+
+type docsJSONNavbarLink struct {
+	Type string `json:"type"`
+	Href string `json:"href"`
 }
 
 // docsJSONColors is the site palette. Mintlify names "primary" for the
@@ -103,6 +116,11 @@ func findDocsJSON(dir string) (string, bool) {
 // site is called and the color it is branded with.
 type siteInfo struct {
 	Name string
+	// Repo is the "owner/name" the documented source lives at, and
+	// RepoURL the address to link it to. Both are empty unless the
+	// navigation source names a repository.
+	Repo    string
+	RepoURL string
 	// Accent and AccentDark are CSS colors for light and dark rendering.
 	// They are empty unless the source names a valid one.
 	Accent     string
@@ -153,6 +171,7 @@ func loadDocsJSON(sourceDir, htmlExt string) (nav *Navigation, site siteInfo, ok
 	}
 
 	site = siteInfo{Name: doc.Name, Accent: cssColor(doc.Colors.Primary)}
+	site.Repo, site.RepoURL = repoLink(doc.Navbar.Primary)
 	// Mintlify's "light" is the variant meant for dark backgrounds.
 	site.AccentDark = cssColor(doc.Colors.Light)
 	if site.AccentDark == "" {
@@ -232,4 +251,26 @@ func (b docsJSONBuilder) page(pagePath string, level int) *NavItem {
 		}
 	}
 	return nil
+}
+
+
+// githubRepo matches the repository page of a GitHub URL, capturing the
+// owner and the repository name.
+var githubRepo = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/?#]+)`)
+
+// repoLink reports the repository a navbar link points at, as the
+// "owner/name" to show and the URL to link to. A link that is not a
+// GitHub repository yields nothing rather than a guess: the label is
+// meant to read as a repository, and only GitHub URLs are recognised
+// well enough to say so.
+func repoLink(link docsJSONNavbarLink) (repo, url string) {
+	if link.Type != "github" {
+		return "", ""
+	}
+	m := githubRepo.FindStringSubmatch(strings.TrimSpace(link.Href))
+	if m == nil {
+		return "", ""
+	}
+	name := strings.TrimSuffix(m[2], ".git")
+	return m[1] + "/" + name, "https://github.com/" + m[1] + "/" + name
 }

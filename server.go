@@ -590,6 +590,8 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 		SiteTitle:   s.config.Title,
 		Accent:      s.site.Accent,
 		AccentDark:  s.site.AccentDark,
+		Repo:        s.site.Repo,
+		RepoURL:     s.site.RepoURL,
 		Data:        s.jsonData,
 		FilePath:    filePath,
 		Version:     version,

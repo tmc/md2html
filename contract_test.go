@@ -28,6 +28,8 @@ func TestPublicContractFields(t *testing.T) {
 				{"Assets", "map[string]string"},
 				{"Accent", "string"},
 				{"AccentDark", "string"},
+				{"Repo", "string"},
+				{"RepoURL", "string"},
 			},
 		},
 		{
@@ -72,6 +74,8 @@ func TestPublicContractFields(t *testing.T) {
 				{"Assets", "map[string]string"},
 				{"Accent", "template.CSS"},
 				{"AccentDark", "template.CSS"},
+				{"Repo", "string"},
+				{"RepoURL", "string"},
 			},
 		},
 	}

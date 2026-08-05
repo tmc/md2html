@@ -197,3 +197,63 @@ func TestLoadDocsJSONIcons(t *testing.T) {
 		}
 	}
 }
+
+func TestRepoLink(t *testing.T) {
+	tests := []struct {
+		name     string
+		link     docsJSONNavbarLink
+		wantRepo string
+		wantURL  string
+	}{
+		{
+			name:     "github repository",
+			link:     docsJSONNavbarLink{Type: "github", Href: "https://github.com/tmc/cdp"},
+			wantRepo: "tmc/cdp",
+			wantURL:  "https://github.com/tmc/cdp",
+		},
+		{
+			name:     "trailing path is dropped",
+			link:     docsJSONNavbarLink{Type: "github", Href: "https://github.com/tmc/cdp/tree/main/docs"},
+			wantRepo: "tmc/cdp",
+			wantURL:  "https://github.com/tmc/cdp",
+		},
+		{
+			name:     "git suffix is dropped",
+			link:     docsJSONNavbarLink{Type: "github", Href: "https://github.com/tmc/cdp.git"},
+			wantRepo: "tmc/cdp",
+			wantURL:  "https://github.com/tmc/cdp",
+		},
+		// A link md2html cannot read as a repository shows nothing, since
+		// the label is meant to read as "owner/name".
+		{name: "another link type", link: docsJSONNavbarLink{Type: "button", Href: "https://github.com/tmc/cdp"}},
+		{name: "not github", link: docsJSONNavbarLink{Type: "github", Href: "https://example.com/tmc/cdp"}},
+		{name: "owner only", link: docsJSONNavbarLink{Type: "github", Href: "https://github.com/tmc"}},
+		{name: "empty", link: docsJSONNavbarLink{}},
+		{name: "not https", link: docsJSONNavbarLink{Type: "github", Href: "http://github.com/tmc/cdp"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, url := repoLink(tt.link)
+			if repo != tt.wantRepo || url != tt.wantURL {
+				t.Errorf("repoLink() = %q, %q, want %q, %q", repo, url, tt.wantRepo, tt.wantURL)
+			}
+		})
+	}
+}
+
+// TestLoadDocsJSONRepo checks that the repository reaches the site info
+// the templates render from.
+func TestLoadDocsJSONRepo(t *testing.T) {
+	_, docsDir := writeDocsSite(t, `{
+  "name": "example",
+  "navbar": {"primary": {"type": "github", "href": "https://github.com/tmc/cdp"}},
+  "navigation": {"groups": [{"group": "G", "pages": ["docs/index"]}]}
+}`)
+	_, site, ok := loadDocsJSON(docsDir, "")
+	if !ok {
+		t.Fatal("loadDocsJSON did not find docs.json")
+	}
+	if site.Repo != "tmc/cdp" || site.RepoURL != "https://github.com/tmc/cdp" {
+		t.Errorf("repo = %q, %q, want %q, %q", site.Repo, site.RepoURL, "tmc/cdp", "https://github.com/tmc/cdp")
+	}
+}

@@ -114,3 +114,31 @@ func TestRenderTemplateNavIconSVG(t *testing.T) {
 		t.Fatalf("unknown icon name did not render an empty marker:\n%s", got)
 	}
 }
+
+// TestRenderTemplateRepoLink checks that a repository from docs.json is
+// shown in the bar, and that a site without one shows nothing rather
+// than an empty link.
+func TestRenderTemplateRepoLink(t *testing.T) {
+	nav := &Navigation{Items: []*NavItem{{Title: "Install", Path: "install.md", URL: "install.html"}}}
+	nav.buildIndexes()
+	base := RenderOptions{Nav: nav.ForPage("install.md"), SiteTitle: "Docs", FilePath: "install.md"}
+
+	opts := base
+	opts.Repo, opts.RepoURL = "tmc/cdp", "https://github.com/tmc/cdp"
+	got := mustRenderTemplateWithOptions(t, Config{HTMLExt: "html"}, "<p>body</p>", "Install", "", false, nil, opts)
+	for _, want := range []string{
+		`class="repo-link" href="https://github.com/tmc/cdp"`,
+		`<span class="repo-link-name">tmc/cdp</span>`,
+		`rel="noreferrer noopener"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("rendered bar missing %q:\n%s", want, got)
+		}
+	}
+
+	got = mustRenderTemplateWithOptions(t, Config{HTMLExt: "html"}, "<p>body</p>", "Install", "", false, nil, base)
+	// The stylesheet always defines .repo-link, so look for the anchor.
+	if strings.Contains(got, `class="repo-link" href=`) {
+		t.Errorf("rendered a repository link for a site without one:\n%s", got)
+	}
+}

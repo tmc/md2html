@@ -1,13 +1,19 @@
 {{define "nav-styles"}}
 <style>
     /* Sticky bar above the layout: site name on the left, status right. */
+    /*
+     * Three slots: the site name, the search field, and the links. The
+     * outer columns are equal so the search sits on the centre of the
+     * viewport rather than on the centre of whatever is left over, which
+     * would move it every time a link appeared beside it.
+     */
     .top-nav {
-        display: flex;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: 1fr minmax(0, 26rem) 1fr;
         align-items: center;
         gap: 1rem;
         height: var(--topbar-height);
-        padding: 0 1.25rem;
+        padding: 0 1.5rem;
         background: color-mix(in srgb, var(--bg) 82%, transparent);
         backdrop-filter: saturate(160%) blur(12px);
         -webkit-backdrop-filter: saturate(160%) blur(12px);
@@ -26,9 +32,18 @@
         min-width: 0;
     }
 
+    .top-nav-right { justify-self: end; }
+
+    .top-nav-center {
+        display: flex;
+        justify-content: center;
+        min-width: 0;
+    }
+
     .top-nav-title {
-        font-weight: 600;
-        letter-spacing: -0.01em;
+        font-size: 1.05rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
         color: var(--text-1);
         white-space: nowrap;
         overflow: hidden;
@@ -75,20 +90,36 @@
     .nav-toggle-bars::before { top: -4px; }
     .nav-toggle-bars::after { top: 4px; }
 
+    /*
+     * A field, not a button: it is the width of the thing it searches, so
+     * it reads as somewhere to type rather than as one more control
+     * crowded in beside the links.
+     */
     .search-trigger {
-        display: inline-flex;
+        display: flex;
         align-items: center;
         gap: 0.6rem;
-        padding: 0.3rem 0.5rem 0.3rem 0.7rem;
+        width: 100%;
+        height: 2.25rem;
+        padding: 0 0.6rem 0 0.75rem;
         font: inherit;
-        font-size: 0.8rem;
+        font-size: 0.85rem;
         color: var(--text-3);
         background: var(--surface);
         border: 1px solid var(--line);
-        border-radius: 999px;
+        border-radius: var(--radius);
         cursor: pointer;
+        text-align: left;
         transition: border-color 0.12s ease, color 0.12s ease;
     }
+
+    .search-trigger-icon {
+        width: 0.95rem;
+        height: 0.95rem;
+        flex: none;
+    }
+
+    .search-trigger-label { flex: 1; min-width: 0; }
 
     .search-trigger:hover {
         color: var(--text-1);
@@ -117,6 +148,33 @@
 
     .skip-link:focus {
         top: 0.5rem;
+    }
+
+    /* The repository the docs describe: mark plus owner/name. */
+    .repo-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.35rem 0.6rem;
+        color: var(--text-2);
+        border-radius: var(--radius-sm);
+        font-size: 0.8rem;
+        font-weight: 500;
+        min-width: 0;
+    }
+
+    .repo-link:hover { color: var(--text-1); background: var(--surface-2); }
+
+    .repo-link-mark {
+        width: 1rem;
+        height: 1rem;
+        flex: none;
+    }
+
+    .repo-link-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .top-nav-link {
@@ -508,6 +566,18 @@
         .page-nav { flex-direction: column; }
         .page-nav a { max-width: 100%; }
         .nav-next { align-items: flex-start; text-align: left; }
+    }
+
+    /* Too narrow for three columns: the search returns to the right. */
+    @media (max-width: 60rem) {
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .top-nav-center { flex: 1; justify-content: flex-end; }
+        .search-trigger { width: auto; max-width: 12rem; }
+        .search-trigger-label { display: none; }
     }
 </style>
 {{end}}

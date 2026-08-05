@@ -582,6 +582,10 @@ type RenderOptions struct {
 	// rendering, as CSS hex colors. Empty leaves the built-in accent.
 	Accent     string
 	AccentDark string
+	// Repo is the "owner/name" of the documented source repository and
+	// RepoURL its address. Empty renders no repository link.
+	Repo    string
+	RepoURL string
 }
 
 func firstFrontmatterString(frontmatter map[string]any, keys ...string) string {
@@ -706,6 +710,8 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		Assets:           opts.Assets,
 		Accent:           template.CSS(opts.Accent),
 		AccentDark:       template.CSS(opts.AccentDark),
+		Repo:             opts.Repo,
+		RepoURL:          opts.RepoURL,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -750,6 +756,9 @@ type templateData struct {
 	// navigation source named one.
 	Accent     template.CSS
 	AccentDark template.CSS
+	// Repo and RepoURL name the source repository shown in the bar.
+	Repo    string
+	RepoURL string
 }
 
 type renderMetadata struct {
