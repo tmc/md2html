@@ -78,6 +78,16 @@
         opacity: 0;
         transition: opacity 0.15s ease, color 0.15s ease;
     }
+    /* With a language strip the button sits in it; without one it floats
+       over the first line of code, where there is room for it. */
+    .md-code:has(.md-code-lang) .copy-btn {
+        top: 0.3rem;
+        background: transparent;
+        border-color: transparent;
+    }
+    .md-code:has(.md-code-lang) .copy-btn:hover {
+        border-color: var(--line-strong);
+    }
     pre:hover .copy-btn,
     .copy-btn:focus-visible { opacity: 1; }
     .copy-btn:hover {

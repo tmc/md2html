@@ -116,11 +116,13 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, e
 			chromahtml.WithClasses(true),
 		),
 	}
+	var inner highlighting.WrapperRenderer
 	if len(jscfg.DiscriminatorPrefixes) > 0 {
-		highlightOpts = append(highlightOpts,
-			highlighting.WithWrapperRenderer(jsonspec.WrapperRenderer(jscfg)),
-		)
+		inner = jsonspec.WrapperRenderer(jscfg)
 	}
+	highlightOpts = append(highlightOpts,
+		highlighting.WithWrapperRenderer(codeBlockWrapper(inner)),
+	)
 
 	extensions := []goldmark.Extender{
 		extension.GFM,

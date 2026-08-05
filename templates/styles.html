@@ -233,6 +233,39 @@
         white-space: break-spaces;
     }
 
+    /* Every fenced block is wrapped in .md-code. The wrapper owns the
+       vertical rhythm and the positioning context, so the language strip
+       and the copy button line up with each other rather than sitting on
+       top of the first line of code. */
+    .md-code {
+        position: relative;
+        margin: 1.4rem 0;
+    }
+
+    .md-code pre {
+        margin: 0;
+        position: static;
+    }
+
+    .md-code-lang {
+        display: block;
+        padding: 0.4rem 1.1rem;
+        font-family: var(--font-sans);
+        font-size: 0.72rem;
+        line-height: 1.4;
+        color: var(--text-3);
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        border-bottom: 0;
+        border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    .md-code-lang + pre,
+    .md-code-lang ~ * pre {
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+    }
+
     pre {
         margin: 1.4rem 0;
         padding: 1rem 1.1rem;
