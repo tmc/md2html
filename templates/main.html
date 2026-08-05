@@ -106,7 +106,7 @@
 <body>
     {{if .LiveReload}}<div id="status" class="connection-status">Connected</div>{{end}}
 
-    {{.Content}}
+    <main class="page">{{.Content}}</main>
 
     {{if .HasMath}}{{template "mathjax-scripts" .}}{{end}}
 

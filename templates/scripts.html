@@ -2,11 +2,43 @@
 {{if .HasMath}}{{template "mathjax-scripts" .}}{{end}}
 {{template "mermaid-scripts" .}}
 {{template "copy-code-script" .}}
+{{template "heading-anchor-script" .}}
 {{template "tabs-script" .}}
 {{with jsonSpec}}<script type="application/json" id="md-jsonspec-schemas">{{.}}</script>
 <script src="{{$.AssetBase}}js/jsonspec.js"></script>{{end}}
 {{if .LiveReload}}{{template "livereload-script" .}}{{end}}
 {{if .Versions}}{{template "version-switcher-script" .}}{{end}}
+{{end}}
+
+{{define "heading-anchor-script"}}
+<script>
+    // Give every section heading a link to itself, the way a reader
+    // expects when they want to point someone at one section.
+    document.addEventListener('DOMContentLoaded', function() {
+        var scope = document.querySelector('.main-content') || document.querySelector('.page') || document.body;
+        scope.querySelectorAll('h2[id], h3[id], h4[id]').forEach(function(heading) {
+            var link = document.createElement('a');
+            link.className = 'heading-anchor';
+            link.href = '#' + heading.id;
+            link.setAttribute('aria-label', 'Link to this section');
+            link.textContent = '#';
+            heading.appendChild(link);
+        });
+    });
+</script>
+<style>
+    .heading-anchor {
+        margin-left: 0.4rem;
+        color: var(--text-3);
+        font-weight: 400;
+        opacity: 0;
+        transition: opacity 0.12s ease;
+    }
+    h2:hover > .heading-anchor,
+    h3:hover > .heading-anchor,
+    h4:hover > .heading-anchor,
+    .heading-anchor:focus-visible { opacity: 1; }
+</style>
 {{end}}
 
 {{define "copy-code-script"}}
@@ -32,20 +64,26 @@
 <style>
     .copy-btn {
         position: absolute;
-        top: 8px;
-        right: 8px;
-        padding: 4px 8px;
-        font-size: 12px;
+        top: 0.5rem;
+        right: 0.5rem;
+        padding: 0.2rem 0.5rem;
+        font-family: var(--font-sans);
+        font-size: 0.7rem;
+        line-height: 1.4;
         background: var(--bg);
-        color: var(--fg-muted);
-        border: 1px solid var(--border);
-        border-radius: 4px;
+        color: var(--text-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
         cursor: pointer;
         opacity: 0;
-        transition: opacity 0.15s ease;
+        transition: opacity 0.15s ease, color 0.15s ease;
     }
-    pre:hover .copy-btn { opacity: 1; }
-    .copy-btn:hover { color: var(--fg); }
+    pre:hover .copy-btn,
+    .copy-btn:focus-visible { opacity: 1; }
+    .copy-btn:hover {
+        color: var(--text-1);
+        border-color: var(--line-strong);
+    }
 </style>
 {{end}}
 

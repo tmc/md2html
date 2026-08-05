@@ -24,7 +24,11 @@
                     const li = document.createElement('li');
                     const a = document.createElement('a');
                     a.href = `#${id}`;
-                    a.textContent = heading.textContent;
+                    // Read the heading without the "#" self-link appended
+                    // to it, whichever script ran first.
+                    const label = heading.cloneNode(true);
+                    label.querySelectorAll('.heading-anchor').forEach(el => el.remove());
+                    a.textContent = label.textContent.trim();
                     a.className = `level-${level}`;
 
                     // Add smooth scrolling

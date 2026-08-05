@@ -115,7 +115,7 @@
     {{if .Search}}{{template "search-modal" .}}{{end}}
 
     {{block "content" .}}
-    {{.Content}}
+    <main class="page">{{.Content}}</main>
     {{end}}
 
     {{block "scripts" .}}

@@ -12,7 +12,7 @@ func TestRenderTemplateStylesTaskListCheckboxes(t *testing.T) {
 		`list-style-type: none;`,
 		`li > input[type="checkbox"][disabled]:first-child`,
 		`appearance: none;`,
-		`border: 2px solid var(--fg-muted);`,
+		`border: 1.5px solid var(--line-strong);`,
 		`opacity: 1;`,
 		`li > input[type="checkbox"][disabled]:first-child:checked`,
 		`background: var(--accent);`,

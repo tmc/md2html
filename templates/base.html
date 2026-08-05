@@ -12,7 +12,7 @@
 </head>
 <body>
     {{template "header" .}}
-    {{block "body-content" .}}{{.Content}}{{end}}
+    {{block "body-content" .}}<main class="page">{{.Content}}</main>{{end}}
     {{template "scripts" .}}
 </body>
 </html>{{end}}

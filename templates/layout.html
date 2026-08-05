@@ -13,8 +13,10 @@
 <body>
     {{template "header" .}}
     {{if .Search}}{{template "search-modal" .}}{{end}}
-    {{template "content" .}}
-    {{template "page-footer" .}}
+    <main class="page">
+        {{template "content" .}}
+        {{template "page-footer" .}}
+    </main>
     {{if .Search}}{{template "search-scripts" .}}{{end}}
     {{template "scripts" .}}
 </body>
