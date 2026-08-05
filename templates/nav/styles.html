@@ -204,12 +204,37 @@
     .nav-item { margin: 0; }
 
     .nav-item a {
-        display: block;
+        display: flex;
+        align-items: center;
+        gap: 0.5em;
         padding: 0.32rem 0.6rem;
         color: var(--text-2);
         border-radius: var(--radius-sm);
         line-height: 1.45;
         transition: color 0.12s ease, background 0.12s ease;
+    }
+
+    /* Icons are sized here rather than in the file: an icon set carries
+       its own pixel dimensions, which are stripped on the way in so the
+       sidebar decides the size. Without a size the SVG would fill the
+       line box. */
+    .nav-icon {
+        display: inline-flex;
+        flex: none;
+        width: 1em;
+        height: 1em;
+        color: var(--text-3, var(--text-2));
+    }
+
+    .nav-icon svg {
+        width: 100%;
+        height: 100%;
+        stroke-width: 2;
+    }
+
+    .nav-item a:hover .nav-icon,
+    .nav-item a.active .nav-icon {
+        color: inherit;
     }
 
     .nav-item a:hover {
