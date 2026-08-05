@@ -82,7 +82,7 @@ func newServer(ctx context.Context, cfg Config, logger *slog.Logger) *server {
 			} else if nav != nil && len(nav.Items) > 0 {
 				s.nav = nav
 				s.site = site
-				s.config.Title = siteTitle(s.config.Title, site.Name)
+				s.title = siteTitle(s.config.Title, site.Name)
 				logger.Info("Loaded navigation", "pages", len(nav.Flat))
 				s.site.Stars = repoStars(context.Background(), cfg, site.Repo, logger)
 			}
@@ -146,7 +146,11 @@ type server struct {
 	// recompute the effective title. Without it the site name applied at
 	// startup would look like a caller's choice and outrank every later
 	// one, so a renamed site never took effect.
-	navTitle        string
+	navTitle string
+	// title is the effective site title. It is derived from navTitle and
+	// the site name, so a reload can change it while requests are being
+	// served; read it with siteTitle rather than config.Title.
+	title           string
 	lastUpdatedMu   sync.Mutex
 	lastUpdated     map[string]string
 	gitMetadataOnce map[string]*sync.Once
@@ -324,19 +328,38 @@ func (s *server) reloadNavigation() {
 		return
 	}
 
-	s.mu.Lock()
+	// The star count is fetched before the lock is taken. It is a network
+	// call bounded only by its own timeout, and every request rendering a
+	// page reads this state, so fetching it under the write lock would
+	// stall the whole server for as long as GitHub takes to answer.
+	s.mu.RLock()
 	previous := s.site
+	s.mu.RUnlock()
 	if site.Repo == previous.Repo {
 		site.Stars = previous.Stars
 	} else {
-		site.Stars = repoStars(context.Background(), s.config, site.Repo, s.logger)
+		site.Stars = repoStars(s.ctx, s.config, site.Repo, s.logger)
 	}
+
+	s.mu.Lock()
 	s.nav = nav
 	s.site = site
+	s.title = siteTitle(s.navTitle, site.Name)
 	s.mu.Unlock()
 
-	s.config.Title = siteTitle(s.navTitle, site.Name)
 	s.logger.Info("Reloaded navigation", "pages", len(nav.Flat))
+}
+
+// siteTitle returns the effective site title. Navigation reload can
+// change it while requests are in flight, so it is read under the lock
+// rather than from config.
+func (s *server) siteTitle() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.title == "" {
+		return s.config.Title
+	}
+	return s.title
 }
 
 func samePath(a, b string) bool {
@@ -408,7 +431,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 				s.logger.Error("Error parsing frontmatter", "file", s.config.Index, "error", err)
 				doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
 			}
-			html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, s.config.Index, s.config.Title), css, s.config.Index, requestedVersion)
+			html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, s.config.Index, s.siteTitle()), css, s.config.Index, requestedVersion)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -478,7 +501,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 					s.logger.Error("Error parsing frontmatter", "file", candidate, "error", err)
 					doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
 				}
-				html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, candidate, s.config.Title), css, candidate, requestedVersion)
+				html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, candidate, s.siteTitle()), css, candidate, requestedVersion)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
@@ -538,7 +561,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			s.logger.Error("Error parsing frontmatter", "file", file, "error", err)
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
-		html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, file, s.config.Title), css, file, requestedVersion)
+		html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, file, s.siteTitle()), css, file, requestedVersion)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -565,7 +588,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("Error parsing frontmatter", "error", err)
 		doc = DocumentData{Content: content, Frontmatter: make(map[string]any)}
 	}
-	html, err := s.renderDocumentWithVersion(doc, s.config.Title, css, "", "")
+	html, err := s.renderDocumentWithVersion(doc, s.siteTitle(), css, "", "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -601,7 +624,7 @@ func (s *server) serveDirectory(w http.ResponseWriter, dir, relDir, css, version
 			s.logger.Error("Error parsing frontmatter", "file", relIndex, "error", err)
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
-		html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, relIndex, s.config.Title), css, relIndex, version)
+		html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, relIndex, s.siteTitle()), css, relIndex, version)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -674,7 +697,7 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 	s.mu.RUnlock()
 
 	opts := RenderOptions{
-		SiteTitle:   s.config.Title,
+		SiteTitle:   s.siteTitle(),
 		Accent:      site.Accent,
 		AccentDark:  site.AccentDark,
 		Repo:        site.Repo,

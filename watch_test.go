@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -73,7 +74,7 @@ func TestReloadNavigationPicksUpDocsJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.nav, s.site = nav, site
-	s.config.Title = siteTitle(s.navTitle, site.Name)
+	s.title = siteTitle(s.navTitle, site.Name)
 	if got := len(s.nav.Flat); got != 1 {
 		t.Fatalf("initial navigation has %d pages, want 1", got)
 	}
@@ -90,8 +91,8 @@ func TestReloadNavigationPicksUpDocsJSON(t *testing.T) {
 	// The title has to follow the renamed site. It used to stick,
 	// because the name applied at startup was mistaken for a title the
 	// caller had chosen.
-	if s.config.Title != "Second" {
-		t.Errorf("title = %q after reload, want %q", s.config.Title, "Second")
+	if got := s.siteTitle(); got != "Second" {
+		t.Errorf("title = %q after reload, want %q", got, "Second")
 	}
 
 	// A config saved mid-edit must not empty the sidebar.
@@ -138,5 +139,80 @@ func TestReloadNavigationKeepsStars(t *testing.T) {
 	s.reloadNavigation()
 	if s.site.Stars != "4" {
 		t.Errorf("stars = %q after reloading the same repository, want %q", s.site.Stars, "4")
+	}
+}
+
+// TestReloadNavigationDuringRequests exercises a reload against the reads
+// a request performs. The navigation, the site, and the title are rebuilt
+// on the watch goroutine while pages are being served, so every one of
+// them has to be written under the lock that the request paths read it
+// with. Under -race an unguarded field fails here; without a test that
+// overlaps the two, it does not fail anywhere.
+func TestReloadNavigationDuringRequests(t *testing.T) {
+	siteDir := t.TempDir()
+	docsDir := filepath.Join(siteDir, "docs")
+	if err := os.MkdirAll(docsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(docsDir, "a.md"), []byte("# A\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(siteDir, "docs.json")
+	write := func(name string) {
+		body := `{"name":"` + name + `","navigation":{"groups":[{"group":"G","pages":["docs/a"]}]}}`
+		if err := os.WriteFile(config, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("First")
+
+	s := &server{
+		config:    Config{Nav: true, Source: docsDir},
+		logger:    discardLogger(),
+		navRoot:   docsDir,
+		navConfig: config,
+		navTitle:  defaultTitle,
+	}
+	nav, site, err := navigationForDir(docsDir, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.nav, s.site = nav, site
+	s.title = siteTitle(s.navTitle, site.Name)
+
+	// The reader runs until the reloads finish rather than for a fixed
+	// count: a reload does file I/O and is much slower, so a fixed count
+	// races through and leaves the two goroutines barely overlapping.
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		defer close(done)
+		for i := 0; i < 50; i++ {
+			write("Site" + string(rune('A'+i%26)))
+			s.reloadNavigation()
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-done:
+				return
+			default:
+			}
+			// What a request reads: the title for the page head, and the
+			// navigation and site for the sidebar and the header.
+			_ = s.siteTitle()
+			s.mu.RLock()
+			_, _ = s.nav, s.site
+			s.mu.RUnlock()
+		}
+	}()
+	wg.Wait()
+
+	if s.siteTitle() == "" {
+		t.Error("title was emptied by concurrent reloads")
 	}
 }
