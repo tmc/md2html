@@ -221,7 +221,7 @@ func jsonScalar(expr string) (string, error) {
 	return "", fmt.Errorf("expression %q is not a JSON scalar", expr)
 }
 
-// blockParser recognises component tags at the start of a line.
+// blockParser recognizes component tags at the start of a line.
 type blockParser struct {
 	registry Registry
 }

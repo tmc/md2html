@@ -69,7 +69,7 @@ func popInline(pc parser.Context, name string) (*Inline, bool) {
 	return top, true
 }
 
-// inlineParser recognises component tags inside a line of text.
+// inlineParser recognizes component tags inside a line of text.
 type inlineParser struct {
 	registry Registry
 }

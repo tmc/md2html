@@ -118,7 +118,7 @@ var (
 // readability is collapsed.
 //
 // Icons are operator-supplied configuration, like the template directory,
-// so this is presentation rather than sanitisation.
+// so this is presentation rather than sanitization.
 func inlineSVG(svg string) template.HTML {
 	svg = svgComment.ReplaceAllString(svg, "")
 	// Only the root element is resized. Shapes inside an icon carry

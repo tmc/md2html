@@ -176,7 +176,7 @@ func currentLine(reader text.Reader) int {
 	return ln + 1
 }
 
-// tabGroupParser recognises "::: tabs <group-id>".
+// tabGroupParser recognizes "::: tabs <group-id>".
 type tabGroupParser struct{}
 
 func (p *tabGroupParser) Trigger() []byte { return []byte{':'} }
@@ -252,7 +252,7 @@ func (p *tabGroupParser) Close(node ast.Node, reader text.Reader, pc parser.Cont
 func (p *tabGroupParser) CanInterruptParagraph() bool { return true }
 func (p *tabGroupParser) CanAcceptIndentedLine() bool { return false }
 
-// tabParser recognises "::: tab <Label>" inside an open Group.
+// tabParser recognizes "::: tab <Label>" inside an open Group.
 type tabParser struct{}
 
 func (p *tabParser) Trigger() []byte { return []byte{':'} }

@@ -18,7 +18,7 @@ var ignoreNames = []string{".md2htmlignore", ".mintignore"}
 // the paths a repository keeps out of its published site: drafts,
 // planning notes, reference trees that belong somewhere else.
 //
-// Honouring it matters more than tidiness. Without it "md2html -html"
+// Honoring it matters more than tidiness. Without it "md2html -html"
 // publishes whatever the repository deliberately excludes, and the only
 // sign is a page count that nobody counted.
 //

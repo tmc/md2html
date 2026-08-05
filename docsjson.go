@@ -263,7 +263,7 @@ var githubRepo = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/?#]+)`)
 // repoLink reports the repository a navbar link points at, as the
 // "owner/name" to show and the URL to link to. A link that is not a
 // GitHub repository yields nothing rather than a guess: the label is
-// meant to read as a repository, and only GitHub URLs are recognised
+// meant to read as a repository, and only GitHub URLs are recognized
 // well enough to say so.
 func repoLink(link docsJSONNavbarLink) (repo, url string) {
 	if link.Type != "github" {
