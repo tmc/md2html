@@ -192,6 +192,28 @@ func TestBuiltinComponents(t *testing.T) {
 			want: []string{`data-title-size="h3"`},
 		},
 		{
+			name: "admonitions render the alert markup",
+			in:   "<Warning>\nbe **careful**\n</Warning>\n",
+			want: []string{
+				`<div class="admonition adm-warning">`,
+				"<p>be <strong>careful</strong></p>",
+			},
+		},
+		{
+			name: "note and info share a kind, tip and check share a kind",
+			in:   "<Note>\na\n</Note>\n\n<Info>\nb\n</Info>\n\n<Tip>\nc\n</Tip>\n\n<Check>\nd\n</Check>\n",
+			want: []string{
+				`<div class="admonition adm-note">`,
+				`<div class="admonition adm-tip">`,
+			},
+		},
+		{
+			name:   "danger is its own kind",
+			in:     "<Danger>\nstop\n</Danger>\n",
+			want:   []string{`<div class="admonition adm-danger">`},
+			absent: []string{"adm-warning"},
+		},
+		{
 			name: "accordion is a details element",
 			in:   "<Accordion title=\"More\" description=\"detail\">\nhidden *body*\n</Accordion>\n",
 			want: []string{

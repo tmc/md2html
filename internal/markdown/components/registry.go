@@ -169,6 +169,13 @@ var DefaultRegistry = Registry{
 				`{{if .Attrs.href}}</a>{{else}}</span>{{end}}`)),
 	},
 
+	"Note":    admonition("note"),
+	"Tip":     admonition("tip"),
+	"Info":    admonition("note"),
+	"Warning": admonition("warning"),
+	"Check":   admonition("tip"),
+	"Danger":  admonition("danger"),
+
 	"Frame": {
 		Attrs: []string{"caption", "hint"},
 		Template: template.Must(template.New("Frame").Parse(
@@ -204,5 +211,19 @@ func accordion(name string) Component {
 				`</summary>` +
 				`<div class="md-accordion-body">{{.Content}}</div>` +
 				`</details>`)),
+	}
+}
+
+// admonition builds a callout component rendering the markup blockquote
+// alerts already produce, so "> [!WARNING]" and <Warning> are styled by
+// one set of rules.
+//
+// Info and Check have no alert kind of their own: they borrow note and
+// tip, the kinds closest in meaning, rather than introduce styling for a
+// distinction the stylesheet does not draw.
+func admonition(kind string) Component {
+	return Component{
+		Template: template.Must(template.New("admonition-" + kind).Parse(
+			`<div class="admonition adm-` + kind + `">` + "\n" + `{{.Content}}</div>` + "\n")),
 	}
 }
