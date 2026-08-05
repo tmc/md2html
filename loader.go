@@ -184,8 +184,8 @@ func (l *Loader) extractStructure(doc *MarkdownDoc, tree ast.Node, source []byte
 		case *ast.Heading:
 			heading := Heading{
 				Level: node.Level,
-				Text:  string(node.Text(source)),
-				ID:    anchor.ID(string(node.Text(source))),
+				Text:  nodeText(node, source),
+				ID:    anchor.ID(nodeText(node, source)),
 			}
 			doc.Headings = append(doc.Headings, heading)
 
@@ -196,7 +196,7 @@ func (l *Loader) extractStructure(doc *MarkdownDoc, tree ast.Node, source []byte
 
 		case *ast.Link:
 			link := Link{
-				Text:   string(node.Text(source)),
+				Text:   nodeText(node, source),
 				URL:    string(node.Destination),
 				Indent: currentIndent,
 			}
@@ -235,7 +235,7 @@ func (l *Loader) extractListItem(node *ast.ListItem, source []byte, indent int) 
 			for pchild := para.FirstChild(); pchild != nil; pchild = pchild.NextSibling() {
 				if link, ok := pchild.(*ast.Link); ok {
 					item.Link = &Link{
-						Text:   string(link.Text(source)),
+						Text:   nodeText(link, source),
 						URL:    string(link.Destination),
 						Indent: indent,
 					}
@@ -243,7 +243,7 @@ func (l *Loader) extractListItem(node *ast.ListItem, source []byte, indent int) 
 				}
 			}
 			// No link found, use text content
-			item.Text = string(para.Text(source))
+			item.Text = nodeText(para, source)
 		}
 	}
 
@@ -302,4 +302,27 @@ func (l *Loader) TemplateFuncs() template.FuncMap {
 		"loadYAML": l.LoadYAML,
 		"loadMD":   l.LoadMD,
 	}
+}
+
+// nodeText returns the plain text of a node and its descendants.
+//
+// goldmark's ast.Node.Text is deprecated, and it read the whole source
+// segment; walking the text nodes gives the same answer from the parsed
+// document, which is what the headings, links, and list items recorded
+// here are built from.
+func nodeText(n ast.Node, source []byte) string {
+	var buf []byte
+	ast.Walk(n, func(c ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		switch t := c.(type) {
+		case *ast.Text:
+			buf = append(buf, t.Segment.Value(source)...)
+		case *ast.String:
+			buf = append(buf, t.Value...)
+		}
+		return ast.WalkContinue, nil
+	})
+	return string(buf)
 }
