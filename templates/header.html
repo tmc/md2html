@@ -2,10 +2,19 @@
 {{if and .Nav .Nav.HasNav}}
 <nav class="top-nav">
     <div class="top-nav-left">
+        <button type="button" class="nav-toggle" aria-controls="site-sidebar" aria-expanded="false" aria-label="Show navigation">
+            <span class="nav-toggle-bars" aria-hidden="true"></span>
+        </button>
         {{/* Groups belong to the sidebar; the bar names the site. */}}
         <span class="top-nav-title">{{if .SiteTitle}}{{.SiteTitle}}{{else}}Documentation{{end}}</span>
     </div>
     <div class="top-nav-right">
+        {{if .Search}}
+        <button type="button" class="search-trigger" onclick="openSearch()">
+            <span>Search</span>
+            <kbd>&#8984;K</kbd>
+        </button>
+        {{end}}
         {{if .LiveReload}}<div id="status" class="connection-status">Connected</div>{{end}}
         {{if .Versions}}
         <div class="version-selector">

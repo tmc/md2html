@@ -7,7 +7,7 @@ exists out/guide/README.html
 exists out/guide/install.html
 exists out/reference.html
 
-grep '<aside class="sidebar">' out/reference.html
+grep '<aside class="sidebar" id="site-sidebar">' out/reference.html
 grep '<li class="nav-group">Guide</li>' out/reference.html
 grep 'href="guide/install.html"' out/reference.html
 grep 'Reference' out/reference.html

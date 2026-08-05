@@ -1,87 +1,83 @@
 {{define "sidebar-toc-scripts"}}
     <script>
-        // Generate sidebar TOC if sidebar is enabled
-        if (document.getElementById('sidebar-toc')) {
-            function generateSidebarTOC() {
-                const headings = document.querySelectorAll('.main-content h1, .main-content h2, .main-content h3');
-                const tocContainer = document.getElementById('sidebar-toc');
+        (function() {
+            const container = document.getElementById('sidebar-toc');
+            if (!container) return;
 
+            function build() {
+                const headings = document.querySelectorAll('.main-content h1, .main-content h2, .main-content h3');
+
+                // A page with barely any structure gains nothing from a
+                // table of contents. Marking it hidden also lets the
+                // layout reclaim the column.
                 if (headings.length < 3) {
-                    tocContainer.style.display = 'none';
+                    container.hidden = true;
                     return;
                 }
 
-                const tocList = document.createElement('ul');
+                const list = document.createElement('ul');
+                const links = new Map();
 
                 headings.forEach((heading, index) => {
-                    const level = parseInt(heading.tagName.charAt(1));
-                    const id = heading.id || `heading-${index}`;
-
                     if (!heading.id) {
-                        heading.id = id;
+                        heading.id = `heading-${index}`;
                     }
-
-                    const li = document.createElement('li');
-                    const a = document.createElement('a');
-                    a.href = `#${id}`;
+                    const link = document.createElement('a');
+                    link.href = `#${heading.id}`;
                     // Read the heading without the "#" self-link appended
                     // to it, whichever script ran first.
                     const label = heading.cloneNode(true);
                     label.querySelectorAll('.heading-anchor').forEach(el => el.remove());
-                    a.textContent = label.textContent.trim();
-                    a.className = `level-${level}`;
+                    link.textContent = label.textContent.trim();
+                    link.className = `level-${heading.tagName.charAt(1)}`;
 
-                    // Add smooth scrolling
-                    a.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        document.getElementById(id).scrollIntoView({
-                            behavior: 'smooth'
-                        });
-
-                        // Update active state
-                        document.querySelectorAll('.sidebar-toc a').forEach(link =>
-                            link.classList.remove('active')
-                        );
-                        a.classList.add('active');
-                    });
-
-                    li.appendChild(a);
-                    tocList.appendChild(li);
+                    const item = document.createElement('li');
+                    item.appendChild(link);
+                    list.appendChild(item);
+                    links.set(heading.id, link);
                 });
 
-                tocContainer.appendChild(tocList);
+                container.appendChild(list);
 
-                // Highlight current section on scroll
-                function updateActiveSection() {
-                    const headings = document.querySelectorAll('.main-content h1, .main-content h2, .main-content h3');
-                    const tocLinks = document.querySelectorAll('.sidebar-toc a');
-
-                    let current = '';
-                    headings.forEach(heading => {
-                        const rect = heading.getBoundingClientRect();
-                        if (rect.top <= 100) {
-                            current = heading.id;
-                        }
-                    });
-
-                    tocLinks.forEach(link => {
-                        link.classList.remove('active');
-                        if (link.getAttribute('href') === `#${current}`) {
-                            link.classList.add('active');
-                        }
-                    });
+                function activate(id) {
+                    links.forEach((link, key) => link.classList.toggle('active', key === id));
                 }
 
-                window.addEventListener('scroll', updateActiveSection);
-                updateActiveSection(); // Initial call
+                // Track the heading nearest the top of the viewport. An
+                // observer reports only what crosses the boundary, so
+                // scrolling costs nothing between section changes.
+                const visible = new Set();
+                const observer = new IntersectionObserver(function(entries) {
+                    entries.forEach(function(entry) {
+                        if (entry.isIntersecting) {
+                            visible.add(entry.target.id);
+                        } else {
+                            visible.delete(entry.target.id);
+                        }
+                    });
+                    for (const heading of headings) {
+                        if (visible.has(heading.id)) {
+                            activate(heading.id);
+                            return;
+                        }
+                    }
+                }, {
+                    // A band across the upper part of the viewport: the
+                    // section being read, rather than the one scrolling
+                    // out of sight at the bottom.
+                    rootMargin: '-10% 0px -70% 0px',
+                    threshold: 0,
+                });
+                headings.forEach(heading => observer.observe(heading));
+
+                activate(headings[0].id);
             }
 
-            // Generate TOC when page loads
             if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', generateSidebarTOC);
+                document.addEventListener('DOMContentLoaded', build);
             } else {
-                generateSidebarTOC();
+                build();
             }
-        }
+        })();
     </script>
 {{end}}

@@ -35,6 +35,90 @@
         text-overflow: ellipsis;
     }
 
+    /* Shown only where the sidebar collapses into a drawer. */
+    .nav-toggle {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        padding: 0;
+        background: transparent;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        color: var(--text-2);
+        cursor: pointer;
+    }
+
+    .nav-toggle:hover { color: var(--text-1); border-color: var(--line-strong); }
+
+    .nav-toggle-bars,
+    .nav-toggle-bars::before,
+    .nav-toggle-bars::after {
+        display: block;
+        width: 0.85rem;
+        height: 1.5px;
+        background: currentColor;
+        border-radius: 1px;
+    }
+
+    .nav-toggle-bars {
+        position: relative;
+    }
+
+    .nav-toggle-bars::before,
+    .nav-toggle-bars::after {
+        content: "";
+        position: absolute;
+    }
+
+    .nav-toggle-bars::before { top: -4px; }
+    .nav-toggle-bars::after { top: 4px; }
+
+    .search-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.3rem 0.5rem 0.3rem 0.7rem;
+        font: inherit;
+        font-size: 0.8rem;
+        color: var(--text-3);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        cursor: pointer;
+        transition: border-color 0.12s ease, color 0.12s ease;
+    }
+
+    .search-trigger:hover {
+        color: var(--text-1);
+        border-color: var(--line-strong);
+    }
+
+    .search-trigger kbd {
+        font-size: 0.68rem;
+        padding: 0.05em 0.35em;
+        border-bottom-width: 1px;
+        color: var(--text-3);
+    }
+
+    .skip-link {
+        position: absolute;
+        left: 0.5rem;
+        top: -3rem;
+        z-index: 200;
+        padding: 0.5rem 0.9rem;
+        background: var(--bg);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm);
+        box-shadow: var(--shadow-2);
+        transition: top 0.15s ease;
+    }
+
+    .skip-link:focus {
+        top: 0.5rem;
+    }
+
     .top-nav-link {
         padding: 0.35rem 0.6rem;
         color: var(--text-2);
@@ -55,6 +139,7 @@
     .docs-layout {
         display: grid;
         grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--toc-width);
+        --toc-width: 14rem;
         align-items: start;
         max-width: 100rem;
         margin: 0 auto;
@@ -315,6 +400,14 @@
     .sidebar-toc a.level-2 { padding-left: 0.75rem; }
     .sidebar-toc a.level-3 { padding-left: 1.6rem; color: var(--text-3); }
 
+    /* A page with too few headings has no rail; do not reserve room. */
+    .docs-layout:has(.sidebar-toc[hidden]),
+    .docs-layout:has(.sidebar-toc[style*="display: none"]) {
+        grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    }
+
+    .sidebar-toc[hidden] { display: none; }
+
     /* The inline table of contents duplicates the rail. */
     .docs-layout .main-content #toc-title,
     .docs-layout .main-content #toc {
@@ -329,22 +422,41 @@
         .main-content { padding: 2.5rem 2.5rem 5rem; }
     }
 
+    /*
+     * Narrow windows: the sidebar becomes a drawer opened from the bar,
+     * so the document starts at the top of the screen instead of below a
+     * screenful of links.
+     */
     @media (max-width: 900px) {
-        .docs-layout {
+        .docs-layout,
+        .docs-layout:has(.sidebar-toc[hidden]) {
             grid-template-columns: minmax(0, 1fr);
         }
 
+        .nav-toggle { display: inline-flex; }
+
         .sidebar {
-            position: static;
-            height: auto;
-            max-height: 18rem;
-            padding: 1rem 1.25rem;
-            border-right: none;
-            border-bottom: 1px solid var(--line);
-            background: var(--surface);
+            position: fixed;
+            top: var(--topbar-height);
+            left: 0;
+            z-index: 90;
+            width: min(20rem, 84vw);
+            height: calc(100vh - var(--topbar-height));
+            background: var(--bg);
+            border-right: 1px solid var(--line);
+            box-shadow: var(--shadow-2);
+            transform: translateX(-102%);
+            transition: transform 0.18s ease;
         }
 
-        .top-nav ~ .docs-layout .sidebar-header { display: block; }
+        .sidebar.open { transform: translateX(0); }
+
+        .nav-backdrop {
+            position: fixed;
+            inset: var(--topbar-height) 0 0;
+            z-index: 80;
+            background: rgba(0, 0, 0, 0.35);
+        }
 
         .main-content { padding: 2rem 1.25rem 4rem; }
     }

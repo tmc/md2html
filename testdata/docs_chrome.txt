@@ -1,0 +1,40 @@
+# Test the chrome around a documented page: skip link, navigation
+# toggle, table of contents, and the search affordance.
+
+cd site
+
+md2html -http :8097 -nav &
+wait-port :8097
+
+curl -s http://localhost:8097/guide
+
+# Keyboard users get a way past the navigation
+stdout 'class="skip-link" href="#main-content"'
+stdout 'id="main-content"'
+
+# The sidebar is addressable by the toggle that opens it on a narrow window
+stdout 'class="nav-toggle" aria-controls="site-sidebar" aria-expanded="false"'
+stdout 'id="site-sidebar"'
+
+# Without -search there is nothing to click for search
+! stdout 'class="search-trigger"'
+
+-- site/SUMMARY.md --
+# Summary
+
+## Guides
+
+* [Guide](guide.md)
+* [Other](other.md)
+
+-- site/guide.md --
+# Guide
+
+A page with enough headings to earn a table of contents.
+
+## One
+
+## Two
+
+-- site/other.md --
+# Other

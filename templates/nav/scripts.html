@@ -1,0 +1,56 @@
+{{define "nav-scripts"}}
+<script>
+    (function() {
+        var sidebar = document.getElementById('site-sidebar');
+        var toggle = document.querySelector('.nav-toggle');
+        if (!sidebar) return;
+
+        // Bring the current page into view in a long sidebar.
+        var active = sidebar.querySelector('.nav-item a.active');
+        if (active) {
+            var top = active.offsetTop;
+            if (top > sidebar.clientHeight - 80) {
+                sidebar.scrollTop = top - sidebar.clientHeight / 2;
+            }
+        }
+
+        if (!toggle) return;
+
+        var backdrop = null;
+
+        function close() {
+            sidebar.classList.remove('open');
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.setAttribute('aria-label', 'Show navigation');
+            if (backdrop) {
+                backdrop.remove();
+                backdrop = null;
+            }
+        }
+
+        function open() {
+            sidebar.classList.add('open');
+            toggle.setAttribute('aria-expanded', 'true');
+            toggle.setAttribute('aria-label', 'Hide navigation');
+            backdrop = document.createElement('div');
+            backdrop.className = 'nav-backdrop';
+            backdrop.addEventListener('click', close);
+            document.body.appendChild(backdrop);
+        }
+
+        toggle.addEventListener('click', function() {
+            if (sidebar.classList.contains('open')) close(); else open();
+        });
+
+        // Following a link inside the drawer navigates; the drawer should
+        // not still be open when the next page paints.
+        sidebar.addEventListener('click', function(e) {
+            if (e.target.closest('a')) close();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') close();
+        });
+    })();
+</script>
+{{end}}

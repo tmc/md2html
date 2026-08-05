@@ -182,6 +182,16 @@
 
     h1 + p, h2 + p, h3 + p { margin-top: 0; }
 
+    /* The sentence under the title reads as a summary of the page. */
+    h1 + p {
+        font-size: 1.075rem;
+        line-height: 1.6;
+        color: var(--text-2);
+        margin-bottom: 1.75rem;
+    }
+
+    h1 + p code { font-size: 0.82em; }
+
     p {
         margin: 0 0 1.1rem;
         text-wrap: pretty;
@@ -207,6 +217,9 @@
     }
 
     strong { font-weight: 600; }
+
+    /* A bare URL should wrap rather than push the page sideways. */
+    :where(p, li, td, dd) a { overflow-wrap: break-word; }
 
     small { font-size: 0.875em; color: var(--text-2); }
 
@@ -500,6 +513,39 @@
     @keyframes fade-in {
         from { opacity: 0; }
         to { opacity: 1; }
+    }
+
+    /*
+     * Print: drop the chrome, keep the document, and spell out where the
+     * links went since a reader on paper cannot follow them.
+     */
+    @media print {
+        :root { --bg: #fff; --text-1: #000; --text-2: #333; }
+
+        .top-nav, .sidebar, .sidebar-toc, .header-bar, .page-nav,
+        .skip-link, .copy-btn, .heading-anchor, .search-trigger {
+            display: none !important;
+        }
+
+        .docs-layout { display: block; }
+        .main-content, .page { padding: 0; max-width: none; }
+        body { font-size: 11pt; }
+
+        a { color: inherit; text-decoration: underline; }
+        .main-content a[href^="http"]::after,
+        .page a[href^="http"]::after {
+            content: " (" attr(href) ")";
+            font-size: 0.85em;
+            color: var(--text-2);
+            word-break: break-all;
+        }
+
+        pre, blockquote, .admonition, table, figure, img {
+            break-inside: avoid;
+            border-color: #bbb;
+        }
+
+        h1, h2, h3, h4 { break-after: avoid; }
     }
 
     @media (prefers-reduced-motion: reduce) {

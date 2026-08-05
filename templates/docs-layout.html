@@ -12,18 +12,19 @@
     {{template "nav-styles" .}}
 </head>
 <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
     {{template "header" .}}
     {{if .Search}}{{template "search-modal" .}}{{end}}
 
     {{if and .Nav .Nav.HasNav}}
     <div class="docs-layout">
-        <aside class="sidebar">
+        <aside class="sidebar" id="site-sidebar">
             <div class="sidebar-header">
                 <h1>{{if .SiteTitle}}{{.SiteTitle}}{{else}}Documentation{{end}}</h1>
             </div>
             {{template "nav-sidebar" .}}
         </aside>
-        <main class="main-content">
+        <main class="main-content" id="main-content">
             {{template "nav-breadcrumb" .}}
             {{template "content" .}}
             {{template "page-footer" .}}
@@ -40,6 +41,7 @@
     {{if .Search}}{{template "search-scripts" .}}{{end}}
     {{template "scripts" .}}
     {{template "sidebar-toc-scripts" .}}
+    {{template "nav-scripts" .}}
 </body>
 </html>
 {{end}}
