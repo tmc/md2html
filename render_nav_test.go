@@ -56,3 +56,27 @@ func TestRenderTemplateNavGroupChildren(t *testing.T) {
 		t.Fatalf("rendered nav missing the page inside the group:\n%s", got)
 	}
 }
+
+// TestRenderTemplateNavIcons checks that a nav icon reaches the page as
+// an inert marker. The name is carried in a data attribute so a
+// stylesheet can attach the glyph; nothing here depends on an icon set
+// being present, and an item without an icon gets no marker at all.
+func TestRenderTemplateNavIcons(t *testing.T) {
+	install := &NavItem{Title: "Install", Path: "install.md", URL: "install.html", Icon: "rocket"}
+	plain := &NavItem{Title: "Plain", Path: "plain.md", URL: "plain.html"}
+	nav := &Navigation{Items: []*NavItem{install, plain}}
+	nav.buildIndexes()
+	opts := RenderOptions{
+		Nav:       nav.ForPage("install.md"),
+		SiteTitle: "Docs",
+		FilePath:  "install.md",
+	}
+
+	got := mustRenderTemplateWithOptions(t, Config{HTMLExt: "html"}, "<p>body</p>", "Install", "", false, nil, opts)
+	if !strings.Contains(got, `<span class="nav-icon" data-icon="rocket" aria-hidden="true"></span>`) {
+		t.Fatalf("rendered nav missing icon marker:\n%s", got)
+	}
+	if strings.Count(got, `class="nav-icon"`) != 1 {
+		t.Fatalf("icon marker rendered for an item without an icon:\n%s", got)
+	}
+}

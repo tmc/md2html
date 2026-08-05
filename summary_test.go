@@ -429,3 +429,35 @@ func sameStrings(a, b []string) bool {
 	}
 	return true
 }
+
+func TestAutoNavigationIcons(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{"plain.md", "---\nicon: rocket\n---\n# Plain\n", "rocket"},
+		{"hyphen.md", "---\nicon: graduation-cap\n---\n# Hyphen\n", "graduation-cap"},
+		{"none.md", "# None\n", ""},
+		{"blank.md", "---\nicon: \"\"\n---\n# Blank\n", ""},
+		{"spaced.md", "---\nicon: \"  rocket  \"\n---\n# Spaced\n", "rocket"},
+		// Names that no icon set would use are dropped rather than
+		// carried into the page as an attribute value.
+		{"upper.md", "---\nicon: Rocket\n---\n# Upper\n", ""},
+		{"path.md", "---\nicon: ../../etc/passwd\n---\n# Path\n", ""},
+		{"markup.md", "---\nicon: \"a\\\" onload=alert(1)\"\n---\n# Markup\n", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeTestFile(t, dir, tt.name, tt.body)
+			nav, err := AutoNavigationFromDir(dir)
+			if err != nil {
+				t.Fatalf("AutoNavigationFromDir() error = %v", err)
+			}
+			if got := nav.Flat[0].Icon; got != tt.want {
+				t.Fatalf("icon = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

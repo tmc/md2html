@@ -169,3 +169,31 @@ func TestSiteTitle(t *testing.T) {
 		}
 	}
 }
+
+// TestLoadDocsJSONIcons checks that icons reach the navigation from each
+// page's frontmatter. Mintlify's docs.json never names an icon: its
+// generated nav is decorated from the pages themselves.
+func TestLoadDocsJSONIcons(t *testing.T) {
+	siteDir, docsDir := writeDocsSite(t, `{
+  "name": "example",
+  "navigation": {
+    "groups": [{"group": "Start here", "pages": ["docs/index", "docs/quickstart"]}]
+  }
+}`)
+	if err := os.WriteFile(filepath.Join(docsDir, "index.md"),
+		[]byte("---\ntitle: Home\nicon: book-open\n---\n\n# Home\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_ = siteDir
+
+	nav, _, ok := loadDocsJSON(docsDir, "")
+	if !ok {
+		t.Fatal("loadDocsJSON did not find docs.json")
+	}
+	want := map[string]string{"Home": "book-open", "Quickstart": ""}
+	for _, item := range nav.Flat {
+		if w, tracked := want[item.Title]; tracked && item.Icon != w {
+			t.Errorf("%s icon = %q, want %q", item.Title, item.Icon, w)
+		}
+	}
+}

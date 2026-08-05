@@ -15,6 +15,7 @@ import (
 // NavItem represents a single navigation entry from SUMMARY.md.
 type NavItem struct {
 	Title    string     `json:"title"`
+	Icon     string     `json:"icon,omitempty"`     // Icon name from page frontmatter
 	Path     string     `json:"path"`               // Source file path (e.g., "getting-started/installation.md")
 	URL      string     `json:"url"`                // Rendered URL (with htmlExt applied)
 	Level    int        `json:"level"`              // Nesting depth (0 = top level)
@@ -330,6 +331,7 @@ type autoNavFile struct {
 	dir             string
 	base            string
 	title           string
+	icon            string
 	weight          int
 	hasWeight       bool
 	sidebarPosition int
@@ -406,6 +408,7 @@ func readAutoNavFile(name, rel string) (autoNavFile, error) {
 		dir:             path.Dir(rel),
 		base:            base,
 		title:           autoNavTitle(cleanStem, doc),
+		icon:            navIcon(doc),
 		weight:          frontmatterInt(doc.Frontmatter, "weight"),
 		hasWeight:       hasFrontmatterInt(doc.Frontmatter, "weight"),
 		sidebarPosition: frontmatterInt(doc.Frontmatter, "sidebar_position"),
@@ -464,6 +467,7 @@ func buildAutoNavItems(files []autoNavFile, htmlExt string) []*NavItem {
 func autoNavItem(f autoNavFile, htmlExt string, level int) *NavItem {
 	return &NavItem{
 		Title: f.title,
+		Icon:  f.icon,
 		Path:  f.relPath,
 		URL:   pathToURL(f.relPath, htmlExt),
 		Level: level,
@@ -478,6 +482,23 @@ func autoNavTitle(stem string, doc DocumentData) string {
 		return h
 	}
 	return titleWords(stem)
+}
+
+// iconName matches the icon names md2html is willing to carry into the
+// rendered page. Icon sets name their glyphs in lowercase kebab-case
+// ("rocket", "graduation-cap"); anything else is dropped rather than
+// escaped, since an unusable name only means the item has no icon.
+var iconName = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+
+// navIcon reports the icon a page names in its frontmatter. The name is
+// not resolved to a glyph here: the nav records what the page asked for
+// and leaves the drawing to the stylesheet.
+func navIcon(doc DocumentData) string {
+	s := strings.TrimSpace(firstFrontmatterString(doc.Frontmatter, "icon"))
+	if !iconName.MatchString(s) {
+		return ""
+	}
+	return s
 }
 
 func autoNavGroupTitle(dir string, landing map[string]autoNavFile) string {

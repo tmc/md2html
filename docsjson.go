@@ -225,6 +225,7 @@ func (b docsJSONBuilder) page(pagePath string, level int) *NavItem {
 		stem := strings.TrimSuffix(path.Base(source), path.Ext(source))
 		return &NavItem{
 			Title: autoNavTitle(stem, docData),
+			Icon:  navIcon(docData),
 			Path:  source,
 			URL:   pathToURL(source, b.htmlExt),
 			Level: level,
