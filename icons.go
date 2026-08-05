@@ -10,11 +10,20 @@ import (
 )
 
 // prepareIcons resolves [Config.Icons] into the icon set the navigation
-// draws from. A directory that cannot be read is a configuration error:
-// silently rendering every page without icons would look like the pages
-// forgot to ask for them.
+// draws from, looking in the conventional places when no directory was
+// named.
+//
+// A directory named with -icons that cannot be read is a configuration
+// error: a mistyped path should say so rather than render every page
+// without icons. A conventional directory that is not there is not an
+// error, since not every site has one.
 func prepareIcons(cfg Config) (Config, error) {
-	if cfg.iconSet != nil || strings.TrimSpace(cfg.Icons) == "" {
+	if cfg.iconSet != nil {
+		return cfg, nil
+	}
+	if strings.TrimSpace(cfg.Icons) == "" {
+		dir, set := findIcons(cfg.Source)
+		cfg.Icons, cfg.iconSet = dir, set
 		return cfg, nil
 	}
 	dir, err := filepath.Abs(cfg.Icons)
@@ -28,6 +37,49 @@ func prepareIcons(cfg Config) (Config, error) {
 	cfg.Icons = dir
 	cfg.iconSet = set
 	return cfg, nil
+}
+
+// iconDirName is the directory an icon set is kept in, both beside the
+// documentation and in the user's configuration.
+const iconDirName = "icons"
+
+// iconSearchPath lists where an icon set is looked for when -icons was
+// not given, nearest first: beside the documentation, then at the root
+// of the published site, then in the user's configuration.
+//
+// Icons that ship with a site belong to it and should be found without
+// being named. A set in the user's configuration is the fallback, so a
+// preview of someone else's tree still draws icons.
+func iconSearchPath(source string) []string {
+	var dirs []string
+	if root, err := sourceRoot(source); err == nil && root != "" {
+		dirs = append(dirs, filepath.Join(root, iconDirName))
+		if siteDir, found := findDocsJSON(root); found {
+			dirs = append(dirs, filepath.Join(siteDir, iconDirName))
+		}
+	}
+	if config, err := os.UserConfigDir(); err == nil {
+		dirs = append(dirs, filepath.Join(config, "md2html", iconDirName))
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		dirs = append(dirs, filepath.Join(home, ".md2html", iconDirName))
+	}
+	return dirs
+}
+
+// findIcons returns the first icon set on the search path. A directory
+// that holds no SVG files is passed over rather than accepted as an
+// empty set, so an unrelated "icons" directory does not mask the one
+// further along.
+func findIcons(source string) (string, map[string]template.HTML) {
+	for _, dir := range iconSearchPath(source) {
+		set, err := loadIcons(dir)
+		if err != nil || len(set) == 0 {
+			continue
+		}
+		return dir, set
+	}
+	return "", nil
 }
 
 // loadIcons reads every .svg in dir, keyed by file name without the

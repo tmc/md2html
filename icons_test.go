@@ -240,3 +240,106 @@ func TestResolveIconDiagramProject(t *testing.T) {
 		}
 	}
 }
+
+// TestFindIconsSearchPath checks that an icon set is found without
+// -icons, nearest first, so a site that ships icons draws them without
+// being told to.
+func TestFindIconsSearchPath(t *testing.T) {
+	const svg = `<svg viewBox="0 0 24 24"><path d="M1 1"/></svg>`
+
+	t.Run("beside the documentation", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, "a.md"), []byte("# A\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		icons := filepath.Join(root, "icons")
+		if err := os.MkdirAll(icons, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(icons, "rocket.svg"), []byte(svg), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := prepareIcons(Config{Source: root})
+		if err != nil {
+			t.Fatalf("prepareIcons() error = %v", err)
+		}
+		if cfg.navIcon("rocket") == "" {
+			t.Errorf("icons beside the documentation were not found; searched %v", iconSearchPath(root))
+		}
+	})
+
+	t.Run("at the site root", func(t *testing.T) {
+		siteDir := t.TempDir()
+		docsDir := filepath.Join(siteDir, "docs")
+		if err := os.MkdirAll(docsDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(docsDir, "a.md"), []byte("# A\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(siteDir, docsJSONName), []byte(`{"name":"S"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		icons := filepath.Join(siteDir, "icons")
+		if err := os.MkdirAll(icons, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(icons, "rocket.svg"), []byte(svg), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := prepareIcons(Config{Source: docsDir})
+		if err != nil {
+			t.Fatalf("prepareIcons() error = %v", err)
+		}
+		if cfg.navIcon("rocket") == "" {
+			t.Errorf("icons at the site root were not found; searched %v", iconSearchPath(docsDir))
+		}
+	})
+
+	// An "icons" directory holding no SVG files must not be taken as an
+	// empty set, or it would mask a real one further along the path.
+	t.Run("empty directory is passed over", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, "icons"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		dir, set := findIcons(root)
+		if dir == filepath.Join(root, "icons") || len(set) != 0 {
+			t.Errorf("findIcons() accepted an empty directory: %q, %d icons", dir, len(set))
+		}
+	})
+
+	// No icons anywhere is not an error: pages simply render without.
+	t.Run("nothing found is not an error", func(t *testing.T) {
+		cfg, err := prepareIcons(Config{Source: t.TempDir()})
+		if err != nil {
+			t.Fatalf("prepareIcons() error = %v", err)
+		}
+		if cfg.navIcon("rocket") != "" {
+			t.Error("found an icon where none was configured")
+		}
+	})
+
+	// An explicit -icons still wins, and still reports a bad path.
+	t.Run("explicit flag overrides discovery", func(t *testing.T) {
+		root := t.TempDir()
+		beside := filepath.Join(root, "icons")
+		if err := os.MkdirAll(beside, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(beside, "rocket.svg"), []byte("<svg>near</svg>"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		named := writeIconSet(t, map[string]string{"rocket": "<svg>named</svg>"})
+		cfg, err := prepareIcons(Config{Source: root, Icons: named})
+		if err != nil {
+			t.Fatalf("prepareIcons() error = %v", err)
+		}
+		if got := cfg.navIcon("rocket"); got != "<svg>named</svg>" {
+			t.Errorf("navIcon() = %q, want the set named with -icons", got)
+		}
+		if _, err := prepareIcons(Config{Source: root, Icons: filepath.Join(root, "nope")}); err == nil {
+			t.Error("a mistyped -icons succeeded, want an error")
+		}
+	})
+}

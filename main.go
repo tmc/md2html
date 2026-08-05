@@ -129,7 +129,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.String("format", "", "structured Markdown format: okf")
 	fs.String("jsonspec", "", "directory containing jsonspec.json and *.schema.json files")
 	fs.String("components", "", "directory containing components.json and component templates")
-	fs.String("icons", "", "directory of .svg files named for the icons pages request in frontmatter")
+	fs.String("icons", "", "directory of .svg files named for the icons pages request in frontmatter (default: ./icons beside the docs, or the user config directory)")
 	fs.Bool("github-stars", false, "fetch the star count of the repository named in docs.json and show it in the bar")
 	fs.Bool("vet", false, "run mdvet checks on source markdown and report diagnostics (does not block rendering)")
 	fs.String("vet-checks", "", "comma-separated mdvet check names to run with -vet (default: all)")
@@ -217,10 +217,6 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	if err != nil {
 		return err
 	}
-	cfg, err = prepareIcons(cfg)
-	if err != nil {
-		return err
-	}
 
 	// Handle positional arguments
 	if len(args) > 0 {
@@ -228,6 +224,13 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	}
 	if len(args) > 1 {
 		return fmt.Errorf("too many positional arguments")
+	}
+
+	// Icons are looked for beside the documentation when no directory
+	// was named, so the source has to be known first.
+	cfg, err = prepareIcons(cfg)
+	if err != nil {
+		return err
 	}
 
 	// Configure logger level based on verbose flag
