@@ -14,9 +14,9 @@ import (
 
 // ID converts heading text to an anchor id.
 //
-// The rules follow Mintlify, which publishes these docs; md2html is the
-// second renderer, and a link that resolves in one has to resolve in the
-// other. Concretely that means "/", "_", and "=" survive rather than
+// The rules are those hosted documentation platforms use, so a source
+// tree rendered by more than one renderer keeps the same deep links.
+// Concretely that means "/", "_", and "=" survive rather than
 // being deleted — dropping them welds words together, turning
 // "extension_console/extension_evaluate" into
 // "extension-consoleextension-evaluate" — and non-ASCII characters,

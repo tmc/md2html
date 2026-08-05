@@ -15,10 +15,11 @@ func TestID(t *testing.T) {
 		{"empty", "", ""},
 		{"punctuation only", "!?.", ""},
 
-		// Measured against `mint dev` on a probe page, heading text to
-		// the id Mintlify put in the DOM. These are the contract: md2html
-		// is the second renderer of the same source, so a deep link that
-		// works on one has to work on the other.
+		// Measured on a probe page served by a hosted documentation
+		// platform (`mint dev`): heading text to the id it put in the
+		// DOM. These are the contract — a source tree may be rendered by
+		// either, and a deep link that works on one has to work on the
+		// other.
 		{
 			"slashes and underscores survive",
 			"click/type_text/hover/focus/press_key timeout units ambiguous",

@@ -103,11 +103,11 @@ func preprocessHTMLBlocks(markdown string) string {
 }
 
 // typographer returns the smart-punctuation extension, configured to
-// match the renderer that publishes these docs rather than to
-// goldmark's defaults.
+// match what hosted documentation platforms produce rather than
+// goldmark's defaults, so the same source reads the same either way.
 //
 // The two disagree about dashes. goldmark reads "--" as an en dash and
-// "---" as an em dash; Mintlify reads "--" as an em dash and leaves
+// "---" as an em dash; the platforms read "--" as an em dash and leave
 // "---" alone. Taking goldmark's defaults would not close the gap, it
 // would move it — and would newly break "---", which the two renderers
 // agree about today.

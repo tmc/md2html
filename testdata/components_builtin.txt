@@ -20,7 +20,7 @@ grep '<span class="md-accordion-description">the reason</span>' output/README.ht
 # string.
 ! grep '<details class="md-accordion" id="closed" open>' output/README.html
 
-# Expandable is the same disclosure under Mintlify's other name.
+# Expandable is the same disclosure under its other name.
 grep 'child fields' output/README.html
 
 # Frames caption above and below.

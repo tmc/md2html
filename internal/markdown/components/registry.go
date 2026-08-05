@@ -113,9 +113,9 @@ var DefaultRegistry = Registry{
 	},
 	"CardGroup": cardGroup,
 
-	// Columns is what Mintlify's current documentation calls the card
-	// grouping wrapper; CardGroup is the older spelling. Both are
-	// accepted so either dialect renders.
+	// Columns and CardGroup are two spellings of the same card grouping
+	// wrapper, both current in MDX documentation. Accepting either means
+	// a document does not have to be rewritten to render.
 	"Columns": cardGroup,
 
 	"Steps": {
