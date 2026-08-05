@@ -429,6 +429,19 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// A page the repository excludes from its site is not served
+		// here either. Listing it nowhere but answering for it anyway
+		// would still publish it to anyone holding the URL.
+		if ignore, err := loadIgnoreSet(root); err == nil && ignore != nil {
+			if full, joinErr := secureJoin(root, filepath.FromSlash(cleanPath)); joinErr == nil {
+				info, statErr := os.Stat(full)
+				if ignore.excludes(full, statErr == nil && info.IsDir()) {
+					s.serveNotFound(w, requestedURL(r), css)
+					return
+				}
+			}
+		}
+
 		// Try the path as-is if it ends with .md
 		var candidates []string
 		if strings.HasSuffix(cleanPath, ".md") || strings.HasSuffix(cleanPath, ".markdown") {

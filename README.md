@@ -30,6 +30,8 @@ Generate static output with docs navigation:
 
 `-nav` takes navigation from `SUMMARY.md`, then from a Mintlify `docs.json` covering the tree, then from the shape of the tree itself. A `docs.json` is looked for in the source directory and its parents, since it sits at the root of the published site while the Markdown often lives in a subdirectory; its page paths are resolved against that root, and pages outside the directory being served are skipped. Its `name` becomes the site title unless `-title` says otherwise.
 
+Pages a repository keeps out of its site are listed in a `.md2htmlignore`, in gitignore syntax, at or above the directory being served; a `.mintignore` is read under the same rules, so a tree that already declares its exclusions does not have to repeat them.
+
 Generate static output with agent-readable summaries:
 
 	md2html -html _site -llms .

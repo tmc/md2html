@@ -343,11 +343,21 @@ type autoNavFile struct {
 
 func autoNavigationFromDir(sourceDir, htmlExt string) (*Navigation, error) {
 	var files []autoNavFile
-	err := filepath.WalkDir(sourceDir, func(name string, entry os.DirEntry, err error) error {
+	ignore, err := loadIgnoreSet(sourceDir)
+	if err != nil {
+		return nil, err
+	}
+	err = filepath.WalkDir(sourceDir, func(name string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if name == sourceDir {
+			return nil
+		}
+		if ignore.excludes(name, entry.IsDir()) {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		base := entry.Name()

@@ -1,0 +1,42 @@
+# Test that a repository's ignore file keeps excluded pages out of the
+# site, in both static output and the development server.
+
+md2html -html out -html-ext html -nav repo/docs
+
+exists out/index.html
+exists out/guide.html
+
+# Working notes the repository excludes are not published
+! exists out/planning/roadmap.html
+! exists out/bakeoff-2026.html
+
+# The server enumerates the same tree, so it agrees
+md2html -http :8099 -nav repo/docs &
+wait-port :8099
+
+curl -s http://localhost:8099/guide
+stdout '<h1.*>Guide</h1>'
+
+curl -s -o /dev/null -w '%{http_code}' http://localhost:8099/planning/roadmap
+stdout '404'
+
+# ...and an excluded page is absent from the navigation
+curl -s http://localhost:8099/
+! stdout 'Roadmap'
+
+-- repo/.mintignore --
+# Local working notes, not part of the site.
+docs/planning/
+bakeoff-*.md
+
+-- repo/docs/index.md --
+# Home
+
+-- repo/docs/guide.md --
+# Guide
+
+-- repo/docs/planning/roadmap.md --
+# Roadmap
+
+-- repo/docs/bakeoff-2026.md --
+# Bakeoff

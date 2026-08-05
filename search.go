@@ -24,9 +24,19 @@ type SearchDocument struct {
 func buildSearchIndex(sourceDir string, cfg Config) ([]SearchDocument, error) {
 	var documents []SearchDocument
 
-	err := filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+	ignore, err := loadIgnoreSet(sourceDir)
+	if err != nil {
+		return nil, err
+	}
+	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+		if ignore.excludes(path, info.IsDir()) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		if info.IsDir() || !strings.HasSuffix(path, ".md") {
 			return nil

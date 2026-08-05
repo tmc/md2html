@@ -389,6 +389,15 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 	var files []markdownFile
 	seen := make(map[string]bool) // track real paths to avoid symlink cycles
 
+	// A repository that publishes part of itself says so in an ignore
+	// file. Reading it here covers both the server and static output,
+	// since everything that enumerates the tree comes through this
+	// function.
+	ignore, err := loadIgnoreSet(rootDir)
+	if err != nil {
+		slog.Default().Warn("Skipping the ignore file", "error", err)
+	}
+
 	// walkDir walks a directory rooted at realDir, mapping discovered paths
 	// to appear under apparentDir relative to rootDir.
 	var walkDir func(realDir, apparentDir string) error
@@ -429,6 +438,9 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 				if depth >= maxDepth {
 					continue
 				}
+				if ignore.excludes(apparentPath, true) {
+					continue
+				}
 				real, err := filepath.EvalSymlinks(apparentPath)
 				if err != nil {
 					real = realPath
@@ -452,6 +464,9 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 
 			name := strings.ToLower(info.Name())
 			if strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".markdown") {
+				if ignore.excludes(apparentPath, false) {
+					continue
+				}
 				files = append(files, markdownFile{
 					RelPath: relPath,
 					Size:    info.Size(),
