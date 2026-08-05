@@ -323,6 +323,14 @@ func initScriptDirs(t testing.TB, s *script.State) {
 	must(s.Setenv("WORK", work))
 	must(os.MkdirAll(filepath.Join(work, "tmp"), 0777))
 	must(s.Setenv(tempEnvName(), filepath.Join(work, "tmp")))
+
+	// A script describes the tree it sets up and nothing else. Commands
+	// that consult the user's home or configuration -- icon discovery
+	// does -- would otherwise read the developer's machine, so a test
+	// could pass on one and fail on another. Point both at $WORK, which
+	// holds no configuration.
+	must(s.Setenv("HOME", work))
+	must(s.Setenv("XDG_CONFIG_HOME", filepath.Join(work, "config")))
 }
 
 // tempEnvName returns the environment variable name for temp directory.

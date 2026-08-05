@@ -119,9 +119,21 @@ func TestPrepareIconsErrors(t *testing.T) {
 	}
 }
 
+// isolateIconHome points the tail of the icon search path -- the user's
+// home and configuration directories -- at an empty directory. Without
+// it a developer who has an icon set installed there sees tests find it,
+// and the same test passes on one machine and fails on another.
+func isolateIconHome(t *testing.T) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
+}
+
 // TestPrepareIconsUnset checks that no icon directory is not an error:
 // icons are optional, and pages naming one simply render without it.
 func TestPrepareIconsUnset(t *testing.T) {
+	isolateIconHome(t)
 	cfg, err := prepareIcons(Config{})
 	if err != nil {
 		t.Fatalf("prepareIcons() error = %v", err)
@@ -246,6 +258,8 @@ func TestResolveIconDiagramProject(t *testing.T) {
 // being told to.
 func TestFindIconsSearchPath(t *testing.T) {
 	const svg = `<svg viewBox="0 0 24 24"><path d="M1 1"/></svg>`
+
+	isolateIconHome(t)
 
 	t.Run("beside the documentation", func(t *testing.T) {
 		root := t.TempDir()
