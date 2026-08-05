@@ -150,7 +150,7 @@ func runCheckFile(t *testing.T, dir, target string, check Check) []Diagnostic {
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc := &Document{File: file, Source: src, Tree: parseTree(src), env: newEnv()}
+	doc := &Document{File: file, Source: src, Tree: parseTree(src), env: newEnv(Site{})}
 	diags, err := check.Check(doc)
 	if err != nil {
 		t.Fatal(err)

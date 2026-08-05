@@ -50,6 +50,26 @@ func (AnchorCheck) Check(doc *Document) ([]Diagnostic, error) {
 			}
 			return ast.WalkContinue, nil
 		}
+		// A link written as a rendered URL — "/docs/churl#exit-status"
+		// rather than "churl.md#exit-status" — names no file on disk, so
+		// without the site mapping neither half can be checked. Docs
+		// written for a hosted site are usually written that way.
+		if target, frag, ok := doc.env.site.resolve(dest); ok {
+			if frag == "" {
+				return ast.WalkContinue, nil
+			}
+			ids := doc.env.anchorsFor(target)
+			if len(ids) > 0 && !ids[frag] {
+				diags = append(diags, Diagnostic{
+					File:    doc.File,
+					Line:    lineOf(doc.Source, n),
+					Check:   "anchors",
+					Message: fmt.Sprintf("link %q: %s has no heading with id %q", dest, displayPath(doc.File, target), frag),
+				})
+			}
+			return ast.WalkContinue, nil
+		}
+
 		// Cross-file fragment: only meaningful for markdown targets.
 		if !shouldCheckOnDisk(dest) {
 			return ast.WalkContinue, nil

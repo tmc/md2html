@@ -69,6 +69,21 @@ func walkOnDiskRefs(doc *Document, name string, images bool) ([]Diagnostic, erro
 		if !shouldCheckOnDisk(dest) {
 			return ast.WalkContinue, nil
 		}
+		// A rooted path inside the site's own prefix is a page URL, not
+		// a filesystem path. Resolve it to the source that renders it;
+		// one that resolves to nothing is a broken link, which is a
+		// sharper finding than declining to look.
+		if doc.env.site.owns(dest) {
+			if _, _, ok := doc.env.site.resolve(dest); !ok {
+				diags = append(diags, Diagnostic{
+					File:    doc.File,
+					Line:    lineOf(doc.Source, n),
+					Check:   name,
+					Message: fmt.Sprintf("link %q: no page in this tree renders that URL", dest),
+				})
+			}
+			return ast.WalkContinue, nil
+		}
 		if isAbsolutePathLink(dest) {
 			// An absolute filesystem path inside a markdown link is
 			// almost always a mistake (leaked worktree path, points

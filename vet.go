@@ -29,7 +29,15 @@ func runVet(cfg Config, logger *slog.Logger) {
 	}
 	checks = withVetComponents(cfg, checks)
 
-	diags, err := mdvet.Run([]string{src}, checks)
+	// md2html already knows the prefix the tree is served under, which
+	// is what makes a link written as "/docs/quickstart" resolvable back
+	// to the file that renders it.
+	site := mdvet.Site{Base: cfg.Base}
+	if root, err := sourceRoot(src); err == nil {
+		site.Root = root
+	}
+
+	diags, err := mdvet.RunSite([]string{src}, checks, site)
 	if err != nil {
 		logger.Warn("vet: run failed", "error", err)
 		return

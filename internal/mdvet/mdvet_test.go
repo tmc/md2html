@@ -138,7 +138,7 @@ func TestLinkCheck(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			doc := &Document{File: file, Source: src, Tree: parseTree(src), env: newEnv()}
+			doc := &Document{File: file, Source: src, Tree: parseTree(src), env: newEnv(Site{})}
 			diags, err := LinkCheck{}.Check(doc)
 			if err != nil {
 				t.Fatal(err)

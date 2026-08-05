@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/tmc/md2html/internal/markdown/components"
@@ -25,6 +26,7 @@ func run(args []string, stdout, stderr *os.File) int {
 	checksAliasFlag := fs.String("checks", "", "comma-separated list of checks to run (default: all)")
 	listFlag := fs.Bool("list", false, "print the available checks and exit")
 	componentsFlag := fs.String("components", "", "directory of component definitions, as passed to md2html")
+	baseFlag := fs.String("base", "", "URL path prefix the tree is served under (e.g. /docs), so links written as rendered URLs can be resolved")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -70,7 +72,10 @@ func run(args []string, stdout, stderr *os.File) int {
 		return 2
 	}
 
-	diags, err := mdvet.Run(fs.Args(), checks)
+	diags, err := mdvet.RunSite(fs.Args(), checks, mdvet.Site{
+		Base: *baseFlag,
+		Root: siteRoot(fs.Args()),
+	})
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
@@ -95,4 +100,22 @@ func withComponentRegistry(checks []mdvet.Check, reg components.Registry) []mdve
 		}
 	}
 	return out
+}
+
+// siteRoot is the directory rendered URLs are resolved against: the
+// single directory being vetted, or the parent of a single file. With
+// several paths there is no one tree to anchor them to, so resolution
+// stays off rather than guessing at one of them.
+func siteRoot(paths []string) string {
+	if len(paths) != 1 {
+		return ""
+	}
+	info, err := os.Stat(paths[0])
+	if err != nil {
+		return ""
+	}
+	if info.IsDir() {
+		return paths[0]
+	}
+	return filepath.Dir(paths[0])
 }

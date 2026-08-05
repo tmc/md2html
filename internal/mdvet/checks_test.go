@@ -14,6 +14,14 @@ import (
 // to contents.
 func runCheck(t *testing.T, files map[string]string, target string, check Check) []Diagnostic {
 	t.Helper()
+	return runCheckSite(t, files, target, check, Site{})
+}
+
+// runCheckSite is runCheck with a site mapping, for the checks that
+// resolve links written as rendered URLs. Site.Root is filled in with
+// the temporary directory the files were written to.
+func runCheckSite(t *testing.T, files map[string]string, target string, check Check, site Site) []Diagnostic {
+	t.Helper()
 	dir := t.TempDir()
 	// Sort to make creation order deterministic on case-insensitive
 	// filesystems (so the directory entry casing is whichever entry
@@ -37,7 +45,10 @@ func runCheck(t *testing.T, files map[string]string, target string, check Check)
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc := &Document{File: file, Source: src, Tree: parseTree(src), env: newEnv()}
+	if site.Root == "" && site.Base != "" {
+		site.Root = dir
+	}
+	doc := &Document{File: file, Source: src, Tree: parseTree(src), env: newEnv(site)}
 	diags, err := check.Check(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -307,7 +318,7 @@ func TestCaseCheck(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		doc := &Document{File: readme, Source: src, Tree: parseTree(src), env: newEnv()}
+		doc := &Document{File: readme, Source: src, Tree: parseTree(src), env: newEnv(Site{})}
 		diags, err := CaseCheck{}.Check(doc)
 		if err != nil {
 			t.Fatal(err)

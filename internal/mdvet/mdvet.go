@@ -103,11 +103,18 @@ func SelectChecks(checks []Check, names []string) ([]Check, error) {
 // A path may be a file or a directory; directories are walked
 // recursively for files matching .md or .markdown (case-insensitive).
 func Run(paths []string, checks []Check) ([]Diagnostic, error) {
+	return RunSite(paths, checks, Site{})
+}
+
+// RunSite is [Run] with site knowledge: it lets checks resolve links
+// written as rendered URLs ("/docs/quickstart") back to the source file
+// that produces them. See [Site].
+func RunSite(paths []string, checks []Check, site Site) ([]Diagnostic, error) {
 	files, err := collectFiles(paths)
 	if err != nil {
 		return nil, err
 	}
-	e := newEnv()
+	e := newEnv(site)
 	assetMode := hasCheck(checks, "assets")
 	registry := componentRegistry(checks)
 	var diags []Diagnostic
@@ -235,12 +242,14 @@ func isMarkdown(path string) bool {
 type env struct {
 	anchors map[string]map[string]bool // file -> set of heading IDs
 	dirs    map[string]map[string]bool // dir -> set of entry names (as on disk)
+	site    Site                       // how rendered URLs map back to sources
 }
 
-func newEnv() *env {
+func newEnv(site Site) *env {
 	return &env{
 		anchors: make(map[string]map[string]bool),
 		dirs:    make(map[string]map[string]bool),
+		site:    site,
 	}
 }
 
