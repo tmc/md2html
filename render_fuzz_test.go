@@ -20,8 +20,8 @@ func FuzzRenderFragment(f *testing.F) {
 				t.Fatalf("panic: %v\ninput=%q", r, markdown)
 			}
 		}()
-		_ = RenderFragment(markdown, "docs/page.md", FragmentOptions{HTMLExt: ".html"})
-		_ = RenderFragment(markdown, "docs/page.md", FragmentOptions{
+		_, _ = RenderFragment(markdown, "docs/page.md", FragmentOptions{HTMLExt: ".html"})
+		_, _ = RenderFragment(markdown, "docs/page.md", FragmentOptions{
 			AllowUnsafe: true,
 			TOC:         true,
 			HTMLExt:     ".html",

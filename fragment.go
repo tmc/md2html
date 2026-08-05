@@ -58,9 +58,14 @@ func pageHasMath(htmlContent string) bool {
 }
 
 // RenderFragment renders Markdown using the md2html pipeline and returns
-// client enhancement metadata for MathJax and Mermaid. An invalid Format is
-// treated as ordinary Markdown because fragment rendering has no error result.
-func RenderFragment(markdown, filePath string, opts FragmentOptions) Fragment {
+// client enhancement metadata for MathJax and Mermaid.
+//
+// An invalid Format is not an error: it is treated as ordinary Markdown,
+// since a presentation profile the caller misspelled should not stop the
+// page from rendering. A renderer that fails is an error, and the
+// returned Fragment then holds no HTML — reporting it is what tells the
+// caller the blank page is a failure rather than an empty document.
+func RenderFragment(markdown, filePath string, opts FragmentOptions) (Fragment, error) {
 	if validateFormat(opts.Format) != nil {
 		opts.Format = ""
 	}
@@ -71,7 +76,10 @@ func RenderFragment(markdown, filePath string, opts FragmentOptions) Fragment {
 		Format:      opts.Format,
 	}
 	theme, darkTheme, autoTheme := resolveMermaidThemes(opts.Frontmatter)
-	html, _ := markdownToHTMLWithContext(cfg, markdown, filePath)
+	html, err := markdownToHTMLWithContext(cfg, markdown, filePath)
+	if err != nil {
+		return Fragment{}, err
+	}
 	return Fragment{
 		HTML:             template.HTML(html),
 		ChromaCSS:        template.CSS(generateChromaCSS()),
@@ -80,7 +88,7 @@ func RenderFragment(markdown, filePath string, opts FragmentOptions) Fragment {
 		MermaidTheme:     theme,
 		MermaidDarkTheme: darkTheme,
 		MermaidAutoTheme: autoTheme,
-	}
+	}, nil
 }
 
 // FragmentStyles returns shared CSS for rendered markdown fragments.

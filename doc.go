@@ -13,7 +13,10 @@
 //
 // For small in-process rendering, use RenderFragment:
 //
-//	frag := md2html.RenderFragment("# Hello\n", "", md2html.FragmentOptions{})
+//	frag, err := md2html.RenderFragment("# Hello\n", "", md2html.FragmentOptions{})
+//	if err != nil {
+//		return err
+//	}
 //	_ = frag.HTML
 //
 // For command-style integration, build a Config and call Run:

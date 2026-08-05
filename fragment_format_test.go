@@ -6,10 +6,13 @@ import (
 )
 
 func TestRenderFragmentInvalidFormatUsesDefault(t *testing.T) {
-	fragment := RenderFragment("[Orders](/tables/orders.md)", "docs/page.md", FragmentOptions{
+	fragment, err := RenderFragment("[Orders](/tables/orders.md)", "docs/page.md", FragmentOptions{
 		Format:  "unknown",
 		HTMLExt: "html",
 	})
+	if err != nil {
+		t.Fatalf("RenderFragment() error = %v", err)
+	}
 	if !strings.Contains(string(fragment.HTML), `href="/tables/orders.md"`) {
 		t.Fatalf("RenderFragment() HTML = %q, want ordinary root link", fragment.HTML)
 	}
