@@ -1,0 +1,91 @@
+{{define "repo-stars-script"}}
+<script>
+    // Refresh the repository star count in the browser.
+    //
+    // The count baked into the page is correct only as of the build. A
+    // deployed site is read for months, so without this the number is
+    // stale from the day it ships; with it, the build-time value is what
+    // shows until the fetch answers, and what stays if it never does.
+    //
+    // The answer is cached in localStorage for five minutes. GitHub
+    // allows 60 unauthenticated requests an hour per address, and a
+    // reader moving between pages would otherwise spend that budget in
+    // a couple of minutes and see the count stop resolving. Five minutes
+    // caps a continuous reader at twelve requests an hour while keeping
+    // the count current enough to be worth showing.
+    (function() {
+        var box = document.querySelector('.repo-link-stars[data-repo]');
+        if (!box) {
+            return;
+        }
+        var repo = box.getAttribute('data-repo');
+        var out = box.querySelector('.repo-link-count');
+        if (!repo || !out) {
+            return;
+        }
+
+        // Same shape as the server's formatStars: 999, 1.2k, 15k, 1.5m.
+        function format(n) {
+            if (n < 1000) {
+                return String(n);
+            }
+            var unit = n < 1e6 ? 'k' : 'm';
+            var v = n < 1e6 ? n / 1000 : n / 1e6;
+            return (v >= 10 ? v.toFixed(0) : v.toFixed(1).replace(/\.0$/, '')) + unit;
+        }
+
+        function show(n) {
+            out.textContent = format(n);
+        }
+
+        // A reload is the reader asking for the current page, so the
+        // cache is skipped and the count refetched. The browser does not
+        // distinguish a plain reload from a hard one, so both count;
+        // going to GitHub on a keypress the reader made is the right
+        // trade either way.
+        var reloaded = false;
+        try {
+            var nav = performance.getEntriesByType('navigation')[0];
+            reloaded = nav ? nav.type === 'reload' : performance.navigation.type === 1;
+        } catch (e) {
+            // No navigation timing: treat it as an ordinary visit.
+        }
+
+        var key = 'md2html:stars:' + repo;
+        var maxAge = 5 * 60 * 1000;
+        try {
+            var hit = JSON.parse(localStorage.getItem(key));
+            if (!reloaded && hit && Date.now() - hit.at < maxAge) {
+                show(hit.n);
+                return;
+            }
+        } catch (e) {
+            // A disabled or full localStorage is not a reason to skip the
+            // fetch; it only means the answer is not remembered.
+        }
+
+        fetch('https://api.github.com/repos/' + repo, {
+            headers: {Accept: 'application/vnd.github+json'}
+        }).then(function(resp) {
+            if (!resp.ok) {
+                throw new Error(resp.status);
+            }
+            return resp.json();
+        }).then(function(data) {
+            var n = data.stargazers_count;
+            if (typeof n !== 'number') {
+                return;
+            }
+            show(n);
+            try {
+                localStorage.setItem(key, JSON.stringify({n: n, at: Date.now()}));
+            } catch (e) {
+                // Nothing to do; the count is already on the page.
+            }
+        }).catch(function() {
+            // Offline, rate-limited, or a repository that has gone
+            // private. The build-time count stays as it is.
+        });
+    })();
+</script>
+{{end}}

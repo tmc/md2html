@@ -142,3 +142,47 @@ func TestRenderTemplateRepoLink(t *testing.T) {
 		t.Errorf("rendered a repository link for a site without one:\n%s", got)
 	}
 }
+
+// TestRenderTemplateStarsRefresh checks what a deployed page carries: a
+// count the browser can update, and the script that updates it. The
+// build-time count is only correct as of the build, so a static site
+// without this shows a number that is stale from the day it ships.
+func TestRenderTemplateStarsRefresh(t *testing.T) {
+	nav := &Navigation{Items: []*NavItem{{Title: "Install", Path: "install.md", URL: "install.html"}}}
+	nav.buildIndexes()
+	base := RenderOptions{Nav: nav.ForPage("install.md"), SiteTitle: "Docs", FilePath: "install.md"}
+	base.Repo, base.RepoURL = "tmc/cdp", "https://github.com/tmc/cdp"
+
+	render := func(opts RenderOptions) string {
+		return mustRenderTemplateWithOptions(t, Config{HTMLExt: "html"}, "<p>body</p>", "Install", "", false, nil, opts)
+	}
+
+	opts := base
+	opts.Stars, opts.ShowStars = "4", true
+	got := render(opts)
+	for _, want := range []string{
+		`<span class="repo-link-stars" data-repo="tmc/cdp">`,
+		`<span class="repo-link-count">4</span>`,
+		"api.github.com/repos/",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("rendered page missing %q:\n%s", want, got)
+		}
+	}
+
+	// A build with no network still has to leave the element behind, or
+	// the browser has nothing to fill in.
+	opts = base
+	opts.ShowStars = true
+	got = render(opts)
+	if !strings.Contains(got, `<span class="repo-link-count"></span>`) {
+		t.Errorf("no count element after a failed fetch:\n%s", got)
+	}
+
+	// Without -github-stars nothing is rendered and nothing is fetched:
+	// the page still needs no network.
+	got = render(base)
+	if strings.Contains(got, "repo-link-count") || strings.Contains(got, "api.github.com") {
+		t.Errorf("rendered star markup without -github-stars:\n%s", got)
+	}
+}

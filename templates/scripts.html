@@ -6,6 +6,7 @@
 {{template "tabs-script" .}}
 {{with jsonSpec}}<script type="application/json" id="md-jsonspec-schemas">{{.}}</script>
 <script src="{{$.AssetBase}}js/jsonspec.js"></script>{{end}}
+{{if and .Repo .ShowStars}}{{template "repo-stars-script" .}}{{end}}
 {{if .LiveReload}}{{template "livereload-script" .}}{{end}}
 {{if .Versions}}{{template "version-switcher-script" .}}{{end}}
 {{end}}

@@ -703,6 +703,7 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 		Repo:        site.Repo,
 		RepoURL:     site.RepoURL,
 		Stars:       site.Stars,
+		ShowStars:   s.config.Stars,
 		Data:        s.jsonData,
 		FilePath:    filePath,
 		Version:     version,

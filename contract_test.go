@@ -31,6 +31,7 @@ func TestPublicContractFields(t *testing.T) {
 				{"Repo", "string"},
 				{"RepoURL", "string"},
 				{"Stars", "string"},
+				{"ShowStars", "bool"},
 			},
 		},
 		{
@@ -78,6 +79,7 @@ func TestPublicContractFields(t *testing.T) {
 				{"Repo", "string"},
 				{"RepoURL", "string"},
 				{"Stars", "string"},
+				{"ShowStars", "bool"},
 			},
 		},
 	}

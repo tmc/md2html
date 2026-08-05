@@ -617,6 +617,10 @@ type RenderOptions struct {
 	// Stars is the repository's star count, already formatted. Empty
 	// shows the link without a count.
 	Stars string
+	// ShowStars reports that a count was asked for. A deployed page
+	// refreshes the count in the browser, so the element has to be
+	// rendered even when the build could not fetch one.
+	ShowStars bool
 }
 
 func firstFrontmatterString(frontmatter map[string]any, keys ...string) string {
@@ -744,6 +748,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		Repo:             opts.Repo,
 		RepoURL:          opts.RepoURL,
 		Stars:            opts.Stars,
+		ShowStars:        opts.ShowStars,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -789,10 +794,13 @@ type templateData struct {
 	Accent     template.CSS
 	AccentDark template.CSS
 	// Repo and RepoURL name the source repository shown in the bar, and
-	// Stars its formatted star count when one was fetched.
-	Repo    string
-	RepoURL string
-	Stars   string
+	// Stars its formatted star count when one was fetched. ShowStars
+	// reports that a count was asked for, which is what decides whether
+	// the page carries the element the browser refreshes.
+	Repo      string
+	RepoURL   string
+	Stars     string
+	ShowStars bool
 }
 
 type renderMetadata struct {
@@ -947,6 +955,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			Repo:        site.Repo,
 			RepoURL:     site.RepoURL,
 			Stars:       site.Stars,
+			ShowStars:   cfg.Stars,
 		}
 		if cfg.LLMS {
 			opts.RawMDURL = rawMarkdownURL(file.RelPath)
@@ -977,6 +986,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 				Repo:        site.Repo,
 				RepoURL:     site.RepoURL,
 				Stars:       site.Stars,
+				ShowStars:   cfg.Stars,
 			}
 			if cfg.LLMS {
 				indexOpts.RawMDURL = rawMarkdownURL(cfg.Index)
