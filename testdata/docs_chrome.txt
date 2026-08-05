@@ -19,6 +19,11 @@ stdout 'id="site-sidebar"'
 # Without -search there is nothing to click for search
 ! stdout 'class="search-trigger"'
 
+# The docs layout owns the one <main> on the page. A second one nested
+# inside it is invalid HTML, and its own max-width would narrow the
+# column the layout had already sized.
+! stdout '<main class="page">'
+
 -- site/SUMMARY.md --
 # Summary
 

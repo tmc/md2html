@@ -255,21 +255,39 @@
         padding-left: 0.4rem;
     }
 
+    /*
+     * The column is wider than a line of prose should be. Text is held
+     * to --measure inside it; code, tables, and figures use the whole
+     * width, because a wrapped command line is harder to read than a
+     * long one and there is no reason to make them scroll while the
+     * column sits half empty.
+     *
+     * Everything is left-aligned to the same edge. Centering each block
+     * on its own would make that edge move whenever a wide element
+     * appeared between two paragraphs.
+     */
     .main-content {
         min-width: 0;
+        /* width, not just max-width: auto inline margins on a grid item
+           make it size to its content instead of filling the track. */
+        width: 100%;
+        max-width: calc(var(--measure) + 18rem);
+        margin-inline: auto;
         padding: 3rem 3rem 6rem;
     }
 
-    /* Keep prose to a readable measure, centered in a wide column. */
     .main-content > * {
         max-width: var(--measure);
-        margin-inline: auto;
+        margin-inline: 0;
     }
 
-    /* Only diagrams and wide media are allowed past the measure. */
+    .main-content > .md-code,
+    .main-content > pre,
+    .main-content > table,
+    .main-content > figure,
     .main-content > .mermaid,
-    .main-content > table {
-        max-width: min(100%, calc(var(--measure) + 4rem));
+    .main-content > .table-wrapper {
+        max-width: 100%;
     }
 
     .breadcrumb {

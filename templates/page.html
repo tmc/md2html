@@ -114,7 +114,12 @@
 
     {{if .Search}}{{template "search-modal" .}}{{end}}
 
-    {{block "content" .}}
+    {{/* Named for this template, not "content": a block also defines the
+         name globally, and "content" is the shared template docs-layout
+         renders inside its own <main>. Redefining it there put a second
+         <main class="page"> inside the first, whose own max-width then
+         squeezed the column the docs layout had already sized. */}}
+    {{block "page-body" .}}
     <main class="page">{{.Content}}</main>
     {{end}}
 
