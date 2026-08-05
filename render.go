@@ -102,6 +102,31 @@ func preprocessHTMLBlocks(markdown string) string {
 	return strings.Join(result, "\n")
 }
 
+// typographer returns the smart-punctuation extension, configured to
+// match the renderer that publishes these docs rather than to
+// goldmark's defaults.
+//
+// The two disagree about dashes. goldmark reads "--" as an en dash and
+// "---" as an em dash; Mintlify reads "--" as an em dash and leaves
+// "---" alone. Taking goldmark's defaults would not close the gap, it
+// would move it — and would newly break "---", which the two renderers
+// agree about today.
+//
+// Quotes keep goldmark's defaults, which do match: straight quotes and
+// apostrophes in prose curl in both. Nothing inside a code span or a
+// fence is touched, since neither is inline text.
+func typographer() goldmark.Extender {
+	return extension.NewTypographer(
+		extension.WithTypographicSubstitutions(map[extension.TypographicPunctuation][]byte{
+			extension.EnDash: []byte("&mdash;"),
+			// "---" substituted with itself. Disabling the rule instead
+			// lets the "--" rule eat the first two hyphens and leave a
+			// stray third; this consumes all three and emits them back.
+			extension.EmDash: []byte("---"),
+		}),
+	)
+}
+
 func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, error) {
 	if cfg.AllowUnsafe {
 		markdown = rewriteLocalHTMLAttributes(markdown, filePath, cfg.HTMLExt, cfg.Index, cfg.Format)
@@ -128,6 +153,7 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, e
 	extensions := []goldmark.Extender{
 		extension.GFM,
 		extension.Footnote,
+		typographer(),
 		meta.Meta,
 		highlighting.NewHighlighting(highlightOpts...),
 		&admonitions.Extender{},

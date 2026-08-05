@@ -35,6 +35,8 @@ func TestID(t *testing.T) {
 			"click/type_text/hover-—-har-flag",
 		},
 		{"a run of hyphens vanishes", "a --- b", "a-b"},
+		{"two hyphens are an em dash, as the rendered text shows", "a -- b", "a-—-b"},
+		{"four hyphens are left alone", "a ---- b", "a-b"},
 		{
 			"leading punctuation of a code span does not double the hyphen",
 			"0d. `-har` is discarded",

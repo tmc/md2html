@@ -43,3 +43,61 @@ func TestRenderHeadingIDsDedupe(t *testing.T) {
 		}
 	}
 }
+
+// TestRenderTypography pins the smart-punctuation rules against the
+// renderer that publishes these docs. goldmark's defaults disagree with
+// it about dashes, so both directions are checked here rather than
+// assumed.
+func TestRenderTypography(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want []string
+		not  []string
+	}{
+		{
+			name: "two hyphens become an em dash in text and id",
+			in:   "## a -- b\n",
+			want: []string{`id="a-—-b"`, "a &mdash; b"},
+		},
+		{
+			name: "three hyphens are left alone",
+			in:   "## a --- b\n",
+			want: []string{`id="a-b"`, "a --- b"},
+			not:  []string{"&mdash;"},
+		},
+		{
+			name: "apostrophes and quotes curl in prose",
+			in:   "the tools' \"docs\"\n",
+			want: []string{"&rsquo;", "&ldquo;", "&rdquo;"},
+		},
+		{
+			name: "nothing inside a code span is touched",
+			in:   "use `--flag` and `it's` and `\"x\"`\n",
+			not:  []string{"&mdash;", "&rsquo;", "&ldquo;"},
+		},
+		{
+			name: "nothing inside a fence is touched",
+			in:   "```\nrun -- 'this' \"raw\"\n```\n",
+			not:  []string{"&mdash;", "&rsquo;", "&ldquo;"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			html, err := markdownToHTMLWithContext(Config{}, tt.in, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, w := range tt.want {
+				if !strings.Contains(html, w) {
+					t.Errorf("missing %q in:\n%s", w, html)
+				}
+			}
+			for _, n := range tt.not {
+				if strings.Contains(html, n) {
+					t.Errorf("unexpected %q in:\n%s", n, html)
+				}
+			}
+		})
+	}
+}

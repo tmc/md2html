@@ -6,6 +6,7 @@ package anchor
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/parser"
@@ -33,6 +34,7 @@ import (
 // character already sits next to a space, as in "paren (thing)",
 // collapsing makes the two indistinguishable.
 func ID(s string) string {
+	s = emDashes(s)
 	b := make([]byte, 0, len(s))
 	for i := 0; i < len(s); i++ {
 		c := s[i]
@@ -59,6 +61,40 @@ func ID(s string) string {
 		b = b[:len(b)-1]
 	}
 	return string(b)
+}
+
+// emDashes applies the one typographic substitution that reaches an id:
+// exactly two hyphens become an em dash, as the renderer already does to
+// the heading text. Three or more are left alone, which both renderers
+// agree on.
+//
+// The substitution has to be repeated here because the id is derived
+// from the heading's source text, not from the substituted inline nodes
+// — without it a heading would display "a — b" and answer to "a-b".
+func emDashes(s string) string {
+	if !strings.Contains(s, "--") {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		if s[i] != '-' {
+			b.WriteByte(s[i])
+			i++
+			continue
+		}
+		run := 0
+		for i+run < len(s) && s[i+run] == '-' {
+			run++
+		}
+		if run == 2 {
+			b.WriteString("—")
+		} else {
+			b.WriteString(s[i : i+run])
+		}
+		i += run
+	}
+	return b.String()
 }
 
 // ids assigns every heading in one document a unique id.
