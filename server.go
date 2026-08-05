@@ -426,8 +426,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// File not found
-		http.Error(w, fmt.Sprintf("File not found: %s", filePath), http.StatusNotFound)
+		s.serveNotFound(w, requestedURL(r), css)
 		return
 	}
 
@@ -445,7 +444,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 		content, err := os.ReadFile(fullPath)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Error reading file %s: %v", file, err), http.StatusNotFound)
+			s.serveNotFound(w, requestedURL(r), css)
 			return
 		}
 		_ = s.watchOpenedPath(fullPath)
@@ -540,6 +539,39 @@ func (s *server) serveDirectory(w http.ResponseWriter, dir, relDir, css, version
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(html))
+}
+
+// requestedURL returns the path the client asked for. Under -base the
+// handler runs behind http.StripPrefix, so r.URL.Path has lost the
+// prefix and would name a URL that does not exist; RequestURI is what
+// arrived on the wire.
+func requestedURL(r *http.Request) string {
+	target := r.RequestURI
+	if target == "" {
+		return r.URL.Path
+	}
+	if i := strings.IndexByte(target, '?'); i >= 0 {
+		target = target[:i]
+	}
+	return target
+}
+
+// serveNotFound reports that urlPath names nothing, rendered through the
+// usual page template so the navigation and styling survive a wrong link.
+// It names only what the client already sent: the paths md2html searched
+// are server-side detail, and echoing them tells a visitor where the
+// source tree lives on disk.
+func (s *server) serveNotFound(w http.ResponseWriter, urlPath, css string) {
+	body := fmt.Sprintf("# Not found\n\nNo page matches `%s`.\n", strings.ReplaceAll(urlPath, "`", ""))
+	doc := DocumentData{Content: body, Frontmatter: make(map[string]any)}
+	html, err := s.renderDocumentWithVersion(doc, "Not found", css, "", "")
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusNotFound)
 	w.Write([]byte(html))
 }
 

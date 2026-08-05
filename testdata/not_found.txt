@@ -1,0 +1,44 @@
+# Test that a missing page renders a real 404 page and reveals no paths
+
+cd testdir
+
+md2html -http :8096 -nav &
+wait-port :8096
+
+# The status is a 404 and the body is a rendered page, not plain text
+curl -s -o /dev/null -w '%{http_code}' http://localhost:8096/nope
+stdout '404'
+
+curl -s http://localhost:8096/nope
+stdout '<h1.*>Not found</h1>'
+stdout '<html'
+stdout 'No page matches'
+
+# The requested URL is echoed back; the filesystem paths md2html searched
+# are not
+curl -s http://localhost:8096/nope
+stdout '/nope'
+! stdout 'testdir'
+! stdout 'no such file'
+
+# Navigation survives, so a wrong link is recoverable
+curl -s http://localhost:8096/nope
+stdout 'Guide'
+
+# The ?file= form reports the same way
+curl -s -o /dev/null -w '%{http_code}' 'http://localhost:8096/?file=missing.md'
+stdout '404'
+
+# Under a prefix the page names the URL the client asked for, not the
+# one left after the prefix was stripped
+md2html -http :8097 -base /docs &
+wait-port :8097
+
+curl -s http://localhost:8097/docs/nope
+stdout 'No page matches /docs/nope'
+
+-- testdir/index.md --
+# Welcome
+
+-- testdir/guide.md --
+# Guide
