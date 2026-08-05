@@ -71,6 +71,7 @@ func AllChecks() []Check {
 		CodeFenceLangCheck{},
 		HeadingSkipCheck{},
 		CaseCheck{},
+		RawHTMLCheck{},
 		ComponentCheck{},
 	}
 }

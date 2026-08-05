@@ -17,6 +17,7 @@
 //	code-fence-lang    fenced code blocks declare a language
 //	heading-skip       no heading-level jumps; at most one h1
 //	case               link path matches on-disk casing
+//	raw-html           no raw HTML in prose, which renders to nothing
 //
 // Flags:
 //
