@@ -1,6 +1,7 @@
 package md2html
 
 import (
+	"html/template"
 	"os"
 	"path/filepath"
 	"strings"
@@ -95,5 +96,54 @@ func TestPrepareIconsUnset(t *testing.T) {
 	}
 	if got := cfg.navIcon("rocket"); got != "" {
 		t.Errorf("navIcon() = %q with no icon set, want empty", got)
+	}
+}
+
+// TestResolveIcon checks that a name is matched against the aliases for
+// the same glyph, so documentation naming Font Awesome icons renders
+// against a Lucide directory and the other way round.
+func TestResolveIcon(t *testing.T) {
+	lucide := map[string]template.HTML{
+		"circle-help":   "<svg>help</svg>",
+		"flask-conical": "<svg>flask</svg>",
+		"rocket":        "<svg>rocket</svg>",
+	}
+	fontAwesome := map[string]template.HTML{
+		"circle-question": "<svg>question</svg>",
+		"vial":            "<svg>vial</svg>",
+	}
+	tests := []struct {
+		name string
+		set  map[string]template.HTML
+		icon string
+		want template.HTML
+	}{
+		{"exact name wins", lucide, "rocket", "<svg>rocket</svg>"},
+		{"font awesome name against a lucide set", lucide, "circle-question", "<svg>help</svg>"},
+		{"lucide name against a font awesome set", fontAwesome, "circle-help", "<svg>question</svg>"},
+		{"second alias is tried", lucide, "vial", "<svg>flask</svg>"},
+		{"no alias and no file", lucide, "no-such-icon", ""},
+		{"alias exists but set has neither", fontAwesome, "gauge-high", ""},
+		{"empty set", nil, "rocket", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolveIcon(tt.set, tt.icon); got != tt.want {
+				t.Errorf("resolveIcon(%q) = %q, want %q", tt.icon, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestIconAliasesAreNotSelfReferential checks that no alias points at
+// the name it is listed under, which would be a lookup that can never
+// add anything.
+func TestIconAliasesAreNotSelfReferential(t *testing.T) {
+	for name, aliases := range iconAliases {
+		for _, alias := range aliases {
+			if alias == name {
+				t.Errorf("%q lists itself as an alias", name)
+			}
+		}
 	}
 }

@@ -78,5 +78,5 @@ func inlineSVG(svg string) template.HTML {
 // with no icon leaves the entry without one, which is how pages render
 // when no set is configured at all.
 func (cfg Config) navIcon(name string) template.HTML {
-	return cfg.iconSet[name]
+	return resolveIcon(cfg.iconSet, name)
 }
