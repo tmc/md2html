@@ -70,12 +70,13 @@ func newServer(ctx context.Context, cfg Config, logger *slog.Logger) *server {
 			if cfg.HTMLExt != "" {
 				htmlExt = "." + cfg.HTMLExt
 			}
-			nav, siteName, err := navigationForDir(root, htmlExt)
+			nav, site, err := navigationForDir(root, htmlExt)
 			if err != nil {
 				logger.Error("Error loading navigation", "error", err)
 			} else if nav != nil && len(nav.Items) > 0 {
 				s.nav = nav
-				s.config.Title = siteTitle(s.config.Title, siteName)
+				s.site = site
+				s.config.Title = siteTitle(s.config.Title, site.Name)
 				logger.Info("Loaded navigation", "pages", len(nav.Flat))
 			}
 		}
@@ -128,8 +129,9 @@ type server struct {
 	versionMgr *GitVersionManager
 	versions   []GitVersion
 
-	// Navigation from SUMMARY.md
+	// Navigation and the site presentation its source carries
 	nav             *Navigation
+	site            siteInfo
 	lastUpdatedMu   sync.Mutex
 	lastUpdated     map[string]string
 	gitMetadataOnce map[string]*sync.Once
@@ -553,6 +555,8 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 
 	opts := RenderOptions{
 		SiteTitle:   s.config.Title,
+		Accent:      s.site.Accent,
+		AccentDark:  s.site.AccentDark,
 		Data:        s.jsonData,
 		FilePath:    filePath,
 		Version:     version,

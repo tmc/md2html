@@ -312,17 +312,17 @@ func LoadNavigationOrAutoFromDir(sourceDir, htmlExt string) (*Navigation, error)
 
 // navigationForDir resolves navigation for a source tree, preferring an
 // explicit SUMMARY.md, then a Mintlify docs.json covering the tree, then
-// the shape of the tree itself. It also reports the site name when the
-// source it used carries one.
-func navigationForDir(sourceDir, htmlExt string) (*Navigation, string, error) {
+// the shape of the tree itself. It also reports the site name and colors
+// when the source it used carries them.
+func navigationForDir(sourceDir, htmlExt string) (*Navigation, siteInfo, error) {
 	if nav := LoadNavigationFromDir(sourceDir, htmlExt); nav != nil && len(nav.Items) > 0 {
-		return nav, "", nil
+		return nav, siteInfo{}, nil
 	}
-	if nav, name, ok := loadDocsJSON(sourceDir, htmlExt); ok {
-		return nav, name, nil
+	if nav, site, ok := loadDocsJSON(sourceDir, htmlExt); ok {
+		return nav, site, nil
 	}
 	nav, err := autoNavigationFromDir(sourceDir, htmlExt)
-	return nav, "", err
+	return nav, siteInfo{}, err
 }
 
 type autoNavFile struct {

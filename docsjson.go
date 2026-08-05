@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -33,7 +34,17 @@ func siteTitle(configured, siteName string) string {
 // docsJSON is the part of a Mintlify docs.json that md2html reads.
 type docsJSON struct {
 	Name       string             `json:"name"`
+	Colors     docsJSONColors     `json:"colors"`
 	Navigation docsJSONNavigation `json:"navigation"`
+}
+
+// docsJSONColors is the site palette. Mintlify names "primary" for the
+// brand color and "light" for the lighter variant it uses on dark
+// backgrounds.
+type docsJSONColors struct {
+	Primary string `json:"primary"`
+	Light   string `json:"light"`
+	Dark    string `json:"dark"`
 }
 
 type docsJSONNavigation struct {
@@ -88,23 +99,46 @@ func findDocsJSON(dir string) (string, bool) {
 	}
 }
 
+// siteInfo is the presentation carried by a navigation source: what the
+// site is called and the color it is branded with.
+type siteInfo struct {
+	Name string
+	// Accent and AccentDark are CSS colors for light and dark rendering.
+	// They are empty unless the source names a valid one.
+	Accent     string
+	AccentDark string
+}
+
+// hexColor matches the CSS hex colors md2html is willing to interpolate
+// into a stylesheet. Anything else is ignored rather than escaped, since
+// a rejected color simply leaves the built-in accent in place.
+var hexColor = regexp.MustCompile(`^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$`)
+
+func cssColor(v string) string {
+	v = strings.TrimSpace(v)
+	if hexColor.MatchString(v) {
+		return v
+	}
+	return ""
+}
+
 // loadDocsJSON reads the docs.json covering sourceDir and returns the
-// navigation it describes along with the site name. It reports ok=false
-// when there is no docs.json, when it does not parse, or when none of the
-// pages it names live under sourceDir — a docs.json found several levels
-// up may describe an unrelated tree.
-func loadDocsJSON(sourceDir, htmlExt string) (nav *Navigation, name string, ok bool) {
+// navigation it describes along with the site name and colors. It reports
+// ok=false when there is no docs.json, when it does not parse, or when
+// none of the pages it names live under sourceDir — a docs.json found
+// several levels up may describe an unrelated tree.
+func loadDocsJSON(sourceDir, htmlExt string) (nav *Navigation, site siteInfo, ok bool) {
 	siteDir, found := findDocsJSON(sourceDir)
 	if !found {
-		return nil, "", false
+		return nil, siteInfo{}, false
 	}
 	data, err := os.ReadFile(filepath.Join(siteDir, docsJSONName))
 	if err != nil {
-		return nil, "", false
+		return nil, siteInfo{}, false
 	}
 	var doc docsJSON
 	if err := json.Unmarshal(data, &doc); err != nil {
-		return nil, "", false
+		return nil, siteInfo{}, false
 	}
 
 	b := docsJSONBuilder{siteDir: siteDir, sourceDir: sourceDir, htmlExt: htmlExt}
@@ -115,12 +149,19 @@ func loadDocsJSON(sourceDir, htmlExt string) (nav *Navigation, name string, ok b
 		}
 	}
 	if len(items) == 0 {
-		return nil, "", false
+		return nil, siteInfo{}, false
+	}
+
+	site = siteInfo{Name: doc.Name, Accent: cssColor(doc.Colors.Primary)}
+	// Mintlify's "light" is the variant meant for dark backgrounds.
+	site.AccentDark = cssColor(doc.Colors.Light)
+	if site.AccentDark == "" {
+		site.AccentDark = site.Accent
 	}
 
 	nav = &Navigation{Items: items}
 	nav.buildIndexes()
-	return nav, doc.Name, true
+	return nav, site, true
 }
 
 type docsJSONBuilder struct {

@@ -569,6 +569,10 @@ type RenderOptions struct {
 	LastUpdated string
 	// Assets maps logical asset names to emitted, fingerprinted paths.
 	Assets map[string]string
+	// Accent and AccentDark are the site's brand color for light and dark
+	// rendering, as CSS hex colors. Empty leaves the built-in accent.
+	Accent     string
+	AccentDark string
 }
 
 func firstFrontmatterString(frontmatter map[string]any, keys ...string) string {
@@ -691,6 +695,8 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		LastUpdated:      meta.LastUpdated,
 		EditURL:          opts.EditURL,
 		Assets:           opts.Assets,
+		Accent:           template.CSS(opts.Accent),
+		AccentDark:       template.CSS(opts.AccentDark),
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -731,6 +737,10 @@ type templateData struct {
 	LastUpdated    string
 	EditURL        string
 	Assets         map[string]string
+	// Accent and AccentDark are validated CSS colors, empty unless the
+	// navigation source named one.
+	Accent     template.CSS
+	AccentDark template.CSS
 }
 
 type renderMetadata struct {
@@ -821,6 +831,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	logger.Info("Found markdown files to process", "count", len(files))
 
 	var nav *Navigation
+	var site siteInfo
 	if cfg.Nav {
 		// Load navigation from SUMMARY.md or build it from the markdown tree.
 		htmlExt := ""
@@ -828,12 +839,11 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			htmlExt = "." + cfg.HTMLExt
 		}
 		var err error
-		var siteName string
-		nav, siteName, err = navigationForDir(sourceDir, htmlExt)
+		nav, site, err = navigationForDir(sourceDir, htmlExt)
 		if err != nil {
 			logger.Error("Error loading navigation", "error", err)
 		} else if nav != nil && len(nav.Items) > 0 {
-			cfg.Title = siteTitle(cfg.Title, siteName)
+			cfg.Title = siteTitle(cfg.Title, site.Name)
 			logger.Info("Loaded navigation", "pages", len(nav.Flat))
 		}
 	}

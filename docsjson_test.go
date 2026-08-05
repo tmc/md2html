@@ -34,6 +34,7 @@ func writeDocsSite(t *testing.T, config string) (siteDir, docsDir string) {
 
 const testDocsJSON = `{
   "name": "example",
+  "colors": {"primary": "#4F46E5", "light": "#A5B4FC"},
   "navigation": {
     "groups": [
       {"group": "Start here", "pages": ["docs/index", "docs/quickstart"]},
@@ -47,12 +48,19 @@ const testDocsJSON = `{
 func TestLoadDocsJSON(t *testing.T) {
 	_, docsDir := writeDocsSite(t, testDocsJSON)
 
-	nav, name, ok := loadDocsJSON(docsDir, "")
+	nav, site, ok := loadDocsJSON(docsDir, "")
 	if !ok {
 		t.Fatal("loadDocsJSON did not find docs.json in a parent directory")
 	}
-	if name != "example" {
-		t.Errorf("name = %q, want %q", name, "example")
+	if site.Name != "example" {
+		t.Errorf("name = %q, want %q", site.Name, "example")
+	}
+	if site.Accent != "#4F46E5" {
+		t.Errorf("accent = %q, want %q", site.Accent, "#4F46E5")
+	}
+	// "light" is the variant for dark backgrounds.
+	if site.AccentDark != "#A5B4FC" {
+		t.Errorf("dark accent = %q, want %q", site.AccentDark, "#A5B4FC")
 	}
 
 	// Groups naming no reachable page are dropped, so "Elsewhere" (outside
@@ -125,6 +133,22 @@ func TestLoadDocsJSONMalformed(t *testing.T) {
 	_, docsDir := writeDocsSite(t, "{not json")
 	if _, _, ok := loadDocsJSON(docsDir, ""); ok {
 		t.Error("loadDocsJSON accepted a malformed docs.json")
+	}
+}
+
+// TestLoadDocsJSONRejectsBadColor checks that a color md2html will not
+// interpolate into a stylesheet is dropped rather than escaped, leaving
+// the built-in accent in place.
+func TestLoadDocsJSONRejectsBadColor(t *testing.T) {
+	config := `{"name": "x", "colors": {"primary": "red; } body { display:none"},
+	  "navigation": {"groups": [{"group": "G", "pages": ["docs/index"]}]}}`
+	_, docsDir := writeDocsSite(t, config)
+	_, site, ok := loadDocsJSON(docsDir, "")
+	if !ok {
+		t.Fatal("loadDocsJSON failed")
+	}
+	if site.Accent != "" {
+		t.Errorf("accent = %q, want it dropped", site.Accent)
 	}
 }
 
