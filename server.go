@@ -71,6 +71,11 @@ func newServer(ctx context.Context, cfg Config, logger *slog.Logger) *server {
 			if cfg.HTMLExt != "" {
 				htmlExt = "." + cfg.HTMLExt
 			}
+			s.navRoot = root
+			s.navTitle = s.config.Title
+			if siteDir, found := findDocsJSON(root); found {
+				s.navConfig = filepath.Join(siteDir, docsJSONName)
+			}
 			nav, site, err := navigationForDir(root, htmlExt)
 			if err != nil {
 				logger.Error("Error loading navigation", "error", err)
@@ -131,9 +136,17 @@ type server struct {
 	versionMgr *GitVersionManager
 	versions   []GitVersion
 
-	// Navigation and the site presentation its source carries
-	nav             *Navigation
-	site            siteInfo
+	// Navigation and the site presentation its source carries. Both are
+	// rebuilt when their source changes, so they are read under mu.
+	nav       *Navigation
+	site      siteInfo
+	navRoot   string // source tree navigation is built from
+	navConfig string // docs.json covering that tree, when there is one
+	// navTitle is the title the caller configured, kept so a reload can
+	// recompute the effective title. Without it the site name applied at
+	// startup would look like a caller's choice and outrank every later
+	// one, so a renamed site never took effect.
+	navTitle        string
 	lastUpdatedMu   sync.Mutex
 	lastUpdated     map[string]string
 	gitMetadataOnce map[string]*sync.Once
@@ -165,6 +178,13 @@ func (s *server) startWatching() error {
 	if s.config.CSS != "" {
 		if err := s.watchOpenedPath(s.config.CSS); err != nil && s.config.Verbose {
 			s.logger.Debug("watch css", "path", s.config.CSS, "error", err)
+		}
+	}
+	// docs.json sits at the root of the published site, which is often
+	// above the directory being served, so it needs a watch of its own.
+	if s.navConfig != "" {
+		if err := s.watchOpenedPath(s.navConfig); err != nil && s.config.Verbose {
+			s.logger.Debug("watch navigation config", "path", s.navConfig, "error", err)
 		}
 	}
 	if s.config.Verbose {
@@ -265,9 +285,58 @@ func (s *server) handleWatchEvent(event fsnotify.Event) {
 	}
 
 	name := strings.ToLower(event.Name)
+	// A navigation source describes the whole site, so a change to it
+	// changes every page, not only the one being viewed.
+	if samePath(event.Name, s.navConfig) || strings.HasSuffix(name, "summary.md") {
+		s.reloadNavigation()
+		s.notifyClients()
+		return
+	}
 	if strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".markdown") {
 		s.notifyClients()
 	}
+}
+
+// reloadNavigation rebuilds the navigation and the presentation its
+// source carries, so an edit to docs.json is picked up without a
+// restart.
+//
+// A rebuild that finds nothing leaves the previous navigation in place:
+// a config saved halfway through an edit should not empty the sidebar.
+// The star count is carried over rather than refetched, since editing
+// the file that names the repository is not news about how many stars it
+// has, and a request per keystroke would be rate limited in short order.
+func (s *server) reloadNavigation() {
+	if s.navRoot == "" {
+		return
+	}
+	htmlExt := ""
+	if s.config.HTMLExt != "" {
+		htmlExt = "." + s.config.HTMLExt
+	}
+	nav, site, err := navigationForDir(s.navRoot, htmlExt)
+	if err != nil {
+		s.logger.Warn("Could not reload navigation", "error", err)
+		return
+	}
+	if nav == nil || len(nav.Items) == 0 {
+		s.logger.Warn("Reloaded navigation is empty; keeping the previous one")
+		return
+	}
+
+	s.mu.Lock()
+	previous := s.site
+	if site.Repo == previous.Repo {
+		site.Stars = previous.Stars
+	} else {
+		site.Stars = repoStars(context.Background(), s.config, site.Repo, s.logger)
+	}
+	s.nav = nav
+	s.site = site
+	s.mu.Unlock()
+
+	s.config.Title = siteTitle(s.navTitle, site.Name)
+	s.logger.Info("Reloaded navigation", "pages", len(nav.Flat))
 }
 
 func samePath(a, b string) bool {
@@ -587,13 +656,17 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 		html = renderFrontmatterHTML(doc.Frontmatter) + html
 	}
 
+	s.mu.RLock()
+	nav, site := s.nav, s.site
+	s.mu.RUnlock()
+
 	opts := RenderOptions{
 		SiteTitle:   s.config.Title,
-		Accent:      s.site.Accent,
-		AccentDark:  s.site.AccentDark,
-		Repo:        s.site.Repo,
-		RepoURL:     s.site.RepoURL,
-		Stars:       s.site.Stars,
+		Accent:      site.Accent,
+		AccentDark:  site.AccentDark,
+		Repo:        site.Repo,
+		RepoURL:     site.RepoURL,
+		Stars:       site.Stars,
 		Data:        s.jsonData,
 		FilePath:    filePath,
 		Version:     version,
@@ -602,8 +675,8 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 		EditURL:     editURL(s.config.EditURL, filePath),
 	}
 	opts.LastUpdated = s.lastUpdatedFor(filePath)
-	if s.nav != nil {
-		opts.Nav = s.nav.ForPage(filePath)
+	if nav != nil {
+		opts.Nav = nav.ForPage(filePath)
 	}
 
 	return renderTemplateWithOptions(s.config, html, title, customCSS, s.watchEnabled(), doc.Frontmatter, opts)
