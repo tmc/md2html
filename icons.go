@@ -55,6 +55,7 @@ func loadIcons(dir string) (map[string]template.HTML, error) {
 
 var (
 	svgComment = regexp.MustCompile(`(?s)<!--.*?-->`)
+	svgRootTag = regexp.MustCompile(`(?s)<svg\b[^>]*>`)
 	svgSize    = regexp.MustCompile(`\s(?:width|height)="[^"]*"`)
 	svgSpace   = regexp.MustCompile(`\s+`)
 )
@@ -68,9 +69,24 @@ var (
 // so this is presentation rather than sanitisation.
 func inlineSVG(svg string) template.HTML {
 	svg = svgComment.ReplaceAllString(svg, "")
-	svg = svgSize.ReplaceAllString(svg, "")
+	// Only the root element is resized. Shapes inside an icon carry
+	// width and height of their own -- a Lucide "workflow" is two
+	// rectangles and a connector -- and stripping those collapses them
+	// to nothing, leaving a fragment of the glyph.
+	svg = replaceFirst(svg, svgRootTag, func(tag string) string {
+		return svgSize.ReplaceAllString(tag, "")
+	})
 	svg = svgSpace.ReplaceAllString(svg, " ")
 	return template.HTML(strings.TrimSpace(svg))
+}
+
+// replaceFirst rewrites the first match of re in s using f.
+func replaceFirst(s string, re *regexp.Regexp, f func(string) string) string {
+	loc := re.FindStringIndex(s)
+	if loc == nil {
+		return s
+	}
+	return s[:loc[0]] + f(s[loc[0]:loc[1]]) + s[loc[1]:]
 }
 
 // navIcon returns the markup for an icon name, or the empty string when

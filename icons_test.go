@@ -30,6 +30,38 @@ const testRocketSVG = `<!-- @license example - ISC -->
   <path d="M12 15v5" />
 </svg>`
 
+// TestInlineSVGKeepsShapeSizes checks that only the root element loses
+// its size. Many icons are built from sized shapes -- Lucide's
+// "workflow" is two rectangles and a connector -- and stripping those
+// collapsed them, so the icon rendered as a fragment of itself.
+func TestInlineSVGKeepsShapeSizes(t *testing.T) {
+	const workflow = `<!-- @license lucide-static v1.28.0 - ISC -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+  <rect width="8" height="8" x="3" y="3" rx="2" />
+  <path d="M7 11v4a2 2 0 0 0 2 2h4" />
+  <rect width="8" height="8" x="13" y="13" rx="2" />
+</svg>`
+
+	got := string(inlineSVG(workflow))
+	if strings.Count(got, `width="8"`) != 2 || strings.Count(got, `height="8"`) != 2 {
+		t.Errorf("inlineSVG dropped the sizes of the shapes inside the icon:\n%s", got)
+	}
+	// The root is still unsized, so the stylesheet decides how big the
+	// icon is.
+	root, _, _ := strings.Cut(got, ">")
+	for _, unwanted := range []string{`width="24"`, `height="24"`} {
+		if strings.Contains(root, unwanted) {
+			t.Errorf("root element kept %s:\n%s", unwanted, root)
+		}
+	}
+	if strings.Contains(got, "<!--") {
+		t.Errorf("license comment was not removed:\n%s", got)
+	}
+	if !strings.Contains(got, `viewBox="0 0 24 24"`) {
+		t.Errorf("viewBox was removed, so the icon has no coordinate system:\n%s", got)
+	}
+}
+
 func TestPrepareIcons(t *testing.T) {
 	dir := writeIconSet(t, map[string]string{
 		"rocket":         testRocketSVG,
