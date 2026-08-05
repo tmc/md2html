@@ -79,6 +79,11 @@ type Config struct {
 	// addition to the built-in ones.
 	Components string
 
+	// Stars fetches the star count of the repository named in the
+	// navigation source and shows it beside the repository link. It is
+	// the only thing here that needs the network, so it is opt-in.
+	Stars bool
+
 	// Icons is a directory of .svg files, one per icon name, drawn on
 	// by pages that name an icon in their frontmatter. Empty means
 	// pages render without icons.
@@ -125,6 +130,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.String("jsonspec", "", "directory containing jsonspec.json and *.schema.json files")
 	fs.String("components", "", "directory containing components.json and component templates")
 	fs.String("icons", "", "directory of .svg files named for the icons pages request in frontmatter")
+	fs.Bool("github-stars", false, "fetch the star count of the repository named in docs.json and show it in the bar")
 	fs.Bool("vet", false, "run mdvet checks on source markdown and report diagnostics (does not block rendering)")
 	fs.String("vet-checks", "", "comma-separated mdvet check names to run with -vet (default: all)")
 	return fs
@@ -163,6 +169,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		JSONSpec:          flagString(fs, "jsonspec"),
 		Components:        flagString(fs, "components"),
 		Icons:             flagString(fs, "icons"),
+		Stars:             flagBool(fs, "github-stars"),
 		Vet:               flagBool(fs, "vet"),
 		VetChecks:         flagString(fs, "vet-checks"),
 	}
@@ -586,6 +593,9 @@ type RenderOptions struct {
 	// RepoURL its address. Empty renders no repository link.
 	Repo    string
 	RepoURL string
+	// Stars is the repository's star count, already formatted. Empty
+	// shows the link without a count.
+	Stars string
 }
 
 func firstFrontmatterString(frontmatter map[string]any, keys ...string) string {
@@ -712,6 +722,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		AccentDark:       template.CSS(opts.AccentDark),
 		Repo:             opts.Repo,
 		RepoURL:          opts.RepoURL,
+		Stars:            opts.Stars,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -756,9 +767,11 @@ type templateData struct {
 	// navigation source named one.
 	Accent     template.CSS
 	AccentDark template.CSS
-	// Repo and RepoURL name the source repository shown in the bar.
+	// Repo and RepoURL name the source repository shown in the bar, and
+	// Stars its formatted star count when one was fetched.
 	Repo    string
 	RepoURL string
+	Stars   string
 }
 
 type renderMetadata struct {
@@ -863,6 +876,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		} else if nav != nil && len(nav.Items) > 0 {
 			cfg.Title = siteTitle(cfg.Title, site.Name)
 			logger.Info("Loaded navigation", "pages", len(nav.Flat))
+			site.Stars = repoStars(ctx, cfg, site.Repo, logger)
 		}
 	}
 	lastUpdated := map[string]string{}
@@ -907,6 +921,11 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			EditURL:     editURL(cfg.EditURL, file.RelPath),
 			LastUpdated: lastUpdated[filepath.ToSlash(file.RelPath)],
 			Assets:      assets,
+			Accent:      site.Accent,
+			AccentDark:  site.AccentDark,
+			Repo:        site.Repo,
+			RepoURL:     site.RepoURL,
+			Stars:       site.Stars,
 		}
 		if cfg.LLMS {
 			opts.RawMDURL = rawMarkdownURL(file.RelPath)
@@ -932,6 +951,11 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 				EditURL:     editURL(cfg.EditURL, cfg.Index),
 				LastUpdated: lastUpdated[filepath.ToSlash(cfg.Index)],
 				Assets:      assets,
+				Accent:      site.Accent,
+				AccentDark:  site.AccentDark,
+				Repo:        site.Repo,
+				RepoURL:     site.RepoURL,
+				Stars:       site.Stars,
 			}
 			if cfg.LLMS {
 				indexOpts.RawMDURL = rawMarkdownURL(cfg.Index)

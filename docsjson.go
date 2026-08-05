@@ -121,6 +121,9 @@ type siteInfo struct {
 	// navigation source names a repository.
 	Repo    string
 	RepoURL string
+	// Stars is the repository's formatted star count, when one was
+	// fetched. It is not read from the navigation source.
+	Stars string
 	// Accent and AccentDark are CSS colors for light and dark rendering.
 	// They are empty unless the source names a valid one.
 	Accent     string
@@ -252,7 +255,6 @@ func (b docsJSONBuilder) page(pagePath string, level int) *NavItem {
 	}
 	return nil
 }
-
 
 // githubRepo matches the repository page of a GitHub URL, capturing the
 // owner and the repository name.

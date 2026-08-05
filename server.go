@@ -79,6 +79,7 @@ func newServer(ctx context.Context, cfg Config, logger *slog.Logger) *server {
 				s.site = site
 				s.config.Title = siteTitle(s.config.Title, site.Name)
 				logger.Info("Loaded navigation", "pages", len(nav.Flat))
+				s.site.Stars = repoStars(context.Background(), cfg, site.Repo, logger)
 			}
 		}
 	}
@@ -592,6 +593,7 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 		AccentDark:  s.site.AccentDark,
 		Repo:        s.site.Repo,
 		RepoURL:     s.site.RepoURL,
+		Stars:       s.site.Stars,
 		Data:        s.jsonData,
 		FilePath:    filePath,
 		Version:     version,
