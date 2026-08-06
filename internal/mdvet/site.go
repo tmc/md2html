@@ -116,5 +116,6 @@ func sourceCandidates(rel string) []string {
 		path.Join(rel, "index.md"),
 		path.Join(rel, "index.markdown"),
 		path.Join(rel, "README.md"),
+		path.Join(rel, "SKILL.md"),
 	}
 }

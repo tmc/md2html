@@ -600,7 +600,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 // dirIndexNames are the file names tried, in order, when a request resolves
 // to a directory. The configured index file wins when one is set.
 func (s *server) dirIndexNames() []string {
-	names := []string{"index.md", "index.markdown", "README.md", "readme.md"}
+	names := []string{"index.md", "index.markdown", "README.md", "readme.md", "SKILL.md"}
 	if s.config.Index != "" {
 		names = append([]string{s.config.Index}, names...)
 	}

@@ -249,10 +249,13 @@ func llmsTitle(relPath string, doc DocumentData) string {
 	if s := firstFrontmatterString(doc.Frontmatter, "title"); s != "" {
 		return s
 	}
+	base := path.Base(normalizeSourcePath(relPath))
+	if s := skillName(base, doc); s != "" {
+		return s
+	}
 	if h := firstHeading(doc.Content); h != "" {
 		return h
 	}
-	base := path.Base(normalizeSourcePath(relPath))
 	return strings.TrimSuffix(base, path.Ext(base))
 }
 

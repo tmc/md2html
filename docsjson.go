@@ -244,9 +244,10 @@ func (b docsJSONBuilder) page(pagePath string, level int) *NavItem {
 		if err != nil {
 			docData = DocumentData{Content: string(data), Frontmatter: map[string]any{}}
 		}
-		stem := strings.TrimSuffix(path.Base(source), path.Ext(source))
+		base := path.Base(source)
+		stem := strings.TrimSuffix(base, path.Ext(base))
 		return &NavItem{
-			Title: autoNavTitle(stem, docData),
+			Title: autoNavTitle(base, stem, docData),
 			Icon:  navIcon(docData),
 			Path:  source,
 			URL:   pathToURL(source, b.htmlExt),

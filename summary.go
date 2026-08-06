@@ -417,7 +417,7 @@ func readAutoNavFile(name, rel string) (autoNavFile, error) {
 		relPath:         rel,
 		dir:             path.Dir(rel),
 		base:            base,
-		title:           autoNavTitle(cleanStem, doc),
+		title:           autoNavTitle(base, cleanStem, doc),
 		icon:            navIcon(doc),
 		weight:          frontmatterInt(doc.Frontmatter, "weight"),
 		hasWeight:       hasFrontmatterInt(doc.Frontmatter, "weight"),
@@ -443,6 +443,24 @@ func buildAutoNavItems(files []autoNavFile, htmlExt string) []*NavItem {
 			continue
 		}
 		byDir[f.dir] = append(byDir[f.dir], f)
+	}
+
+	// A group label is not a link, so a landing file has no entry of its
+	// own. That is right for a directory of pages introduced by a README,
+	// and wrong for an agent skill, where the landing file is the skill
+	// and everything beside it is supporting material. Give a skill an
+	// entry: within its group when the directory holds other pages, and
+	// at the top level when SKILL.md is all there is — the usual case,
+	// where a group of one would only add a label above its own page.
+	for dir, f := range landing {
+		if dir == "" || !isSkillFile(f.base) {
+			continue
+		}
+		if len(byDir[dir]) == 0 {
+			byDir[""] = append(byDir[""], f)
+		} else {
+			byDir[dir] = append([]autoNavFile{f}, byDir[dir]...)
+		}
 	}
 
 	var dirs []string
@@ -484,8 +502,11 @@ func autoNavItem(f autoNavFile, htmlExt string, level int) *NavItem {
 	}
 }
 
-func autoNavTitle(stem string, doc DocumentData) string {
+func autoNavTitle(base, stem string, doc DocumentData) string {
 	if s := firstFrontmatterString(doc.Frontmatter, "title"); s != "" {
+		return s
+	}
+	if s := skillName(base, doc); s != "" {
 		return s
 	}
 	if h := firstHeading(doc.Content); h != "" {
@@ -531,6 +552,11 @@ func sortAutoNavItems(items []*NavItem) {
 }
 
 func autoNavLess(a, b autoNavFile) bool {
+	// A landing file that reached a page list introduces the rest of the
+	// directory, so it leads regardless of name.
+	if a.isLanding != b.isLanding {
+		return a.isLanding
+	}
 	if a.hasWeight != b.hasWeight {
 		return a.hasWeight
 	}
@@ -567,12 +593,16 @@ func landingRank(base string) int {
 		return 0
 	case "readme.md", "readme.markdown":
 		return 1
+	case "skill.md", "skill.markdown":
+		// An agent skill is the landing page of the directory named for
+		// it, but yields to a README written for people.
+		return 2
 	}
-	return 2
+	return 3
 }
 
 func isLandingFile(base string) bool {
-	return landingRank(base) < 2
+	return landingRank(base) < 3
 }
 
 func splitNumericPrefix(stem string) (int, bool, string) {

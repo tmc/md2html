@@ -1,0 +1,34 @@
+# Test that an agent skill is served and named as one
+
+cd testdir
+
+md2html -http :8112 -nav -depth 6 &
+wait-port :8112
+
+# SKILL.md is the landing file of the directory named for the skill, so
+# the skill answers to the directory URL
+curl -s http://localhost:8112/skills/it2/
+stdout 'iTerm2 CLI Automation'
+
+# The navigation names the skill from its frontmatter, not from the
+# heading, and links to it rather than dropping it as a landing file
+curl -s http://localhost:8112/
+stdout '>\s*it2\s*<'
+! stdout '>\s*Skill\s*<'
+
+# llms.txt carries the skill and its description
+curl -s http://localhost:8112/llms.txt
+stdout '\[it2\]\(skills/it2/SKILL\): Control iTerm2 terminals'
+
+-- testdir/index.md --
+# Welcome
+
+-- testdir/skills/it2/SKILL.md --
+---
+name: it2
+description: Control iTerm2 terminals.
+---
+
+# it2 - iTerm2 CLI Automation
+
+Splitting panes and sending commands.
