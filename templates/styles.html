@@ -433,9 +433,9 @@
         background: var(--surface);
     }
 
+    /* Diagrams keep their natural size; the container scrolls. Scaling
+       a wide flowchart down to fit makes its text illegible. */
     .mermaid svg {
-        max-width: 100%;
-        height: auto;
         display: block;
         margin: 0 auto;
     }

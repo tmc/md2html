@@ -10,13 +10,37 @@
 
             const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
+            // Drive mermaid's base theme from the page palette so diagrams
+            // sit on the same surface as the rest of the page in both
+            // color schemes.
+            const styles = getComputedStyle(document.documentElement);
+            const v = name => styles.getPropertyValue(name).trim();
+
             mermaid.initialize({
                 startOnLoad: false,
-                theme: isDarkMode ? 'dark' : 'default',
+                theme: 'base',
                 securityLevel: 'loose',
-                maxWidth: '100%',
-                useMaxWidth: true,
-                wrap: true
+                themeVariables: {
+                    darkMode: isDarkMode,
+                    background: v('--surface'),
+                    primaryColor: v('--surface-2'),
+                    primaryTextColor: v('--text-1'),
+                    primaryBorderColor: v('--line-strong'),
+                    secondaryColor: v('--surface-2'),
+                    tertiaryColor: v('--surface'),
+                    lineColor: v('--text-2'),
+                    textColor: v('--text-1'),
+                    clusterBkg: v('--surface-2'),
+                    clusterBorder: v('--line'),
+                    edgeLabelBackground: v('--surface'),
+                    fontFamily: styles.fontFamily || 'inherit'
+                },
+                // Natural size plus a scrolling container beats scaling a
+                // wide flowchart down to an illegible thumbnail.
+                flowchart: { useMaxWidth: false },
+                sequence: { useMaxWidth: false, wrap: true },
+                journey: { useMaxWidth: false },
+                timeline: { useMaxWidth: false }
             });
 
             // Convert code blocks with language-mermaid to mermaid diagrams
