@@ -269,6 +269,7 @@ func (p *blockParser) Open(parent ast.Node, reader text.Reader, pc parser.Contex
 	openLine := currentLine(reader)
 	reader.Advance(len(line) - 1)
 	node := NewNode(name, attrs, selfClosing, openLine)
+	node.indent = pos
 	if selfClosing {
 		return node, parser.NoChildren
 	}
@@ -282,22 +283,26 @@ func (p *blockParser) Continue(node ast.Node, reader text.Reader, pc parser.Cont
 		return parser.Close
 	}
 	line, seg := reader.PeekLine()
-	pos := pc.BlockOffset()
-	if pos < 0 {
-		return parser.Continue | parser.HasChildren
+	indent := 0
+	for indent < len(line) && line[indent] == ' ' {
+		indent++
 	}
-	name, ok := scanCloseTag(line[pos:])
-	if !ok || name != n.Name {
-		return parser.Continue | parser.HasChildren
+	if name, ok := scanCloseTag(line[indent:]); ok && name == n.Name {
+		// Close only the innermost open component, so that the inner
+		// tag of a <Card> nested in a <Card> claims the first </Card>.
+		if top, ok := peekOpen(pc); ok && top == n {
+			reader.Advance(seg.Stop - seg.Start - 1)
+			n.closed = true
+			return parser.Close
+		}
 	}
-	// Close only the innermost open component, so that the inner tag of
-	// a <Card> nested in a <Card> claims the first </Card>.
-	if top, ok := peekOpen(pc); !ok || top != n {
-		return parser.Continue | parser.HasChildren
+	// Strip the indentation the tag's nesting introduced, up to one
+	// two-space level past the tag itself, so a body written at JSX
+	// indentation parses as Markdown rather than as indented code.
+	if strip := min(indent, n.indent+2); strip > 0 {
+		reader.Advance(strip)
 	}
-	reader.Advance(seg.Stop - seg.Start - 1)
-	n.closed = true
-	return parser.Close
+	return parser.Continue | parser.HasChildren
 }
 
 func (p *blockParser) Close(node ast.Node, reader text.Reader, pc parser.Context) {

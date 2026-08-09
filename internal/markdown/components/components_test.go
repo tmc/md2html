@@ -259,6 +259,15 @@ func TestBuiltinComponents(t *testing.T) {
 			},
 		},
 		{
+			name: "jsx indentation does not become code",
+			in: "<CardGroup>\n" +
+				"  <Card title=\"A\">\n" +
+				"    Body text.\n" +
+				"  </Card>\n" +
+				"</CardGroup>\n",
+			want: []string{"<p>Body text.</p>"},
+		},
+		{
 			name: "columns is an alias of card group",
 			in:   "<Columns cols={4}>\n<Card title=\"A\">\na\n</Card>\n</Columns>\n",
 			want: []string{`<div class="md-card-group" data-cols="4">`},

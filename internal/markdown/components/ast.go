@@ -23,6 +23,12 @@ type Node struct {
 	// locate an unclosed component.
 	OpenLine int
 
+	// indent is the column of the opening tag. Body lines written one
+	// level deeper than the tag, as JSX convention has them, are
+	// stripped back by this much plus one level so they parse as
+	// ordinary Markdown rather than indented code.
+	indent int
+
 	// closed records that a matching closing tag was consumed, so that
 	// Close can distinguish a well-formed component from one left open
 	// at end of input.
