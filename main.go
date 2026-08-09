@@ -293,7 +293,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
 
-		html, err := markdownToHTMLWithContext(cfg, doc.Content, cfg.Source)
+		html, err := markdownToHTMLWithContext(cfg, promoteTitleHeading(doc), cfg.Source)
 		if err != nil {
 			return err
 		}
@@ -1053,7 +1053,7 @@ func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssCon
 		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 	}
 
-	htmlContent, err := markdownToHTMLWithContext(cfg, doc.Content, file.RelPath)
+	htmlContent, err := markdownToHTMLWithContext(cfg, promoteTitleHeading(doc), file.RelPath)
 	if err != nil {
 		return err
 	}
@@ -1095,6 +1095,28 @@ func pageTitle(frontmatter map[string]any, filePath, fallback string) string {
 	return fallback
 }
 
+// promoteTitleHeading returns the document body with the frontmatter
+// title prepended as an H1 when the body does not already open with one.
+// Mintlify pages carry their heading in frontmatter alone, so without
+// this such pages would open with body text.
+func promoteTitleHeading(doc DocumentData) string {
+	title, ok := doc.Frontmatter["title"].(string)
+	if !ok || strings.TrimSpace(title) == "" {
+		return doc.Content
+	}
+	for _, line := range strings.Split(doc.Content, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "# ") || line == "#" {
+			return doc.Content
+		}
+		break
+	}
+	return "# " + strings.TrimSpace(title) + "\n\n" + doc.Content
+}
+
 // documentTitle names a rendered page. Frontmatter wins, then the document's
 // first heading, then the file name, then fallback. The heading is preferred
 // over the file name because it is what the reader sees at the top of the
@@ -1128,7 +1150,7 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 	if htmlPath == "" {
 		htmlPath = filepath.Base(indexPath)
 	}
-	htmlContent, err := markdownToHTMLWithContext(cfg, doc.Content, htmlPath)
+	htmlContent, err := markdownToHTMLWithContext(cfg, promoteTitleHeading(doc), htmlPath)
 	if err != nil {
 		return err
 	}

@@ -684,7 +684,7 @@ func (s *server) serveNotFound(w http.ResponseWriter, urlPath, css string) {
 
 // renderDocumentWithVersion renders a document with version information
 func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, filePath, version string) (string, error) {
-	html, err := markdownToHTMLWithContext(s.config, doc.Content, filePath)
+	html, err := markdownToHTMLWithContext(s.config, promoteTitleHeading(doc), filePath)
 	if err != nil {
 		return "", err
 	}

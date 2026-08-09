@@ -2,6 +2,59 @@ package md2html
 
 import "testing"
 
+func TestPromoteTitleHeading(t *testing.T) {
+	tests := []struct {
+		name string
+		doc  DocumentData
+		want string
+	}{
+		{
+			name: "title becomes the heading",
+			doc: DocumentData{
+				Frontmatter: map[string]any{"title": "Getting started"},
+				Content:     "Install the tool.\n",
+			},
+			want: "# Getting started\n\nInstall the tool.\n",
+		},
+		{
+			name: "existing heading is kept",
+			doc: DocumentData{
+				Frontmatter: map[string]any{"title": "Getting started"},
+				Content:     "# Already here\n\ntext\n",
+			},
+			want: "# Already here\n\ntext\n",
+		},
+		{
+			name: "no title leaves the body alone",
+			doc:  DocumentData{Frontmatter: map[string]any{}, Content: "text\n"},
+			want: "text\n",
+		},
+		{
+			name: "leading blank lines are skipped",
+			doc: DocumentData{
+				Frontmatter: map[string]any{"title": "T"},
+				Content:     "\n\n# H\n",
+			},
+			want: "\n\n# H\n",
+		},
+		{
+			name: "deeper heading still gets the title",
+			doc: DocumentData{
+				Frontmatter: map[string]any{"title": "T"},
+				Content:     "## Section\n",
+			},
+			want: "# T\n\n## Section\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := promoteTitleHeading(tt.doc); got != tt.want {
+				t.Errorf("promoteTitleHeading() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPageTitle(t *testing.T) {
 	tests := []struct {
 		name        string
