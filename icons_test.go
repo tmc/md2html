@@ -179,6 +179,33 @@ func TestResolveIcon(t *testing.T) {
 	}
 }
 
+// TestResolveFontAwesomeIcons checks Font Awesome names whose Lucide
+// counterparts use different names. These names are used by Mintlify
+// documentation in the wild.
+func TestResolveFontAwesomeIcons(t *testing.T) {
+	tests := []struct {
+		fontAwesome string
+		lucide      string
+	}{
+		{"arrows-turn-to-dots", "workflow"},
+		{"boxes-stacked", "boxes"},
+		{"bullseye", "target"},
+		{"burst", "badge"},
+		{"cube", "box"},
+		{"right-left", "arrow-right-left"},
+		{"ruler-combined", "ruler"},
+		{"table-cells", "table-2"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.fontAwesome, func(t *testing.T) {
+			set := map[string]template.HTML{tt.lucide: "<svg/>"}
+			if got := resolveIcon(set, tt.fontAwesome); got != "<svg/>" {
+				t.Errorf("resolveIcon(%q) against Lucide %q = %q, want the glyph", tt.fontAwesome, tt.lucide, got)
+			}
+		})
+	}
+}
+
 // TestIconAliasesAreNotSelfReferential checks that no alias points at
 // the name it is listed under, which would be a lookup that can never
 // add anything.

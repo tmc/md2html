@@ -18,7 +18,7 @@ import "html/template"
 // depending on which was consulted first; [TestIconGroupsAreDisjoint]
 // enforces that.
 var iconGroups = [][]string{
-	{"diagram-project", "workflow", "sitemap", "git-fork"},
+	{"diagram-project", "arrows-turn-to-dots", "workflow", "sitemap", "git-fork"},
 	{"network-wired", "network", "share-2"},
 	{"circle-question", "circle-help", "help-circle"},
 	{"circle-exclamation", "circle-alert", "alert-circle"},
@@ -32,6 +32,7 @@ var iconGroups = [][]string{
 	{"screwdriver-wrench", "wrench", "tool", "settings-2"},
 	{"file-lines", "file-text", "file"},
 	{"rectangle-list", "list", "list-checks"},
+	{"table-cells", "table-2", "table"},
 	{"gauge-high", "gauge", "gauge-circle"},
 	{"puzzle-piece", "puzzle"},
 	{"robot", "bot"},
@@ -40,7 +41,12 @@ var iconGroups = [][]string{
 	{"vial", "test-tube", "flask", "flask-conical", "beaker"},
 	{"gear", "gears", "settings", "cog"},
 	{"bolt", "zap"},
-	{"box", "package"},
+	{"cube", "box", "package"},
+	{"boxes-stacked", "boxes"},
+	{"bullseye", "target"},
+	{"burst", "badge"},
+	{"right-left", "arrow-right-left"},
+	{"ruler-combined", "ruler"},
 	{"house", "home"},
 }
 
