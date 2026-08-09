@@ -13,6 +13,10 @@ type Extender struct {
 	// Registry supplies the component contracts. A zero Extender uses
 	// [DefaultRegistry].
 	Registry Registry
+
+	// Icons resolves an icon name to its markup for templates that call
+	// [Data.Icon]. A nil Icons leaves every icon empty.
+	Icons IconFunc
 }
 
 // Extend implements goldmark.Extender.
@@ -34,7 +38,7 @@ func (e Extender) Extend(md goldmark.Markdown) {
 	)
 	md.Renderer().AddOptions(
 		renderer.WithNodeRenderers(
-			util.Prioritized(&Renderer{registry: reg}, 100),
+			util.Prioritized(&Renderer{registry: reg, icons: e.Icons}, 100),
 		),
 	)
 }

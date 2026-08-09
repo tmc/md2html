@@ -21,6 +21,7 @@ const contentPlaceholder = "\x00md2html:component-content\x00"
 // Renderer renders component nodes using the templates in its registry.
 type Renderer struct {
 	registry Registry
+	icons    IconFunc
 }
 
 // RegisterFuncs implements renderer.NodeRenderer.
@@ -60,7 +61,7 @@ func (r *Renderer) split(name string, attrs map[string]string) (prefix, suffix s
 		return "", "", fmt.Errorf("components: <%s> is not registered", name)
 	}
 	var buf bytes.Buffer
-	data := Data{Attrs: attrs, Content: template.HTML(contentPlaceholder)}
+	data := Data{Attrs: attrs, Content: template.HTML(contentPlaceholder), icons: r.icons}
 	if err := comp.Template.Execute(&buf, data); err != nil {
 		return "", "", fmt.Errorf("components: render <%s>: %w", name, err)
 	}

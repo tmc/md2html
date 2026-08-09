@@ -159,7 +159,7 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, e
 		&admonitions.Extender{},
 		alertsExtender{},
 		tabs.Extender{},
-		components.Extender{Registry: cfg.componentsRegistry()},
+		components.Extender{Registry: cfg.componentsRegistry(), Icons: cfg.navIcon},
 		media.Extender{},
 		jsonspec.Extension(jscfg),
 	}

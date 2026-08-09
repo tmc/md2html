@@ -2,6 +2,7 @@ package components
 
 import (
 	"bytes"
+	"html/template"
 	"strings"
 	"testing"
 
@@ -259,6 +260,11 @@ func TestBuiltinComponents(t *testing.T) {
 			},
 		},
 		{
+			name: "icon renders as an empty span without a resolver",
+			in:   "<Card title=\"Go\" icon=\"rocket\">\ntext\n</Card>\n",
+			want: []string{`<span class="md-card-icon" data-icon="rocket" aria-hidden="true"></span>`},
+		},
+		{
 			name: "jsx indentation does not become code",
 			in: "<CardGroup>\n" +
 				"  <Card title=\"A\">\n" +
@@ -290,6 +296,28 @@ func TestBuiltinComponents(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestIconResolver(t *testing.T) {
+	md := goldmark.New(goldmark.WithExtensions(Extender{
+		Icons: func(name string) template.HTML {
+			if name == "rocket" {
+				return "<svg>rocket</svg>"
+			}
+			return ""
+		},
+	}))
+	pc := parser.NewContext()
+	source := []byte("<Card title=\"Go\" icon=\"rocket\">\ntext\n</Card>\n")
+	doc := md.Parser().Parse(text.NewReader(source), parser.WithContext(pc))
+	var buf bytes.Buffer
+	if err := md.Renderer().Render(&buf, source, doc); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	got := buf.String()
+	if !strings.Contains(got, `data-icon="rocket" aria-hidden="true"><svg>rocket</svg></span>`) {
+		t.Errorf("icon not resolved to markup:\n%s", got)
 	}
 }
 

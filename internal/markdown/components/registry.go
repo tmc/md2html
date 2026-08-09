@@ -38,6 +38,23 @@ type Data struct {
 
 	// Content is the rendered Markdown body of the component.
 	Content template.HTML
+
+	// icons resolves icon names for [Data.Icon].
+	icons IconFunc
+}
+
+// An IconFunc resolves an icon name to its markup. It returns the empty
+// string for a name it does not know.
+type IconFunc func(name string) template.HTML
+
+// Icon returns the markup for the named icon, or the empty string when
+// no icon resolver is configured or the name is unknown. Templates use
+// it so an icon attribute becomes a glyph rather than its literal name.
+func (d Data) Icon(name string) template.HTML {
+	if d.icons == nil {
+		return ""
+	}
+	return d.icons(name)
 }
 
 // Bool reports whether the named attribute is set to a true value.
@@ -105,7 +122,7 @@ var DefaultRegistry = Registry{
 			`<div class="md-card">` +
 				`{{if .Attrs.href}}<a class="md-card-link" href="{{.Attrs.href}}">{{end}}` +
 				`<div class="md-card-title">` +
-				`{{with .Attrs.icon}}<span class="md-card-icon" aria-hidden="true">{{.}}</span>{{end}}` +
+				`{{with .Attrs.icon}}<span class="md-card-icon" data-icon="{{.}}" aria-hidden="true">{{$.Icon .}}</span>{{end}}` +
 				`{{.Attrs.title}}</div>` +
 				`{{if .Attrs.href}}</a>{{end}}` +
 				`<div class="md-card-body">{{.Content}}</div>` +
@@ -130,7 +147,7 @@ var DefaultRegistry = Registry{
 			`<li class="md-step"{{with .Attrs.stepNumber}} value="{{.}}"{{end}}` +
 				`{{with .Attrs.id}} id="{{.}}"{{end}}>` +
 				`<div class="md-step-title">` +
-				`{{with .Attrs.icon}}<span class="md-step-icon" aria-hidden="true">{{.}}</span>{{end}}` +
+				`{{with .Attrs.icon}}<span class="md-step-icon" data-icon="{{.}}" aria-hidden="true">{{$.Icon .}}</span>{{end}}` +
 				`{{.Attrs.title}}</div>` +
 				`<div class="md-step-body">{{.Content}}</div>` +
 				`</li>`)),
@@ -151,7 +168,7 @@ var DefaultRegistry = Registry{
 				` data-size="{{or .Attrs.size "sm"}}" data-shape="{{or .Attrs.shape "rounded"}}"` +
 				`{{if .Bool "stroke"}} data-stroke="true"{{end}}` +
 				`{{if .Bool "disabled"}} data-disabled="true"{{end}}>` +
-				`{{with .Attrs.icon}}<span class="md-badge-icon" aria-hidden="true">{{.}}</span>{{end}}` +
+				`{{with .Attrs.icon}}<span class="md-badge-icon" data-icon="{{.}}" aria-hidden="true">{{$.Icon .}}</span>{{end}}` +
 				`{{.Content}}</span>`)),
 	},
 	// Tooltip uses the title attribute so the hint is available without
@@ -205,7 +222,7 @@ func accordion(name string) Component {
 			`<details class="md-accordion"{{with .Attrs.id}} id="{{.}}"{{end}}` +
 				`{{if .Bool "defaultOpen"}} open{{end}}>` +
 				`<summary class="md-accordion-summary">` +
-				`{{with .Attrs.icon}}<span class="md-accordion-icon" aria-hidden="true">{{.}}</span>{{end}}` +
+				`{{with .Attrs.icon}}<span class="md-accordion-icon" data-icon="{{.}}" aria-hidden="true">{{$.Icon .}}</span>{{end}}` +
 				`<span class="md-accordion-title">{{.Attrs.title}}</span>` +
 				`{{with .Attrs.description}}<span class="md-accordion-description">{{.}}</span>{{end}}` +
 				`</summary>` +
