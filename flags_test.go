@@ -17,3 +17,13 @@ func TestConfigFromForeignFlagSet(t *testing.T) {
 		t.Fatalf("HTTP = %q, want empty", cfg.HTTP)
 	}
 }
+
+func TestChdirFlag(t *testing.T) {
+	fs := NewFlagSet("md2html")
+	if err := fs.Parse([]string{"-C", "/somewhere"}); err != nil {
+		t.Fatal(err)
+	}
+	if cfg := ConfigFromFlags(fs); cfg.Chdir != "/somewhere" {
+		t.Fatalf("Chdir = %q, want /somewhere", cfg.Chdir)
+	}
+}

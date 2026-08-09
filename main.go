@@ -23,6 +23,10 @@ import (
 )
 
 type Config struct {
+	// Chdir is a directory to change to before anything else, like
+	// go -C or make -C. Every relative path — the source, output,
+	// css, and configuration files — then resolves against it.
+	Chdir             string
 	Source            string // file, directory, or "-" for stdin
 	HTTP              string
 	HTML              string
@@ -103,6 +107,7 @@ type Config struct {
 // NewFlagSet returns a FlagSet configured for the md2html CLI.
 func NewFlagSet(name string) *flag.FlagSet {
 	fs := flag.NewFlagSet(name, flag.ExitOnError)
+	fs.String("C", "", "change to directory before doing anything else")
 	fs.String("http", "", "HTTP server bind address")
 	fs.String("html", "", "output directory for static HTML generation (disables server mode)")
 	fs.Bool("open", false, "automatically open browser")
@@ -142,6 +147,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 // ConfigFromFlags creates a Config from an initialized FlagSet.
 func ConfigFromFlags(fs *flag.FlagSet) Config {
 	return Config{
+		Chdir:             flagString(fs, "C"),
 		HTTP:              flagString(fs, "http"),
 		HTML:              flagString(fs, "html"),
 		Open:              flagBool(fs, "open"),
@@ -207,6 +213,14 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	// Set up signal handling
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Change directory first so every later relative path resolves
+	// against it. This is process-global, which is what -C means.
+	if cfg.Chdir != "" {
+		if err := os.Chdir(cfg.Chdir); err != nil {
+			return fmt.Errorf("chdir: %w", err)
+		}
+	}
 
 	if err := validateFormat(cfg.Format); err != nil {
 		return err
