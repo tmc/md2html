@@ -74,6 +74,7 @@ func AllChecks() []Check {
 		CaseCheck{},
 		RawHTMLCheck{},
 		ComponentCheck{},
+		IconCheck{},
 	}
 }
 

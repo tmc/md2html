@@ -28,6 +28,7 @@ func runVet(cfg Config, logger *slog.Logger) {
 		checks = withoutVetCheck(checks, "frontmatter")
 	}
 	checks = withVetComponents(cfg, checks)
+	checks = withVetIcons(cfg, checks)
 
 	// md2html already knows the prefix the tree is served under, which
 	// is what makes a link written as "/docs/quickstart" resolvable back
@@ -53,6 +54,20 @@ func runVet(cfg Config, logger *slog.Logger) {
 	if len(diags) > 0 {
 		logger.Info("vet: completed with diagnostics", "count", len(diags))
 	}
+}
+
+func withVetIcons(cfg Config, checks []mdvet.Check) []mdvet.Check {
+	if cfg.iconDisabled {
+		return withoutVetCheck(checks, "icons")
+	}
+	out := make([]mdvet.Check, len(checks))
+	copy(out, checks)
+	for i, check := range out {
+		if _, ok := check.(mdvet.IconCheck); ok {
+			out[i] = mdvet.IconCheck{Resolve: cfg.hasIcon}
+		}
+	}
+	return out
 }
 
 // withVetComponents points the components check at the same registry
