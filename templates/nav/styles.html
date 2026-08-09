@@ -13,7 +13,13 @@
         align-items: center;
         gap: 1rem;
         height: var(--topbar-height);
-        padding: 0 1.5rem;
+        /*
+         * The bar itself is full-bleed for the background and border,
+         * but its content is held to the same 100rem measure as the
+         * layout below so the name and links line up with the sidebar
+         * and table of contents instead of the viewport edges.
+         */
+        padding: 0 max(1.5rem, calc((100% - 100rem) / 2));
         background: color-mix(in srgb, var(--bg) 82%, transparent);
         backdrop-filter: saturate(160%) blur(12px);
         -webkit-backdrop-filter: saturate(160%) blur(12px);
