@@ -120,6 +120,22 @@ func TestLoadDocsJSONFromSiteRoot(t *testing.T) {
 	}
 }
 
+// TestLoadDocsJSONRelativeDir checks that a relative source directory,
+// as a plain "md2html -html out ." invocation produces, still resolves
+// pages against the absolute docs.json directory.
+func TestLoadDocsJSONRelativeDir(t *testing.T) {
+	siteDir, _ := writeDocsSite(t, testDocsJSON)
+	t.Chdir(siteDir)
+
+	nav, _, ok := loadDocsJSON(".", "")
+	if !ok {
+		t.Fatal("loadDocsJSON did not load docs.json for a relative source directory")
+	}
+	if got, want := nav.Items[0].Children[0].Path, "docs/index.md"; got != want {
+		t.Errorf("page path = %q, want %q", got, want)
+	}
+}
+
 func TestLoadDocsJSONAbsent(t *testing.T) {
 	// t.TempDir is under the system temp directory, which has no docs.json
 	// above it in any tree this test controls.

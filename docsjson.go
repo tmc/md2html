@@ -149,6 +149,13 @@ func cssColor(v string) string {
 // none of the pages it names live under sourceDir — a docs.json found
 // several levels up may describe an unrelated tree.
 func loadDocsJSON(sourceDir, htmlExt string) (nav *Navigation, site siteInfo, ok bool) {
+	// Page paths are resolved against the docs.json directory, which
+	// findDocsJSON returns absolute, so the source directory must be
+	// absolute too for filepath.Rel to relate them.
+	sourceDir, err := filepath.Abs(sourceDir)
+	if err != nil {
+		return nil, siteInfo{}, false
+	}
 	siteDir, found := findDocsJSON(sourceDir)
 	if !found {
 		return nil, siteInfo{}, false
