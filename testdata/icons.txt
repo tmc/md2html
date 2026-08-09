@@ -16,9 +16,14 @@ grep 'data-icon="no-such-icon" aria-hidden="true"></span>' output/quickstart.htm
 
 rm -rf output
 
-# Without -icons, pages still record what they asked for and render
-# without a glyph.
+# Without -icons, pages render from the built-in Font Awesome set.
 md2html -html output -html-ext html -nav site
+grep 'data-icon="rocket" aria-hidden="true"><svg' output/quickstart.html
+
+rm -rf output
+
+# -no-icons disables the built-in set without dropping the requested name.
+md2html -html output -html-ext html -nav -no-icons site
 grep 'data-icon="rocket" aria-hidden="true"></span>' output/quickstart.html
 
 rm -rf output

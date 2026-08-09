@@ -16,6 +16,7 @@ import (
 type NavItem struct {
 	Title    string     `json:"title"`
 	Icon     string     `json:"icon,omitempty"`     // Icon name from page frontmatter
+	IconType string     `json:"iconType,omitempty"` // Font Awesome style from page frontmatter
 	Path     string     `json:"path"`               // Source file path (e.g., "getting-started/installation.md")
 	URL      string     `json:"url"`                // Rendered URL (with htmlExt applied)
 	Level    int        `json:"level"`              // Nesting depth (0 = top level)
@@ -332,6 +333,7 @@ type autoNavFile struct {
 	base            string
 	title           string
 	icon            string
+	iconType        string
 	weight          int
 	hasWeight       bool
 	sidebarPosition int
@@ -419,6 +421,7 @@ func readAutoNavFile(name, rel string) (autoNavFile, error) {
 		base:            base,
 		title:           autoNavTitle(base, cleanStem, doc),
 		icon:            navIcon(doc),
+		iconType:        navIconType(doc),
 		weight:          frontmatterInt(doc.Frontmatter, "weight"),
 		hasWeight:       hasFrontmatterInt(doc.Frontmatter, "weight"),
 		sidebarPosition: frontmatterInt(doc.Frontmatter, "sidebar_position"),
@@ -494,11 +497,12 @@ func buildAutoNavItems(files []autoNavFile, htmlExt string) []*NavItem {
 
 func autoNavItem(f autoNavFile, htmlExt string, level int) *NavItem {
 	return &NavItem{
-		Title: f.title,
-		Icon:  f.icon,
-		Path:  f.relPath,
-		URL:   pathToURL(f.relPath, htmlExt),
-		Level: level,
+		Title:    f.title,
+		Icon:     f.icon,
+		IconType: f.iconType,
+		Path:     f.relPath,
+		URL:      pathToURL(f.relPath, htmlExt),
+		Level:    level,
 	}
 }
 
@@ -530,6 +534,14 @@ func navIcon(doc DocumentData) string {
 		return ""
 	}
 	return s
+}
+
+func navIconType(doc DocumentData) string {
+	s := strings.TrimSpace(firstFrontmatterString(doc.Frontmatter, "iconType"))
+	if iconName.MatchString(s) {
+		return s
+	}
+	return ""
 }
 
 func autoNavGroupTitle(dir string, landing map[string]autoNavFile) string {

@@ -461,3 +461,15 @@ func TestAutoNavigationIcons(t *testing.T) {
 		})
 	}
 }
+
+func TestAutoNavigationIconType(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "history.md", "---\nicon: clock\niconType: regular\n---\n# History\n")
+	nav, err := AutoNavigationFromDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := nav.Flat[0].IconType; got != "regular" {
+		t.Errorf("iconType = %q, want regular", got)
+	}
+}

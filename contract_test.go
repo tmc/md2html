@@ -81,6 +81,7 @@ func TestPublicContractFields(t *testing.T) {
 				{"RepoURL", "string"},
 				{"Stars", "string"},
 				{"ShowStars", "bool"},
+				{"IconAttribution", "template.HTML"},
 				{"NavLinks", "[]md2html.SiteLink"},
 			},
 		},

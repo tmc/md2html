@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
+
+	"github.com/tmc/md2html/internal/iconsets"
 )
 
 // prepareIcons resolves [Config.Icons] into the icon set the navigation
@@ -21,10 +24,20 @@ func prepareIcons(cfg Config) (Config, error) {
 	if cfg.iconSet != nil {
 		return cfg, nil
 	}
+	if cfg.NoIcons {
+		cfg.iconSet = make(map[string]template.HTML)
+		cfg.iconMissing = new(sync.Map)
+		cfg.iconDisabled = true
+		return cfg, nil
+	}
 	if strings.TrimSpace(cfg.Icons) == "" {
 		dir, set := findIcons(cfg.Source)
-		cfg.Icons, cfg.iconSet = dir, set
-		return cfg, nil
+		if len(set) != 0 {
+			cfg.Icons, cfg.iconSet = dir, set
+			cfg.iconMissing = new(sync.Map)
+			return cfg, nil
+		}
+		return prepareBuiltinIcons(cfg, iconLibraryForSource(cfg.Source))
 	}
 	dir, err := filepath.Abs(cfg.Icons)
 	if err != nil {
@@ -36,20 +49,56 @@ func prepareIcons(cfg Config) (Config, error) {
 	}
 	cfg.Icons = dir
 	cfg.iconSet = set
+	cfg.iconMissing = new(sync.Map)
 	return cfg, nil
 }
 
-// iconDirName is the directory an icon set is kept in, both beside the
-// documentation and in the user's configuration.
+func prepareBuiltinIcons(cfg Config, name string) (Config, error) {
+	lib, err := iconsets.Load(name)
+	if err != nil {
+		return cfg, fmt.Errorf("load built-in icons: %w", err)
+	}
+	cfg.iconAttribution = lib.Attribution
+	cfg.iconMissing = new(sync.Map)
+	cfg.iconSet = make(map[string]template.HTML)
+	if name != "fontawesome" {
+		for name, svg := range lib.Icons {
+			cfg.iconSet[name] = inlineSVG(svg)
+		}
+		return cfg, nil
+	}
+	cfg.iconStyles = make(map[string]map[string]template.HTML)
+	for _, style := range []string{"solid", "regular", "brands"} {
+		cfg.iconStyles[style] = make(map[string]template.HTML)
+	}
+	for key, svg := range lib.Icons {
+		style, name, ok := strings.Cut(key, "/")
+		if !ok {
+			continue
+		}
+		markup := inlineSVG(svg)
+		cfg.iconStyles[style][name] = markup
+	}
+	for _, style := range []string{"solid", "regular", "brands"} {
+		for name, markup := range cfg.iconStyles[style] {
+			if _, exists := cfg.iconSet[name]; !exists {
+				cfg.iconSet[name] = markup
+			}
+		}
+	}
+	return cfg, nil
+}
+
+// iconDirName is the directory an icon set is kept in beside documentation.
 const iconDirName = "icons"
 
 // iconSearchPath lists where an icon set is looked for when -icons was
 // not given, nearest first: beside the documentation, then at the root
-// of the published site, then in the user's configuration.
+// of the published site.
 //
 // Icons that ship with a site belong to it and should be found without
-// being named. A set in the user's configuration is the fallback, so a
-// preview of someone else's tree still draws icons.
+// being named. Machine-global directories are deliberately omitted so
+// the same source tree renders the same way on every machine.
 func iconSearchPath(source string) []string {
 	var dirs []string
 	if root, err := sourceRoot(source); err == nil && root != "" {
@@ -57,12 +106,6 @@ func iconSearchPath(source string) []string {
 		if siteDir, found := findDocsJSON(root); found {
 			dirs = append(dirs, filepath.Join(siteDir, iconDirName))
 		}
-	}
-	if config, err := os.UserConfigDir(); err == nil {
-		dirs = append(dirs, filepath.Join(config, "md2html", iconDirName))
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		dirs = append(dirs, filepath.Join(home, ".md2html", iconDirName))
 	}
 	return dirs
 }
@@ -100,7 +143,7 @@ func loadIcons(dir string) (map[string]template.HTML, error) {
 			return nil, err
 		}
 		name := strings.TrimSuffix(filepath.Base(entry), ".svg")
-		set[name] = inlineSVG(string(data))
+		set[name] = inlineCustomSVG(string(data))
 	}
 	return set, nil
 }
@@ -120,7 +163,19 @@ var (
 // Icons are operator-supplied configuration, like the template directory,
 // so this is presentation rather than sanitization.
 func inlineSVG(svg string) template.HTML {
-	svg = svgComment.ReplaceAllString(svg, "")
+	return inlineSVGWithComments(svg, false)
+}
+
+// inlineCustomSVG keeps comments because an operator-supplied SVG may
+// carry attribution required by its license.
+func inlineCustomSVG(svg string) template.HTML {
+	return inlineSVGWithComments(svg, true)
+}
+
+func inlineSVGWithComments(svg string, keepComments bool) template.HTML {
+	if !keepComments {
+		svg = svgComment.ReplaceAllString(svg, "")
+	}
 	// Only the root element is resized. Shapes inside an icon carry
 	// width and height of their own -- a Lucide "workflow" is two
 	// rectangles and a connector -- and stripping those collapses them
@@ -146,5 +201,49 @@ func replaceFirst(s string, re *regexp.Regexp, f func(string) string) string {
 // with no icon leaves the entry without one, which is how pages render
 // when no set is configured at all.
 func (cfg Config) navIcon(name string) template.HTML {
-	return resolveIcon(cfg.iconSet, name)
+	return cfg.navIconType(name, "")
+}
+
+func (cfg Config) navIconType(name, style string) template.HTML {
+	if cfg.iconDisabled {
+		return ""
+	}
+	if style != "" && cfg.iconStyles != nil {
+		set, ok := cfg.iconStyles[style]
+		if !ok {
+			cfg.warnMissingIcon(name, style)
+			return ""
+		}
+		if svg := resolveIcon(set, name); svg != "" {
+			return svg
+		}
+		cfg.warnMissingIcon(name, style)
+		return ""
+	}
+	if svg := resolveIcon(cfg.iconSet, name); svg != "" {
+		return svg
+	}
+	cfg.warnMissingIcon(name, style)
+	return ""
+}
+
+func (cfg Config) hasIcon(name, style string) bool {
+	if cfg.iconDisabled {
+		return false
+	}
+	if style != "" && cfg.iconStyles != nil {
+		return resolveIcon(cfg.iconStyles[style], name) != ""
+	}
+	return resolveIcon(cfg.iconSet, name) != ""
+}
+
+func (cfg Config) warnMissingIcon(name, style string) {
+	if cfg.iconLogger == nil || cfg.iconMissing == nil {
+		return
+	}
+	key := style + "/" + name
+	if _, loaded := cfg.iconMissing.LoadOrStore(key, struct{}{}); loaded {
+		return
+	}
+	cfg.iconLogger.Warn("Icon not found", "name", name, "style", style)
 }

@@ -301,15 +301,15 @@ func TestBuiltinComponents(t *testing.T) {
 
 func TestIconResolver(t *testing.T) {
 	md := goldmark.New(goldmark.WithExtensions(Extender{
-		Icons: func(name string) template.HTML {
-			if name == "rocket" {
+		Icons: func(name, style string) template.HTML {
+			if name == "rocket" && style == "regular" {
 				return "<svg>rocket</svg>"
 			}
 			return ""
 		},
 	}))
 	pc := parser.NewContext()
-	source := []byte("<Card title=\"Go\" icon=\"rocket\">\ntext\n</Card>\n")
+	source := []byte("<Card title=\"Go\" icon=\"rocket\" iconType=\"regular\">\ntext\n</Card>\n")
 	doc := md.Parser().Parse(text.NewReader(source), parser.WithContext(pc))
 	var buf bytes.Buffer
 	if err := md.Renderer().Render(&buf, source, doc); err != nil {

@@ -45,7 +45,7 @@ type Data struct {
 
 // An IconFunc resolves an icon name to its markup. It returns the empty
 // string for a name it does not know.
-type IconFunc func(name string) template.HTML
+type IconFunc func(name, style string) template.HTML
 
 // Icon returns the markup for the named icon, or the empty string when
 // no icon resolver is configured or the name is unknown. Templates use
@@ -54,7 +54,7 @@ func (d Data) Icon(name string) template.HTML {
 	if d.icons == nil {
 		return ""
 	}
-	return d.icons(name)
+	return d.icons(name, d.Attrs["iconType"])
 }
 
 // Bool reports whether the named attribute is set to a true value.
@@ -116,7 +116,7 @@ func (c Component) validate(name string, attrs map[string]string) []string {
 // at markup the theme has no styles for.
 var DefaultRegistry = Registry{
 	"Card": {
-		Attrs:    []string{"title", "icon", "href"},
+		Attrs:    []string{"title", "icon", "iconType", "href"},
 		Required: []string{"title"},
 		Template: template.Must(template.New("Card").Parse(
 			`<div class="md-card">` +
@@ -141,7 +141,7 @@ var DefaultRegistry = Registry{
 			`<ol class="md-steps" data-title-size="{{or .Attrs.titleSize "p"}}">{{.Content}}</ol>`)),
 	},
 	"Step": {
-		Attrs:    []string{"title", "icon", "stepNumber", "id", "noAnchor"},
+		Attrs:    []string{"title", "icon", "iconType", "stepNumber", "id", "noAnchor"},
 		Required: []string{"title"},
 		Template: template.Must(template.New("Step").Parse(
 			`<li class="md-step"{{with .Attrs.stepNumber}} value="{{.}}"{{end}}` +
@@ -161,7 +161,7 @@ var DefaultRegistry = Registry{
 	"Expandable": accordion("Expandable"),
 
 	"Badge": {
-		Attrs:  []string{"color", "size", "shape", "icon", "stroke", "disabled"},
+		Attrs:  []string{"color", "size", "shape", "icon", "iconType", "stroke", "disabled"},
 		Inline: true,
 		Template: template.Must(template.New("Badge").Parse(
 			`<span class="md-badge" data-color="{{or .Attrs.color "gray"}}"` +
@@ -216,7 +216,7 @@ var cardGroup = Component{
 // or a reader with scripts blocked still shows the open sections.
 func accordion(name string) Component {
 	return Component{
-		Attrs:    []string{"title", "description", "defaultOpen", "id", "icon"},
+		Attrs:    []string{"title", "description", "defaultOpen", "id", "icon", "iconType"},
 		Required: []string{"title"},
 		Template: template.Must(template.New(name).Parse(
 			`<details class="md-accordion"{{with .Attrs.id}} id="{{.}}"{{end}}` +

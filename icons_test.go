@@ -2,6 +2,7 @@ package md2html
 
 import (
 	"html/template"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -80,10 +81,13 @@ func TestPrepareIcons(t *testing.T) {
 	}
 
 	rocket := string(cfg.navIcon("rocket"))
-	for _, unwanted := range []string{`width="24"`, `height="24"`, "<!--", "\n"} {
+	for _, unwanted := range []string{`width="24"`, `height="24"`, "\n"} {
 		if strings.Contains(rocket, unwanted) {
 			t.Errorf("inlined icon still contains %q:\n%s", unwanted, rocket)
 		}
+	}
+	if !strings.Contains(rocket, "<!-- @license example - ISC -->") {
+		t.Errorf("operator-supplied icon lost its attribution comment:\n%s", rocket)
 	}
 	for _, wanted := range []string{`viewBox="0 0 24 24"`, `stroke="currentColor"`, "<path"} {
 		if !strings.Contains(rocket, wanted) {
@@ -130,16 +134,120 @@ func isolateIconHome(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
 }
 
-// TestPrepareIconsUnset checks that no icon directory is not an error:
-// icons are optional, and pages naming one simply render without it.
+// TestPrepareIconsUnset checks that Font Awesome is the deterministic
+// default when no project or explicit icon directory is present.
 func TestPrepareIconsUnset(t *testing.T) {
 	isolateIconHome(t)
 	cfg, err := prepareIcons(Config{})
 	if err != nil {
 		t.Fatalf("prepareIcons() error = %v", err)
 	}
+	if got := cfg.navIcon("rocket"); got == "" {
+		t.Error("navIcon() did not use the built-in Font Awesome set")
+	}
+}
+
+func TestPrepareBuiltinIconLibraries(t *testing.T) {
+	for _, library := range []string{"fontawesome", "lucide", "tabler"} {
+		t.Run(library, func(t *testing.T) {
+			cfg, err := prepareBuiltinIcons(Config{}, library)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.navIcon("rocket") == "" {
+				t.Errorf("%s has no rocket icon", library)
+			}
+			if cfg.iconAttribution == "" {
+				t.Errorf("%s has no attribution", library)
+			}
+		})
+	}
+}
+
+func TestPrepareIconsLibrarySelection(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "docs.json"), []byte(`{"icons":{"library":"lucide"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := prepareIcons(Config{Source: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.iconAttribution; !strings.Contains(got, "Lucide") {
+		t.Errorf("docs.json selected attribution %q, want Lucide", got)
+	}
+}
+
+func TestFontAwesomeStyles(t *testing.T) {
+	cfg, err := prepareBuiltinIcons(Config{}, "fontawesome")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.navIconType("clock", "regular") == "" {
+		t.Error("regular clock did not resolve")
+	}
+	if cfg.navIconType("apple", "brands") == "" {
+		t.Error("brands apple did not resolve")
+	}
+	if got := cfg.navIconType("rocket", "light"); got != "" {
+		t.Errorf("unsupported explicit light style resolved to %q", got)
+	}
+	if got := cfg.navIconType("rocket", "regular"); got != "" {
+		t.Errorf("missing regular rocket silently fell back to another style: %q", got)
+	}
+}
+
+func TestNoIcons(t *testing.T) {
+	cfg, err := prepareIcons(Config{NoIcons: true})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got := cfg.navIcon("rocket"); got != "" {
-		t.Errorf("navIcon() = %q with no icon set, want empty", got)
+		t.Errorf("navIcon() with NoIcons = %q, want empty", got)
+	}
+}
+
+func TestMissingIconWarnsOnce(t *testing.T) {
+	var log strings.Builder
+	cfg, err := prepareBuiltinIcons(Config{}, "fontawesome")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.iconLogger = slog.New(slog.NewTextHandler(&log, nil))
+	cfg.navIcon("not-a-real-icon")
+	cfg.navIcon("not-a-real-icon")
+	if got := strings.Count(log.String(), "Icon not found"); got != 1 {
+		t.Errorf("missing-icon warnings = %d, want 1:\n%s", got, log.String())
+	}
+}
+
+func TestIconSearchPathHasNoGlobalDirectories(t *testing.T) {
+	root := t.TempDir()
+	for _, dir := range iconSearchPath(root) {
+		if !strings.HasPrefix(dir, root+string(filepath.Separator)) {
+			t.Errorf("icon search path contains machine-global directory %q", dir)
+		}
+	}
+}
+
+func TestFontAwesomeCorpus(t *testing.T) {
+	cfg, err := prepareBuiltinIcons(Config{}, "fontawesome")
+	if err != nil {
+		t.Fatal(err)
+	}
+	icons := []string{
+		"apple", "arrows-turn-to-dots", "book-open", "box-archive", "boxes-stacked",
+		"bullseye", "burst", "calendar-check", "chart-line", "clock", "code",
+		"comments", "cube", "cubes", "diagram-next", "diagram-project", "flask",
+		"folder-tree", "gauge-high", "graduation-cap", "hammer", "house", "life-ring",
+		"list", "map", "microchip", "microscope", "network-wired", "play", "right-left",
+		"rocket", "ruler-combined", "screwdriver-wrench", "shapes", "table", "table-cells",
+		"triangle-exclamation", "wrench",
+	}
+	for _, icon := range icons {
+		if cfg.navIcon(icon) == "" {
+			t.Errorf("Font Awesome default does not resolve %q", icon)
+		}
 	}
 }
 
@@ -350,14 +458,14 @@ func TestFindIconsSearchPath(t *testing.T) {
 		}
 	})
 
-	// No icons anywhere is not an error: pages simply render without.
-	t.Run("nothing found is not an error", func(t *testing.T) {
+	// No project icons falls back to the deterministic built-in set.
+	t.Run("nothing found uses built-in icons", func(t *testing.T) {
 		cfg, err := prepareIcons(Config{Source: t.TempDir()})
 		if err != nil {
 			t.Fatalf("prepareIcons() error = %v", err)
 		}
-		if cfg.navIcon("rocket") != "" {
-			t.Error("found an icon where none was configured")
+		if cfg.navIcon("rocket") == "" {
+			t.Error("built-in Font Awesome icon was not found")
 		}
 	})
 

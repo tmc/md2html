@@ -95,7 +95,7 @@ func TestRenderTemplateNavIconSVG(t *testing.T) {
 	}
 
 	install := &NavItem{Title: "Install", Path: "install.md", URL: "install.html", Icon: "rocket"}
-	absent := &NavItem{Title: "Absent", Path: "absent.md", URL: "absent.html", Icon: "no-such-icon"}
+	absent := &NavItem{Title: "Absent", Path: "absent.md", URL: "absent.html", Icon: "clock"}
 	nav := &Navigation{Items: []*NavItem{install, absent}}
 	nav.buildIndexes()
 	opts := RenderOptions{Nav: nav.ForPage("install.md"), SiteTitle: "Docs", FilePath: "install.md"}
@@ -111,8 +111,27 @@ func TestRenderTemplateNavIconSVG(t *testing.T) {
 	}
 	// A name the set does not have leaves an empty marker rather than
 	// failing the render.
-	if !strings.Contains(got, `data-icon="no-such-icon" aria-hidden="true"></span>`) {
-		t.Fatalf("unknown icon name did not render an empty marker:\n%s", got)
+	if !strings.Contains(got, `data-icon="clock" aria-hidden="true"></span>`) {
+		t.Fatalf("custom icon directory fell back to the built-in set:\n%s", got)
+	}
+}
+
+func TestRenderTemplateBuiltinIconStyleAndAttribution(t *testing.T) {
+	cfg, err := prepareBuiltinIcons(Config{HTMLExt: "html"}, "fontawesome")
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := &NavItem{Title: "History", Path: "history.md", URL: "history.html", Icon: "clock", IconType: "regular"}
+	nav := &Navigation{Items: []*NavItem{item}}
+	nav.buildIndexes()
+	opts := RenderOptions{Nav: nav.ForPage("history.md"), SiteTitle: "Docs", FilePath: "history.md"}
+	got := mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "History", "", false, nil, opts)
+	want := string(cfg.navIconType("clock", "regular"))
+	if want == "" || !strings.Contains(got, want) {
+		t.Fatalf("rendered navigation did not use the requested regular icon")
+	}
+	if strings.Count(got, cfg.iconAttribution) != 1 {
+		t.Errorf("built-in attribution count = %d, want 1", strings.Count(got, cfg.iconAttribution))
 	}
 }
 

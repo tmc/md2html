@@ -35,8 +35,35 @@ func siteTitle(configured, siteName string) string {
 type docsJSON struct {
 	Name       string             `json:"name"`
 	Colors     docsJSONColors     `json:"colors"`
+	Icons      docsJSONIcons      `json:"icons"`
 	Navigation docsJSONNavigation `json:"navigation"`
 	Navbar     docsJSONNavbar     `json:"navbar"`
+}
+
+type docsJSONIcons struct {
+	Library string `json:"library"`
+}
+
+// iconLibraryForSource reports the library selected by docs.json.
+// Mintlify defaults to Font Awesome when the setting is absent.
+func iconLibraryForSource(source string) string {
+	root, found := findDocsJSON(source)
+	if !found {
+		return "fontawesome"
+	}
+	data, err := os.ReadFile(filepath.Join(root, docsJSONName))
+	if err != nil {
+		return "fontawesome"
+	}
+	var doc docsJSON
+	if json.Unmarshal(data, &doc) != nil {
+		return "fontawesome"
+	}
+	switch doc.Icons.Library {
+	case "fontawesome", "lucide", "tabler":
+		return doc.Icons.Library
+	}
+	return "fontawesome"
 }
 
 // docsJSONNavbar is the bar above the page. Mintlify puts plain links
@@ -269,11 +296,12 @@ func (b docsJSONBuilder) page(pagePath string, level int) *NavItem {
 		base := path.Base(source)
 		stem := strings.TrimSuffix(base, path.Ext(base))
 		return &NavItem{
-			Title: autoNavTitle(base, stem, docData),
-			Icon:  navIcon(docData),
-			Path:  source,
-			URL:   pathToURL(source, b.htmlExt),
-			Level: level,
+			Title:    autoNavTitle(base, stem, docData),
+			Icon:     navIcon(docData),
+			IconType: navIconType(docData),
+			Path:     source,
+			URL:      pathToURL(source, b.htmlExt),
+			Level:    level,
 		}
 	}
 	return nil

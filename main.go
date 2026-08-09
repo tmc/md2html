@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -89,12 +90,19 @@ type Config struct {
 	Stars bool
 
 	// Icons is a directory of .svg files, one per icon name, drawn on
-	// by pages that name an icon in their frontmatter. Empty means
-	// pages render without icons.
+	// by pages that name an icon in their frontmatter. It replaces the
+	// icon library selected by docs.json.
 	Icons string
+	// NoIcons disables both built-in and directory icon sets.
+	NoIcons bool
 
 	componentRegistry components.Registry
 	iconSet           map[string]template.HTML
+	iconStyles        map[string]map[string]template.HTML
+	iconAttribution   string
+	iconMissing       *sync.Map
+	iconLogger        *slog.Logger
+	iconDisabled      bool
 	// starsAPI overrides the host star counts are read from. Only tests
 	// set it; the empty value means the real API.
 	starsAPI string
@@ -137,7 +145,8 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.String("format", "", "structured Markdown format: okf")
 	fs.String("jsonspec", "", "directory containing jsonspec.json and *.schema.json files")
 	fs.String("components", "", "directory containing components.json and component templates")
-	fs.String("icons", "", "directory of .svg files named for the icons pages request in frontmatter (default: ./icons beside the docs, or the user config directory)")
+	fs.String("icons", "", "directory of .svg files named for the icons pages request in frontmatter (replaces the library selected by docs.json)")
+	fs.Bool("no-icons", false, "disable navigation and component icons")
 	fs.Bool("github-stars", false, "fetch the star count of the repository named in docs.json and show it in the bar")
 	fs.Bool("vet", false, "run mdvet checks on source markdown and report diagnostics (does not block rendering)")
 	fs.String("vet-checks", "", "comma-separated mdvet check names to run with -vet (default: all)")
@@ -178,6 +187,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		JSONSpec:          flagString(fs, "jsonspec"),
 		Components:        flagString(fs, "components"),
 		Icons:             flagString(fs, "icons"),
+		NoIcons:           flagBool(fs, "no-icons"),
 		Stars:             flagBool(fs, "github-stars"),
 		Vet:               flagBool(fs, "vet"),
 		VetChecks:         flagString(fs, "vet-checks"),
@@ -259,6 +269,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		handler := slog.NewTextHandler(os.Stderr, opts)
 		logger = slog.New(handler)
 	}
+	cfg.iconLogger = logger
 
 	// Run mdvet checks before any rendering. Diagnostics are reported
 	// to the logger but never cause Run to fail.
@@ -563,7 +574,7 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 		"navHref": func(currentFile, targetFile, htmlExt, indexFile string) string {
 			return relativeRenderedLink(currentFile, targetFile, htmlExt, indexFile)
 		},
-		"navIcon": cfg.navIcon,
+		"navIcon": cfg.navIconType,
 		"asset": func(assets map[string]string, name string) string {
 			if assets != nil {
 				if v := assets[name]; v != "" {
@@ -729,6 +740,10 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 	var buf bytes.Buffer
 	mermaidTheme, mermaidDarkTheme, mermaidAutoTheme := resolveMermaidThemes(frontmatter)
 	meta := pageMetadata(cfg, title, frontmatter, opts)
+	var iconAttribution template.HTML
+	if cfg.iconAttribution != "" {
+		iconAttribution = template.HTML("<!-- " + cfg.iconAttribution + " -->")
+	}
 
 	data := templateData{
 		Title:            title,
@@ -766,6 +781,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		NavLinks:         opts.NavLinks,
 		Stars:            opts.Stars,
 		ShowStars:        opts.ShowStars,
+		IconAttribution:  iconAttribution,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -818,6 +834,9 @@ type templateData struct {
 	RepoURL   string
 	Stars     string
 	ShowStars bool
+	// IconAttribution credits the built-in icon set in one place instead
+	// of repeating its license comment in every inlined SVG.
+	IconAttribution template.HTML
 	// NavLinks are plain links shown in the navigation bar.
 	NavLinks []SiteLink
 }

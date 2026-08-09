@@ -30,6 +30,10 @@ Generate static output with docs navigation:
 
 `-nav` takes navigation from `SUMMARY.md`, then from a Mintlify `docs.json` covering the tree, then from the shape of the tree itself. A `docs.json` is looked for in the source directory and its parents, since it sits at the root of the published site while the Markdown often lives in a subdirectory; its page paths are resolved against that root, and pages outside the directory being served are skipped. Its `name` becomes the site title unless `-title` says otherwise.
 
+Navigation and component icons work without installation. md2html embeds pinned Font Awesome Free, Lucide, and Tabler Outline sets and follows `docs.json`'s `icons.library`; the Mintlify default is Font Awesome. Font Awesome's `iconType` supports the free `solid`, `regular`, and `brands` styles. An unavailable icon is left blank and reported once.
+
+Use `-icons dir` to replace the selected library with a directory of SVG files named for the icons that request them, or `-no-icons` to disable icons. A project-local `icons` directory is also a complete replacement. md2html does not consult a user-global icon directory or fetch icons while rendering, so the same source tree renders identically on different machines.
+
 `-github-stars` shows the star count of the repository named in `docs.json` beside the repository link. The count is fetched at build time and refreshed in the browser, so a deployed page does not show the number frozen at the build; the fetch is cached for five minutes per reader. Without the flag no page makes any request.
 
 Pages a repository keeps out of its site are listed in a `.md2htmlignore`, in gitignore syntax, at or above the directory being served; a `.mintignore` is read under the same rules, so a tree that already declares its exclusions does not have to repeat them.
