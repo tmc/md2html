@@ -1116,26 +1116,43 @@ func pageTitle(frontmatter map[string]any, filePath, fallback string) string {
 	return fallback
 }
 
-// promoteTitleHeading returns the document body with the frontmatter
-// title prepended as an H1 when the body does not already open with one.
-// Mintlify pages carry their heading in frontmatter alone, so without
-// this such pages would open with body text.
+// promoteTitleHeading returns the document body with its frontmatter
+// presentation applied: the title prepended as an H1 when the body does
+// not already open with one, and the description inserted as the lede
+// paragraph under that opening H1. Mintlify pages carry both in
+// frontmatter alone, so without this they would open with body text.
 func promoteTitleHeading(doc DocumentData) string {
-	title, ok := doc.Frontmatter["title"].(string)
-	if !ok || strings.TrimSpace(title) == "" {
-		return doc.Content
+	title := strings.TrimSpace(firstFrontmatterString(doc.Frontmatter, "title"))
+	desc := strings.TrimSpace(firstFrontmatterString(doc.Frontmatter, "description"))
+	// A body that already states the description keeps its own copy.
+	if desc != "" && strings.Contains(doc.Content, desc) {
+		desc = ""
 	}
-	for _, line := range strings.Split(doc.Content, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
+
+	lines := strings.Split(doc.Content, "\n")
+	first := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			first = i
+			break
 		}
-		if strings.HasPrefix(line, "# ") || line == "#" {
+	}
+
+	hasH1 := first >= 0 && (strings.HasPrefix(strings.TrimSpace(lines[first]), "# ") || strings.TrimSpace(lines[first]) == "#")
+	switch {
+	case hasH1:
+		if desc == "" {
 			return doc.Content
 		}
-		break
+		return strings.Join(lines[:first+1], "\n") + "\n\n" + desc + "\n" + strings.Join(lines[first+1:], "\n")
+	case title != "":
+		head := "# " + title + "\n\n"
+		if desc != "" {
+			head += desc + "\n\n"
+		}
+		return head + doc.Content
 	}
-	return "# " + strings.TrimSpace(title) + "\n\n" + doc.Content
+	return doc.Content
 }
 
 // documentTitle names a rendered page. Frontmatter wins, then the document's

@@ -45,6 +45,30 @@ func TestPromoteTitleHeading(t *testing.T) {
 			},
 			want: "# T\n\n## Section\n",
 		},
+		{
+			name: "description becomes the lede",
+			doc: DocumentData{
+				Frontmatter: map[string]any{"title": "T", "description": "What this is."},
+				Content:     "Body.\n",
+			},
+			want: "# T\n\nWhat this is.\n\nBody.\n",
+		},
+		{
+			name: "description follows an existing heading",
+			doc: DocumentData{
+				Frontmatter: map[string]any{"description": "What this is."},
+				Content:     "# Already here\n\nBody.\n",
+			},
+			want: "# Already here\n\nWhat this is.\n\nBody.\n",
+		},
+		{
+			name: "description already in the body is not repeated",
+			doc: DocumentData{
+				Frontmatter: map[string]any{"title": "T", "description": "Body."},
+				Content:     "Body.\n",
+			},
+			want: "# T\n\nBody.\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
