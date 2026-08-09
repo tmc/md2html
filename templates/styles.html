@@ -706,16 +706,19 @@
         margin-right: 6px;
     }
     /* Icon markup comes from the icon set at whatever size it was drawn;
-       inline it at text scale or a card-sized SVG fills the card. */
+       constrain it or a card-sized SVG fills the card. A card's icon sits
+       on its own line above the title; the others ride inline. */
     .md-card-icon, .md-step-icon, .md-accordion-icon, .md-badge-icon {
-        display: inline-flex;
-        vertical-align: -0.18em;
         color: var(--accent, #0969da);
     }
-    .md-card-icon svg, .md-step-icon svg, .md-accordion-icon svg, .md-badge-icon svg {
+    .md-step-icon, .md-accordion-icon, .md-badge-icon { display: inline-flex; vertical-align: -0.18em; }
+    .md-step-icon svg, .md-accordion-icon svg, .md-badge-icon svg {
         width: 1.15em;
         height: 1.15em;
     }
+    .md-card-icon { display: block; margin-bottom: 10px; }
+    .md-card-icon svg { width: 1.4rem; height: 1.4rem; }
+    .md-card-icon:empty { display: none; }
     .md-card-link {
         color: inherit;
         text-decoration: none;
