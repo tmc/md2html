@@ -171,17 +171,10 @@
 }
 
 .search-result-title mark {
-    background: #fff3cd;
-    color: #000;
+    background: var(--mark-bg, #fff3cd);
+    color: var(--mark-fg, #000);
     padding: 1px 2px;
     border-radius: 2px;
-}
-
-@media (prefers-color-scheme: dark) {
-    .search-result-title mark {
-        background: #4d4400;
-        color: #ffd000;
-    }
 }
 
 .search-result-blurb {
@@ -192,15 +185,8 @@
 }
 
 .search-result-blurb mark {
-    background: #fff3cd;
-    color: #000;
-}
-
-@media (prefers-color-scheme: dark) {
-    .search-result-blurb mark {
-        background: #4d4400;
-        color: #ffd000;
-    }
+    background: var(--mark-bg, #fff3cd);
+    color: var(--mark-fg, #000);
 }
 
 .search-result-meta {

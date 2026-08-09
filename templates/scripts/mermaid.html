@@ -8,7 +8,9 @@
                 return; // loader failed; the onerror handler already reported it
             }
 
-            const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const forced = document.documentElement.dataset.theme;
+            const isDarkMode = forced ? forced === 'dark' :
+                window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
             // Drive mermaid's base theme from the page palette so diagrams
             // sit on the same surface as the rest of the page in both

@@ -61,10 +61,16 @@
         --warning-bg: #fff8e8;
         --danger: #c5303b;
         --danger-bg: #fff2f2;
+
+        --mark-bg: #fff3cd;
+        --mark-fg: #000000;
     }
 
+    /* Dark tokens apply when the system prefers dark and the reader
+       has not forced light, and when the reader forced dark. The two
+       copies must stay identical. */
     @media (prefers-color-scheme: dark) {
-        :root {
+        :root:not([data-theme="light"]) {
             color-scheme: dark;
 
             --text-1: #e7eaef;
@@ -94,7 +100,44 @@
             --warning-bg: rgba(203, 148, 20, 0.1);
             --danger: #ff6f6a;
             --danger-bg: rgba(255, 90, 84, 0.09);
+
+            --mark-bg: #4d4400;
+            --mark-fg: #ffd000;
         }
+    }
+    :root[data-theme="dark"] {
+            color-scheme: dark;
+
+            --text-1: #e7eaef;
+            --text-2: #a3abb9;
+            --text-3: #78808e;
+            --bg: #0c0e12;
+            --surface: #14171d;
+            --surface-2: #1b1f27;
+            --line: #242932;
+            --line-strong: #363d49;
+
+            --accent: #9aabff;
+            --accent-hover: #b6c2ff;
+            --accent-soft: rgba(154, 171, 255, 0.12);
+            --accent-line: rgba(154, 171, 255, 0.4);
+
+            --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+            --shadow-2: 0 8px 24px -10px rgba(0, 0, 0, 0.7);
+
+            --note: #7f9dff;
+            --note-bg: rgba(90, 125, 255, 0.09);
+            --success: #4ac07d;
+            --success-bg: rgba(52, 190, 118, 0.09);
+            --important: #b493ff;
+            --important-bg: rgba(150, 110, 255, 0.1);
+            --warning: #dfa528;
+            --warning-bg: rgba(203, 148, 20, 0.1);
+            --danger: #ff6f6a;
+            --danger-bg: rgba(255, 90, 84, 0.09);
+
+            --mark-bg: #4d4400;
+            --mark-fg: #ffd000;
     }
 
     *, *::before, *::after { box-sizing: border-box; }
@@ -819,12 +862,18 @@
         --accent-line: color-mix(in srgb, {{.Accent}} 40%, transparent);
     }
     @media (prefers-color-scheme: dark) {
-        :root {
+        :root:not([data-theme="light"]) {
             --accent: {{.AccentDark}};
             --accent-hover: {{.AccentDark}};
             --accent-soft: color-mix(in srgb, {{.AccentDark}} 14%, transparent);
             --accent-line: color-mix(in srgb, {{.AccentDark}} 45%, transparent);
         }
+    }
+    :root[data-theme="dark"] {
+        --accent: {{.AccentDark}};
+        --accent-hover: {{.AccentDark}};
+        --accent-soft: color-mix(in srgb, {{.AccentDark}} 14%, transparent);
+        --accent-line: color-mix(in srgb, {{.AccentDark}} 45%, transparent);
     }
 </style>
 {{end}}

@@ -20,6 +20,7 @@
     </div>
     <div class="top-nav-right">
         {{range .NavLinks}}<a class="top-nav-link" href="{{.Href}}">{{.Label}}</a>{{end}}
+        {{template "theme-toggle" .}}
         {{template "repo-link" .}}
         {{if .LiveReload}}<div id="status" class="connection-status">Connected</div>{{end}}
         {{if .Versions}}
@@ -62,6 +63,19 @@
   accessible label because the mark alone does not say which repository
   this is.
 */}}
+{{/*
+  The theme toggle switches between light and dark without a reload. The
+  choice is stored and applied before first paint by the theme-init
+  script in the head; the button here only flips it. Auto (following the
+  system) is the state before the reader ever clicks.
+*/}}
+{{define "theme-toggle"}}
+<button type="button" class="theme-toggle" aria-label="Change theme" title="Change theme">
+    <svg class="theme-toggle-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+    <svg class="theme-toggle-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+</button>
+{{end}}
+
 {{define "repo-link"}}
 {{if .RepoURL}}
 <a class="repo-link" href="{{.RepoURL}}" target="_blank" rel="noreferrer noopener" title="{{.Repo}}">

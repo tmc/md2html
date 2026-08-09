@@ -2,6 +2,7 @@
 {{if .HasMath}}{{template "mathjax-scripts" .}}{{end}}
 {{template "mermaid-scripts" .}}
 {{template "copy-code-script" .}}
+{{template "theme-toggle-script" .}}
 {{template "heading-anchor-script" .}}
 {{template "tabs-script" .}}
 {{with jsonSpec}}<script type="application/json" id="md-jsonspec-schemas">{{.}}</script>

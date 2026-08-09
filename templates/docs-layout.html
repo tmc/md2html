@@ -7,6 +7,7 @@
     <title>{{.Title}}</title>
     {{template "head-meta" .}}
     {{if .RawMDURL}}<link rel="alternate" type="text/markdown" href="{{.RawMDURL}}">{{end}}
+    {{template "theme-init" .}}
     {{if .Search}}{{template "search-styles" .}}{{end}}
     {{template "styles" .}}
     {{template "nav-styles" .}}

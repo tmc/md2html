@@ -1,0 +1,53 @@
+{{define "theme-init"}}
+<script>
+    // Apply a stored theme choice before first paint, so a reader who
+    // forced light or dark does not see the other theme flash. No stored
+    // choice leaves the page following the system preference.
+    (function() {
+        try {
+            var t = localStorage.getItem('md2html:theme');
+            if (t === 'light' || t === 'dark') {
+                document.documentElement.dataset.theme = t;
+            }
+        } catch (e) {
+            // No storage means no stored choice; the system decides.
+        }
+    })();
+</script>
+{{end}}
+
+{{define "theme-toggle-script"}}
+<script>
+    // The toggle flips to the opposite of whatever the page currently
+    // shows and remembers it. Choosing what the system already prefers
+    // clears the override, so the page goes back to following along.
+    document.addEventListener('DOMContentLoaded', function() {
+        var button = document.querySelector('.theme-toggle');
+        if (!button) {
+            return;
+        }
+        button.addEventListener('click', function() {
+            var root = document.documentElement;
+            var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            var shownDark = root.dataset.theme ? root.dataset.theme === 'dark' : systemDark;
+            var next = shownDark ? 'light' : 'dark';
+            var store = next;
+            if ((next === 'dark') === systemDark) {
+                store = null;
+                delete root.dataset.theme;
+            } else {
+                root.dataset.theme = next;
+            }
+            try {
+                if (store) {
+                    localStorage.setItem('md2html:theme', store);
+                } else {
+                    localStorage.removeItem('md2html:theme');
+                }
+            } catch (e) {
+                // The page is already switched; it just will not stick.
+            }
+        });
+    });
+</script>
+{{end}}
