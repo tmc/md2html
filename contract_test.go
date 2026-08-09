@@ -30,6 +30,7 @@ func TestPublicContractFields(t *testing.T) {
 				{"AccentDark", "string"},
 				{"Repo", "string"},
 				{"RepoURL", "string"},
+				{"NavLinks", "[]md2html.SiteLink"},
 				{"Stars", "string"},
 				{"ShowStars", "bool"},
 			},
@@ -80,6 +81,7 @@ func TestPublicContractFields(t *testing.T) {
 				{"RepoURL", "string"},
 				{"Stars", "string"},
 				{"ShowStars", "bool"},
+				{"NavLinks", "[]md2html.SiteLink"},
 			},
 		},
 	}

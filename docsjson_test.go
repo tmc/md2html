@@ -120,6 +120,32 @@ func TestLoadDocsJSONFromSiteRoot(t *testing.T) {
 	}
 }
 
+func TestLoadDocsJSONNavbarLinks(t *testing.T) {
+	_, docsDir := writeDocsSite(t, `{
+	  "navigation": {"groups": [{"group": "G", "pages": ["docs/index"]}]},
+	  "navbar": {
+	    "links": [
+	      {"label": "Community", "href": "https://example.com/chat"},
+	      {"label": "", "href": "https://example.com/skipped"},
+	      {"label": "No href"}
+	    ],
+	    "primary": {"type": "github", "href": "https://github.com/o/r"}
+	  }
+	}`)
+
+	_, site, ok := loadDocsJSON(docsDir, "")
+	if !ok {
+		t.Fatal("loadDocsJSON failed")
+	}
+	want := []SiteLink{{Label: "Community", Href: "https://example.com/chat"}}
+	if len(site.Links) != 1 || site.Links[0] != want[0] {
+		t.Errorf("links = %+v, want %+v", site.Links, want)
+	}
+	if site.Repo != "o/r" {
+		t.Errorf("repo = %q, want o/r", site.Repo)
+	}
+}
+
 // TestLoadDocsJSONRelativeDir checks that a relative source directory,
 // as a plain "md2html -html out ." invocation produces, still resolves
 // pages against the absolute docs.json directory.

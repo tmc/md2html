@@ -614,6 +614,8 @@ type RenderOptions struct {
 	// RepoURL its address. Empty renders no repository link.
 	Repo    string
 	RepoURL string
+	// NavLinks are plain links shown in the navigation bar.
+	NavLinks []SiteLink
 	// Stars is the repository's star count, already formatted. Empty
 	// shows the link without a count.
 	Stars string
@@ -747,6 +749,7 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		AccentDark:       template.CSS(opts.AccentDark),
 		Repo:             opts.Repo,
 		RepoURL:          opts.RepoURL,
+		NavLinks:         opts.NavLinks,
 		Stars:            opts.Stars,
 		ShowStars:        opts.ShowStars,
 	}
@@ -801,6 +804,8 @@ type templateData struct {
 	RepoURL   string
 	Stars     string
 	ShowStars bool
+	// NavLinks are plain links shown in the navigation bar.
+	NavLinks []SiteLink
 }
 
 type renderMetadata struct {
@@ -954,6 +959,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			AccentDark:  site.AccentDark,
 			Repo:        site.Repo,
 			RepoURL:     site.RepoURL,
+			NavLinks:    site.Links,
 			Stars:       site.Stars,
 			ShowStars:   cfg.Stars,
 		}
@@ -985,6 +991,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 				AccentDark:  site.AccentDark,
 				Repo:        site.Repo,
 				RepoURL:     site.RepoURL,
+				NavLinks:    site.Links,
 				Stars:       site.Stars,
 				ShowStars:   cfg.Stars,
 			}

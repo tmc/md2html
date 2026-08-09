@@ -39,16 +39,18 @@ type docsJSON struct {
 	Navbar     docsJSONNavbar     `json:"navbar"`
 }
 
-// docsJSONNavbar is the bar above the page. Mintlify puts a single
-// "primary" call to action in it, which for a source project is a link
-// to the repository.
+// docsJSONNavbar is the bar above the page. Mintlify puts plain links
+// and a single "primary" call to action in it, which for a source
+// project is a link to the repository.
 type docsJSONNavbar struct {
-	Primary docsJSONNavbarLink `json:"primary"`
+	Links   []docsJSONNavbarLink `json:"links"`
+	Primary docsJSONNavbarLink   `json:"primary"`
 }
 
 type docsJSONNavbarLink struct {
-	Type string `json:"type"`
-	Href string `json:"href"`
+	Type  string `json:"type"`
+	Label string `json:"label"`
+	Href  string `json:"href"`
 }
 
 // docsJSONColors is the site palette. Mintlify names "primary" for the
@@ -128,6 +130,14 @@ type siteInfo struct {
 	// They are empty unless the source names a valid one.
 	Accent     string
 	AccentDark string
+	// Links are the plain navigation bar links the source names.
+	Links []SiteLink
+}
+
+// A SiteLink is one plain link in the navigation bar.
+type SiteLink struct {
+	Label string
+	Href  string
 }
 
 // hexColor matches the CSS hex colors md2html is willing to interpolate
@@ -182,6 +192,11 @@ func loadDocsJSON(sourceDir, htmlExt string) (nav *Navigation, site siteInfo, ok
 
 	site = siteInfo{Name: doc.Name, Accent: cssColor(doc.Colors.Primary)}
 	site.Repo, site.RepoURL = repoLink(doc.Navbar.Primary)
+	for _, l := range doc.Navbar.Links {
+		if l.Label != "" && l.Href != "" {
+			site.Links = append(site.Links, SiteLink{Label: l.Label, Href: l.Href})
+		}
+	}
 	// Mintlify's "light" is the variant meant for dark backgrounds.
 	site.AccentDark = cssColor(doc.Colors.Light)
 	if site.AccentDark == "" {

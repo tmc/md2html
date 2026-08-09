@@ -702,6 +702,7 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 		AccentDark:  site.AccentDark,
 		Repo:        site.Repo,
 		RepoURL:     site.RepoURL,
+		NavLinks:    site.Links,
 		Stars:       site.Stars,
 		ShowStars:   s.config.Stars,
 		Data:        s.jsonData,

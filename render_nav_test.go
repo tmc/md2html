@@ -27,8 +27,9 @@ func TestRenderTemplateNavGroupsAreLabels(t *testing.T) {
 	if !strings.Contains(got, `<li class="nav-group">Getting Started</li>`) {
 		t.Fatalf("rendered nav missing group label:\n%s", got)
 	}
-	// The bar above the sidebar names the site, not every group.
-	if !strings.Contains(got, `<span class="top-nav-title">Docs</span>`) {
+	// The bar above the sidebar names the site, not every group, and
+	// the name links home.
+	if !strings.Contains(got, `class="top-nav-title" href="./">Docs</a>`) {
 		t.Fatalf("rendered nav missing site title in the top bar:\n%s", got)
 	}
 }
@@ -182,7 +183,7 @@ func TestRenderTemplateStarsRefresh(t *testing.T) {
 	// Without -github-stars nothing is rendered and nothing is fetched:
 	// the page still needs no network.
 	got = render(base)
-	if strings.Contains(got, "repo-link-count") || strings.Contains(got, "api.github.com") {
+	if strings.Contains(got, `<span class="repo-link-count">`) || strings.Contains(got, "api.github.com") {
 		t.Errorf("rendered star markup without -github-stars:\n%s", got)
 	}
 }

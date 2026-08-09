@@ -5,8 +5,9 @@
         <button type="button" class="nav-toggle" aria-controls="site-sidebar" aria-expanded="false" aria-label="Show navigation">
             <span class="nav-toggle-bars" aria-hidden="true"></span>
         </button>
-        {{/* Groups belong to the sidebar; the bar names the site. */}}
-        <span class="top-nav-title">{{if .SiteTitle}}{{.SiteTitle}}{{else}}Documentation{{end}}</span>
+        {{/* Groups belong to the sidebar; the bar names the site and
+             links home, relative so a static tree works at any prefix. */}}
+        <a class="top-nav-title" href="{{.AssetBase}}">{{if .SiteTitle}}{{.SiteTitle}}{{else}}Documentation{{end}}</a>
     </div>
     <div class="top-nav-center">
         {{if .Search}}
@@ -18,6 +19,7 @@
         {{end}}
     </div>
     <div class="top-nav-right">
+        {{range .NavLinks}}<a class="top-nav-link" href="{{.Href}}">{{.Label}}</a>{{end}}
         {{template "repo-link" .}}
         {{if .LiveReload}}<div id="status" class="connection-status">Connected</div>{{end}}
         {{if .Versions}}
