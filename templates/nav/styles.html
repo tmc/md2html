@@ -25,9 +25,12 @@
          */
         padding-left: calc(max(0px, (100% - 100rem) / 2) + 2.1rem);
         padding-right: calc(max(0px, (100% - 100rem) / 2) + 0.9rem);
-        background: color-mix(in srgb, var(--bg) 82%, transparent);
-        backdrop-filter: saturate(160%) blur(12px);
-        -webkit-backdrop-filter: saturate(160%) blur(12px);
+        /* Enough of the page shows through to say the document runs on
+           under the bar, and no more: at a wider blur the words scrolling
+           past smear into a shape that reads as a smudge on the glass. */
+        background: color-mix(in srgb, var(--bg) 93%, transparent);
+        backdrop-filter: saturate(130%) blur(6px);
+        -webkit-backdrop-filter: saturate(130%) blur(6px);
         border-bottom: 1px solid var(--line);
         font-size: 0.875rem;
         position: sticky;
@@ -355,18 +358,15 @@
         flex: none;
         width: 1em;
         height: 1em;
-        color: var(--text-3, var(--text-2));
+        /* The glyph belongs to its label: a paler icon beside a darker
+           word reads as two lists rather than one. */
+        color: inherit;
     }
 
     .nav-icon svg {
         width: 100%;
         height: 100%;
         stroke-width: 2;
-    }
-
-    .nav-item a:hover .nav-icon,
-    .nav-item a.active .nav-icon {
-        color: inherit;
     }
 
     .nav-item a:hover {
@@ -493,10 +493,13 @@
         letter-spacing: 0.08em;
     }
 
+    /* The label above it already says which way this goes; the title is
+       a link, not a heading, so it does not need the weight or the ink
+       of one. */
     .nav-title {
         font-size: 0.94rem;
-        font-weight: 550;
-        color: var(--text-1);
+        font-weight: 500;
+        color: var(--text-2);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
