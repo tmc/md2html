@@ -14,7 +14,7 @@ func TestRenderTemplateMetadata(t *testing.T) {
 		"description": "A useful page summary.",
 		"og_image":    "https://example.com/og.png",
 	}
-	opts := RenderOptions{FilePath: "guide/intro.md"}
+	opts := RenderOptions{FilePath: "guide/intro.md", SiteTitle: "Example Docs"}
 
 	got := mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "Intro", "", false, frontmatter, opts)
 	for _, want := range []string{
@@ -22,12 +22,58 @@ func TestRenderTemplateMetadata(t *testing.T) {
 		`<link rel="canonical" href="https://example.com/docs/guide/intro.html">`,
 		`<meta property="og:title" content="Intro">`,
 		`<meta property="og:description" content="A useful page summary.">`,
+		`<meta property="og:type" content="article">`,
+		`<meta property="og:site_name" content="Example Docs">`,
 		`<meta property="og:image" content="https://example.com/og.png">`,
 		`<meta property="og:url" content="https://example.com/docs/guide/intro.html">`,
+		`<meta name="twitter:card" content="summary_large_image">`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("rendered metadata missing %q in:\n%s", want, got)
 		}
+	}
+}
+
+// TestRenderTemplateSocialImage checks the two ways a page gets a card
+// image, and that both end up absolute: a crawler fetches og:image with
+// no document to resolve it against.
+func TestRenderTemplateSocialImage(t *testing.T) {
+	cfg := Config{
+		SiteURL: "https://example.com/docs",
+		HTMLExt: "html",
+		OGImage: "img/card.png",
+	}
+
+	got := mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "Intro", "", false, nil, RenderOptions{FilePath: "guide/intro.md"})
+	if want := `<meta property="og:image" content="https://example.com/docs/img/card.png">`; !strings.Contains(got, want) {
+		t.Fatalf("site-wide image not resolved against the site root, want %q in:\n%s", want, got)
+	}
+
+	frontmatter := map[string]any{"image": "screenshot.png", "image_alt": "The dashboard"}
+	got = mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "Intro", "", false, frontmatter, RenderOptions{FilePath: "guide/intro.md"})
+	for _, want := range []string{
+		`<meta property="og:image" content="https://example.com/docs/guide/screenshot.png">`,
+		`<meta property="og:image:alt" content="The dashboard">`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("page image not resolved against the page URL, want %q in:\n%s", want, got)
+		}
+	}
+}
+
+// TestRenderTemplateSiteRootType checks that the site root claims
+// og:type website while ordinary pages claim article.
+func TestRenderTemplateSiteRootType(t *testing.T) {
+	cfg := Config{HTMLExt: "html", Index: "index.md"}
+
+	got := mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "Home", "", false, nil, RenderOptions{FilePath: "index.md"})
+	if want := `<meta property="og:type" content="website">`; !strings.Contains(got, want) {
+		t.Fatalf("site root missing %q in:\n%s", want, got)
+	}
+
+	got = mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "Posts", "", false, nil, RenderOptions{FilePath: "posts/index.md"})
+	if want := `<meta property="og:type" content="article">`; !strings.Contains(got, want) {
+		t.Fatalf("section index missing %q in:\n%s", want, got)
 	}
 }
 

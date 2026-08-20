@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -50,9 +51,13 @@ type Config struct {
 	Search            bool
 	LLMS              bool
 	SiteURL           string
-	EditURL           string
-	Nav               bool
-	Watch             string
+	// OGImage is the social card image used by pages whose frontmatter
+	// names none. A relative value resolves against SiteURL, so a site
+	// served from a subdirectory still advertises an absolute URL.
+	OGImage string
+	EditURL string
+	Nav     bool
+	Watch   string
 	// Base is the URL path prefix the served tree is published under,
 	// such as "/docs". It lets root-absolute links written for the
 	// published site resolve when previewing a subtree. Server mode only.
@@ -137,6 +142,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.Bool("search", false, "enable client-side search")
 	fs.Bool("llms", false, "emit llms.txt, llms-full.txt, and raw markdown links in static output")
 	fs.String("site-url", "", "canonical base URL for generated pages")
+	fs.String("og-image", "", "social card image for pages that name none in frontmatter; relative values resolve against -site-url")
 	fs.String("edit-url", "", "URL template for edit links; {path} is replaced with the source path")
 	fs.Bool("nav", false, "render docs navigation from SUMMARY.md or the markdown tree")
 	fs.String("watch", "auto", "live reload file watching: auto, true, or false")
@@ -178,6 +184,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		Search:            flagBool(fs, "search"),
 		LLMS:              flagBool(fs, "llms"),
 		SiteURL:           flagString(fs, "site-url"),
+		OGImage:           flagString(fs, "og-image"),
 		EditURL:           flagString(fs, "edit-url"),
 		Nav:               flagBool(fs, "nav"),
 		Watch:             flagString(fs, "watch"),
@@ -746,42 +753,44 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 	}
 
 	data := templateData{
-		Title:            title,
-		Content:          template.HTML(htmlContent),
-		CustomCSS:        template.CSS(customCSS),
-		ChromaCSS:        template.CSS(generateChromaCSS()),
-		Verbose:          cfg.Verbose,
-		LiveReload:       liveReload,
-		HTMLExt:          cfg.HTMLExt,
-		Frontmatter:      frontmatter,
-		Version:          opts.Version,
-		Versions:         opts.Versions,
-		Search:           cfg.Search,
-		Nav:              opts.Nav,
-		SiteTitle:        opts.SiteTitle,
-		Data:             opts.Data,
-		IndexFile:        cfg.Index,
-		MermaidTheme:     mermaidTheme,
-		MermaidDarkTheme: mermaidDarkTheme,
-		MermaidAutoTheme: mermaidAutoTheme,
-		FilePath:         opts.FilePath,
-		AssetBase:        assetBase(opts.FilePath),
-		RawMDURL:         opts.RawMDURL,
-		HasMath:          pageHasMath(htmlContent),
-		Description:      meta.Description,
-		CanonicalURL:     meta.CanonicalURL,
-		OpenGraphImage:   meta.OpenGraphImage,
-		LastUpdated:      meta.LastUpdated,
-		EditURL:          opts.EditURL,
-		Assets:           opts.Assets,
-		Accent:           template.CSS(opts.Accent),
-		AccentDark:       template.CSS(opts.AccentDark),
-		Repo:             opts.Repo,
-		RepoURL:          opts.RepoURL,
-		NavLinks:         opts.NavLinks,
-		Stars:            opts.Stars,
-		ShowStars:        opts.ShowStars,
-		IconAttribution:  iconAttribution,
+		Title:             title,
+		Content:           template.HTML(htmlContent),
+		CustomCSS:         template.CSS(customCSS),
+		ChromaCSS:         template.CSS(generateChromaCSS()),
+		Verbose:           cfg.Verbose,
+		LiveReload:        liveReload,
+		HTMLExt:           cfg.HTMLExt,
+		Frontmatter:       frontmatter,
+		Version:           opts.Version,
+		Versions:          opts.Versions,
+		Search:            cfg.Search,
+		Nav:               opts.Nav,
+		SiteTitle:         opts.SiteTitle,
+		Data:              opts.Data,
+		IndexFile:         cfg.Index,
+		MermaidTheme:      mermaidTheme,
+		MermaidDarkTheme:  mermaidDarkTheme,
+		MermaidAutoTheme:  mermaidAutoTheme,
+		FilePath:          opts.FilePath,
+		AssetBase:         assetBase(opts.FilePath),
+		RawMDURL:          opts.RawMDURL,
+		HasMath:           pageHasMath(htmlContent),
+		Description:       meta.Description,
+		CanonicalURL:      meta.CanonicalURL,
+		OpenGraphImage:    meta.OpenGraphImage,
+		OpenGraphImageAlt: meta.OpenGraphImageAlt,
+		OpenGraphType:     meta.OpenGraphType,
+		LastUpdated:       meta.LastUpdated,
+		EditURL:           opts.EditURL,
+		Assets:            opts.Assets,
+		Accent:            template.CSS(opts.Accent),
+		AccentDark:        template.CSS(opts.AccentDark),
+		Repo:              opts.Repo,
+		RepoURL:           opts.RepoURL,
+		NavLinks:          opts.NavLinks,
+		Stars:             opts.Stars,
+		ShowStars:         opts.ShowStars,
+		IconAttribution:   iconAttribution,
 	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -815,13 +824,19 @@ type templateData struct {
 	// HasMath reports whether the page content contains TeX math
 	// delimiters outside code regions, so templates can load MathJax
 	// only where it is needed.
-	HasMath        bool
-	Description    string
-	CanonicalURL   string
-	OpenGraphImage string
-	LastUpdated    string
-	EditURL        string
-	Assets         map[string]string
+	HasMath      bool
+	Description  string
+	CanonicalURL string
+	// OpenGraphImage is the absolute URL of the page's social card
+	// image, OpenGraphImageAlt its description, and OpenGraphType the
+	// og:type the page claims: "website" for the site root, "article"
+	// for every other page.
+	OpenGraphImage    string
+	OpenGraphImageAlt string
+	OpenGraphType     string
+	LastUpdated       string
+	EditURL           string
+	Assets            map[string]string
 	// Accent and AccentDark are validated CSS colors, empty unless the
 	// navigation source named one.
 	Accent     template.CSS
@@ -842,10 +857,12 @@ type templateData struct {
 }
 
 type renderMetadata struct {
-	Description    string
-	CanonicalURL   string
-	OpenGraphImage string
-	LastUpdated    string
+	Description       string
+	CanonicalURL      string
+	OpenGraphImage    string
+	OpenGraphImageAlt string
+	OpenGraphType     string
+	LastUpdated       string
 }
 
 func pageMetadata(cfg Config, title string, frontmatter map[string]any, opts RenderOptions) renderMetadata {
@@ -854,15 +871,56 @@ func pageMetadata(cfg Config, title string, frontmatter map[string]any, opts Ren
 		desc = opts.Description
 	}
 	meta := renderMetadata{
-		Description:    desc,
-		OpenGraphImage: firstFrontmatterString(frontmatter, "og_image", "image"),
-		LastUpdated:    opts.LastUpdated,
+		Description:       desc,
+		OpenGraphImage:    firstFrontmatterString(frontmatter, "og_image", "image"),
+		OpenGraphImageAlt: firstFrontmatterString(frontmatter, "og_image_alt", "image_alt"),
+		OpenGraphType:     "article",
+		LastUpdated:       opts.LastUpdated,
 	}
-	if cfg.SiteURL != "" && opts.FilePath != "" {
+	if opts.FilePath != "" {
 		rendered := renderedPathForSource(opts.FilePath, cfg.HTMLExt, cfg.Index)
-		meta.CanonicalURL = joinSiteURL(cfg.SiteURL, canonicalPagePath(rendered, cfg.HTMLExt))
+		page := canonicalPagePath(rendered, cfg.HTMLExt)
+		if page == "" {
+			meta.OpenGraphType = "website"
+		}
+		if cfg.SiteURL != "" {
+			meta.CanonicalURL = joinSiteURL(cfg.SiteURL, page)
+		}
+	}
+	// A card image has to be an absolute URL: the crawler fetches it
+	// without a document to resolve against. The page URL is the base,
+	// so a page-relative name in frontmatter means what it says, while
+	// the site-wide default is written relative to the site root.
+	if meta.OpenGraphImage != "" {
+		meta.OpenGraphImage = absoluteURL(meta.CanonicalURL, meta.OpenGraphImage)
+	} else if cfg.OGImage != "" {
+		base := strings.TrimRight(strings.TrimSpace(cfg.SiteURL), "/")
+		if base != "" {
+			base += "/"
+		}
+		meta.OpenGraphImage = absoluteURL(base, cfg.OGImage)
+		meta.OpenGraphImageAlt = ""
 	}
 	return meta
+}
+
+// absoluteURL resolves ref against base. A ref that is already absolute
+// is returned unchanged, and so is one that cannot be resolved because
+// no base URL was configured: half a URL is no more useful than a
+// relative one, and dropping it would hide the mistake.
+func absoluteURL(base, ref string) string {
+	u, err := url.Parse(ref)
+	if err != nil {
+		return ref
+	}
+	if u.IsAbs() || strings.HasPrefix(ref, "//") {
+		return ref
+	}
+	b, err := url.Parse(base)
+	if err != nil || !b.IsAbs() {
+		return ref
+	}
+	return b.ResolveReference(u).String()
 }
 
 func joinSiteURL(base, pagePath string) string {
@@ -1255,7 +1313,7 @@ func generateTOCIndex(outputDir string, files []markdownFile, cssContent string,
 
 	// Render with template
 	doc := DocumentData{Content: buf.String(), Frontmatter: make(map[string]any)}
-	finalHTML, err := renderTemplateWithOptions(cfg, htmlContent, listingTitle(""), cssContent, false, doc.Frontmatter, RenderOptions{Assets: assets})
+	finalHTML, err := renderTemplateWithOptions(cfg, htmlContent, listingTitle(""), cssContent, false, doc.Frontmatter, RenderOptions{Assets: assets, SiteTitle: cfg.Title})
 	if err != nil {
 		return err
 	}

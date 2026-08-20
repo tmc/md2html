@@ -3,6 +3,10 @@
 {{if .CanonicalURL}}<link rel="canonical" href="{{.CanonicalURL}}">{{end}}
 {{if .Title}}<meta property="og:title" content="{{.Title}}">{{end}}
 {{if .Description}}<meta property="og:description" content="{{.Description}}">{{end}}
-{{if .OpenGraphImage}}<meta property="og:image" content="{{.OpenGraphImage}}">{{end}}
+{{if .OpenGraphType}}<meta property="og:type" content="{{.OpenGraphType}}">{{end}}
+{{if .SiteTitle}}<meta property="og:site_name" content="{{.SiteTitle}}">{{end}}
 {{if .CanonicalURL}}<meta property="og:url" content="{{.CanonicalURL}}">{{end}}
+{{if .OpenGraphImage}}<meta property="og:image" content="{{.OpenGraphImage}}">
+{{if .OpenGraphImageAlt}}<meta property="og:image:alt" content="{{.OpenGraphImageAlt}}">{{end}}{{end}}
+<meta name="twitter:card" content="{{if .OpenGraphImage}}summary_large_image{{else}}summary{{end}}">
 {{end}}

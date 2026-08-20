@@ -54,6 +54,8 @@ Pages are then served under `/docs/`, and a request outside the prefix redirects
 
 Served pages take their title from the frontmatter `title`, then the first heading, then the file name. A directory URL serves that directory's index file (`index.md` or `README.md`, or the file named by `-index`) and otherwise a listing of the Markdown files beneath it, to `-depth` levels.
 
+Every page carries the metadata a link preview is built from: `description`, `rel=canonical`, `og:title`, `og:description`, `og:type` (`website` at the site root, `article` elsewhere), `og:site_name`, `og:url`, and `twitter:card`. Set `-site-url` so the canonical URL and `og:url` are absolute; a crawler has no document to resolve a relative one against. A page names its card image with frontmatter `og_image` (or `image`) and describes it with `og_image_alt`, and `-og-image` supplies one for every page that names none. A page image resolves against the page URL and the `-og-image` default against the site root, so both are emitted absolute. Pages with an image advertise `summary_large_image`, the large card X and Slack draw from a 1200×630 image; pages without advertise `summary`.
+
 Mermaid diagrams and TeX math are rendered in the browser by scripts loaded from a CDN, so those pages need network access on first view. When a script fails to load the page says so rather than leaving the block unrendered.
 
 MDX-style layout components are supported for `Card`, `CardGroup` (also spelled `Columns`), `Steps`/`Step`, `Accordion`/`AccordionGroup` (`Expandable` is the same disclosure), and `Frame`:

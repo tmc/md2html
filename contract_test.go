@@ -72,6 +72,8 @@ func TestPublicContractFields(t *testing.T) {
 				{"Description", "string"},
 				{"CanonicalURL", "string"},
 				{"OpenGraphImage", "string"},
+				{"OpenGraphImageAlt", "string"},
+				{"OpenGraphType", "string"},
 				{"LastUpdated", "string"},
 				{"EditURL", "string"},
 				{"Assets", "map[string]string"},
