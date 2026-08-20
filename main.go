@@ -954,6 +954,16 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
 
+	// Copy assets before rendering, so anything generated under the same
+	// name — llms.txt, the search assets — is what survives.
+	assetCount, err := copySourceAssets(sourceDir, outputDir, logger)
+	if err != nil {
+		logger.Error("Error copying assets", "error", err)
+	}
+	if assetCount > 0 {
+		logger.Info("Copied assets", "count", assetCount)
+	}
+
 	// Load JSON data if provided
 	var jsonData any
 	if cfg.DataJSON != "" {

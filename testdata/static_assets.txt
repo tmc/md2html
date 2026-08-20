@@ -1,0 +1,52 @@
+# Test that static output carries the files pages point at. Rendering
+# writes HTML, so without the copy a page's image resolves while the
+# tree is served and 404s once the site is deployed.
+
+md2html -html out -html-ext html repo/docs
+
+exists out/index.html
+exists out/img/diagram.svg
+exists out/robots.txt
+exists out/favicon.ico
+exists out/css/extra.css
+
+# A docs tree sits inside a repository holding more than a site, so the
+# copy is an allowlist: source and configuration stay unpublished.
+! exists out/notes.go
+! exists out/config.json
+! exists out/.hidden/leak.svg
+
+# The ignore file governs assets as it governs pages.
+! exists out/planning/sketch.svg
+
+-- repo/.mintignore --
+docs/planning/
+
+-- repo/docs/index.md --
+# Home
+
+![Diagram](img/diagram.svg)
+
+-- repo/docs/img/diagram.svg --
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>
+
+-- repo/docs/robots.txt --
+User-agent: *
+
+-- repo/docs/favicon.ico --
+not really an icon, but the copy does not care
+
+-- repo/docs/css/extra.css --
+body { color: red }
+
+-- repo/docs/notes.go --
+package notes
+
+-- repo/docs/config.json --
+{}
+
+-- repo/docs/.hidden/leak.svg --
+<svg xmlns="http://www.w3.org/2000/svg"></svg>
+
+-- repo/docs/planning/sketch.svg --
+<svg xmlns="http://www.w3.org/2000/svg"></svg>
