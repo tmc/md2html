@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -22,7 +23,7 @@ type IconCheck struct {
 func (IconCheck) Name() string { return "icons" }
 
 func (c IconCheck) Check(doc *Document) ([]Diagnostic, error) {
-	library := documentIconLibrary(doc.File)
+	config, library := documentIcons(doc.File)
 	var refs []iconRef
 	fm, ok, err := frontmatter(doc.Source)
 	if ok && err == nil {
@@ -52,7 +53,7 @@ func (c IconCheck) Check(doc *Document) ([]Diagnostic, error) {
 	if err != nil {
 		return nil, err
 	}
-	var diags []Diagnostic
+	diags := c.checkConfig(doc.env, config, library)
 	for _, ref := range refs {
 		if c.Resolve != nil {
 			if !c.Resolve(ref.name, ref.style) {
@@ -69,6 +70,44 @@ func (c IconCheck) Check(doc *Document) ([]Diagnostic, error) {
 		}
 	}
 	return diags, nil
+}
+
+// configIconRE matches an icon name in docs.json. The file is scanned a
+// line at a time rather than decoded, because an icon may sit on a
+// group, an anchor, a tab, or a navbar link, and what makes the
+// diagnostic worth reading is the line it is on.
+var configIconRE = regexp.MustCompile(`"icon"\s*:\s*"([^"]+)"`)
+
+// checkConfig reports the icons named in the docs.json at config that
+// the library cannot draw. The file governs every page under it, so it
+// is checked once per run rather than once per document.
+func (c IconCheck) checkConfig(e *env, config, library string) []Diagnostic {
+	if config == "" || e == nil || e.configs[config] {
+		return nil
+	}
+	e.configs[config] = true
+	data, err := os.ReadFile(config)
+	if err != nil {
+		return nil
+	}
+	var diags []Diagnostic
+	for i, line := range strings.Split(string(data), "\n") {
+		m := configIconRE.FindStringSubmatchIndex(line)
+		if m == nil {
+			continue
+		}
+		name := line[m[2]:m[3]]
+		if c.Resolve != nil {
+			if !c.Resolve(name, "") {
+				diags = append(diags, iconDiagnostic(config, i+1, fmt.Sprintf("icon %q is not in the configured icon set", name)))
+			}
+			continue
+		}
+		if !knownIcon(library, name, "") {
+			diags = append(diags, iconDiagnostic(config, i+1, fmt.Sprintf("icon %q is not in the %s library", name, library)))
+		}
+	}
+	return diags
 }
 
 type iconRef struct {
@@ -126,13 +165,18 @@ func knownIcon(library, name, style string) bool {
 	return false
 }
 
-func documentIconLibrary(file string) string {
+// documentIcons reports the docs.json that governs file, and the icon
+// library it selects. Mintlify defaults to Font Awesome, which is also
+// what a tree with no docs.json gets, and what an unreadable or
+// unrecognized setting falls back to.
+func documentIcons(file string) (config, library string) {
 	dir, err := filepath.Abs(filepath.Dir(file))
 	if err != nil {
-		return "fontawesome"
+		return "", "fontawesome"
 	}
 	for {
-		data, err := os.ReadFile(filepath.Join(dir, "docs.json"))
+		config := filepath.Join(dir, "docs.json")
+		data, err := os.ReadFile(config)
 		if err == nil {
 			var cfg struct {
 				Icons struct {
@@ -142,14 +186,14 @@ func documentIconLibrary(file string) string {
 			if json.Unmarshal(data, &cfg) == nil {
 				switch strings.ToLower(cfg.Icons.Library) {
 				case "lucide", "tabler", "fontawesome":
-					return strings.ToLower(cfg.Icons.Library)
+					return config, strings.ToLower(cfg.Icons.Library)
 				}
 			}
-			return "fontawesome"
+			return config, "fontawesome"
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return "fontawesome"
+			return "", "fontawesome"
 		}
 		dir = parent
 	}

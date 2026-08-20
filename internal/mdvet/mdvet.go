@@ -244,6 +244,7 @@ func isMarkdown(path string) bool {
 type env struct {
 	anchors map[string]map[string]bool // file -> set of heading IDs
 	dirs    map[string]map[string]bool // dir -> set of entry names (as on disk)
+	configs map[string]bool            // docs.json files already checked
 	site    Site                       // how rendered URLs map back to sources
 }
 
@@ -251,6 +252,7 @@ func newEnv(site Site) *env {
 	return &env{
 		anchors: make(map[string]map[string]bool),
 		dirs:    make(map[string]map[string]bool),
+		configs: make(map[string]bool),
 		site:    site,
 	}
 }

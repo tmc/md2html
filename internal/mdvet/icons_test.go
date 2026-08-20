@@ -28,6 +28,33 @@ func TestIconCheck(t *testing.T) {
 	}
 }
 
+func TestIconCheckConfig(t *testing.T) {
+	root := t.TempDir()
+	write := func(name, content string) string {
+		t.Helper()
+		file := filepath.Join(root, name)
+		if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return file
+	}
+	config := write("docs.json", "{\n  \"navigation\": {\n    \"groups\": [\n      {\"group\": \"Start\", \"icon\": \"rocket\"},\n      {\"group\": \"Reference\", \"icon\": \"not-a-real-icon\"}\n    ]\n  }\n}\n")
+	first := write("first.md", "---\ntitle: First\n---\n")
+	second := write("second.md", "---\ntitle: Second\n---\n")
+
+	diags, err := Run([]string{first, second}, []Check{IconCheck{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(diags) != 1 {
+		t.Fatalf("diagnostics = %#v, want one", diags)
+	}
+	d := diags[0]
+	if d.File != config || d.Line != 5 || !strings.Contains(d.Message, `"not-a-real-icon"`) {
+		t.Fatalf("diagnostic = %#v, want %s:5 naming the unknown icon", d, config)
+	}
+}
+
 func TestIconCheckFontAwesomeStyle(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "page.md")
