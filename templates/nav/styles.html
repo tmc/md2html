@@ -16,10 +16,15 @@
         /*
          * The bar itself is full-bleed for the background and border,
          * but its content is held to the same 100rem measure as the
-         * layout below so the name and links line up with the sidebar
-         * and table of contents instead of the viewport edges.
+         * layout below, and then inset by what the columns inset their
+         * own text: the sidebar's padding plus a nav item's, so the site
+         * name starts on the same vertical as the links under it, and
+         * the table of contents' padding less the repository link's own,
+         * so the two end on the same one. Without the insets the bar's
+         * ends sit a dozen pixels outside every column on the page.
          */
-        padding: 0 max(1.5rem, calc((100% - 100rem) / 2));
+        padding-left: calc(max(0px, (100% - 100rem) / 2) + 2.1rem);
+        padding-right: calc(max(0px, (100% - 100rem) / 2) + 0.9rem);
         background: color-mix(in srgb, var(--bg) 82%, transparent);
         backdrop-filter: saturate(160%) blur(12px);
         -webkit-backdrop-filter: saturate(160%) blur(12px);
@@ -604,6 +609,12 @@
         }
 
         .nav-toggle { display: inline-flex; }
+
+        /* No sidebar to line up with; the document's own gutter. */
+        .top-nav {
+            padding-left: 1.25rem;
+            padding-right: 1.25rem;
+        }
 
         .sidebar {
             position: fixed;
