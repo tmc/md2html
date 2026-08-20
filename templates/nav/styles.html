@@ -662,5 +662,35 @@
         .search-trigger { width: auto; max-width: 12rem; }
         .search-trigger-label { display: none; }
     }
+
+    /*
+     * A phone fits the site name and three controls, and not the words
+     * beside them: at this width the name and the repository both
+     * truncated to a few letters and a pair of ellipses, which say less
+     * than the marks they sat next to. The controls become their glyphs,
+     * and the name gets the room they gave up. The shortcut hint goes
+     * with them — there is no key to press.
+     */
+    @media (max-width: 40rem) {
+        .top-nav { gap: 0.4rem; }
+
+        .search-trigger {
+            flex: none;
+            width: 2.25rem;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .search-trigger kbd { display: none; }
+
+        /* The live-reload light is for whoever is writing the page, and
+           they are not reading it on a phone. Left in, it pushed the
+           search off the end of the bar. */
+        .connection-status { display: none; }
+
+        .repo-link { padding: 0.35rem; }
+        .repo-link-name,
+        .repo-link-stars { display: none; }
+    }
 </style>
 {{end}}
