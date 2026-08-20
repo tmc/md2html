@@ -4,6 +4,8 @@ package iconsets
 var AliasGroups = [][]string{
 	{"diagram-project", "arrows-turn-to-dots", "workflow", "sitemap", "git-fork"},
 	{"network-wired", "network", "share-2"},
+	{"signal-stream", "tower-broadcast", "broadcast-tower", "radio-tower", "broadcast"},
+	{"library", "books", "book-bookmark", "book"},
 	{"circle-question", "circle-help", "help-circle"},
 	{"circle-exclamation", "circle-alert", "alert-circle"},
 	{"triangle-exclamation", "triangle-alert", "alert-triangle"},
