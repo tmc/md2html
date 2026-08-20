@@ -58,22 +58,92 @@ func generateChromaCSS() string {
 		chromahtml.WithLineNumbers(false),
 	)
 
+	var light, dark bytes.Buffer
+	if err := formatter.WriteCSS(&light, lightStyle); err != nil {
+		return ""
+	}
+	if err := formatter.WriteCSS(&dark, darkStyle); err != nil {
+		return ""
+	}
+
+	lightCSS := withoutCanvas(light.String())
+	darkCSS := withoutCanvas(dark.String())
+
+	// The syntax colors have to follow the same conditions as the design
+	// tokens, or a reader who forces one theme gets the other theme's
+	// code: dark-background keywords on the light page surface, which is
+	// unreadable. Each stylesheet is scoped the way the tokens are —
+	// what the system prefers, unless the reader forced the other.
+	//
+	// Both are scoped, not just one. The two styles do not name the same
+	// token classes, so whichever was left unscoped would show through
+	// wherever the other is silent: github colors NameOther near-black
+	// and github-dark says nothing about it, which left every plain
+	// identifier in a dark block black on black.
 	var buf bytes.Buffer
-
-	// Write dark theme CSS with media query
 	buf.WriteString("@media (prefers-color-scheme: dark) {\n")
-	if err := formatter.WriteCSS(&buf, darkStyle); err != nil {
-		return ""
-	}
-	buf.WriteString("\n}\n")
+	buf.WriteString(scopeCSS(darkCSS, `:root:not([data-theme="light"])`))
+	buf.WriteString("}\n\n")
+	buf.WriteString(scopeCSS(darkCSS, `:root[data-theme="dark"]`))
 
-	// Write light theme CSS with media query (and as default)
 	buf.WriteString("\n@media (prefers-color-scheme: light), (prefers-color-scheme: no-preference) {\n")
-	if err := formatter.WriteCSS(&buf, lightStyle); err != nil {
-		return ""
-	}
-	buf.WriteString("\n}\n")
+	buf.WriteString(scopeCSS(lightCSS, `:root:not([data-theme="dark"])`))
+	buf.WriteString("}\n\n")
+	buf.WriteString(scopeCSS(lightCSS, `:root[data-theme="light"]`))
 
+	return buf.String()
+}
+
+// withoutCanvas drops the rules that paint chroma's own page color
+// behind a block. The page already gives code a surface from its design
+// tokens; chroma's is a shade off from it, and once the stylesheet is
+// scoped to a theme it outweighs the page's own rule.
+func withoutCanvas(css string) string {
+	var buf strings.Builder
+	for line := range strings.SplitSeq(css, "\n") {
+		if strings.HasPrefix(line, "/* Background */") || strings.HasPrefix(line, "/* PreWrapper */") {
+			continue
+		}
+		if line == "" {
+			continue
+		}
+		buf.WriteString(line)
+		buf.WriteByte('\n')
+	}
+	return buf.String()
+}
+
+// scopeCSS narrows every rule in css to descendants of scope. chroma
+// writes one rule per line, an optional "/* Token */" comment followed
+// by a selector list, so each line's selectors are prefixed in place.
+// A line that holds no rule is copied through.
+func scopeCSS(css, scope string) string {
+	var buf strings.Builder
+	for line := range strings.SplitSeq(css, "\n") {
+		open := strings.IndexByte(line, '{')
+		if open < 0 {
+			buf.WriteString(line)
+			buf.WriteByte('\n')
+			continue
+		}
+		head, body := line[:open], line[open:]
+		if end := strings.LastIndex(head, "*/"); end >= 0 {
+			buf.WriteString(head[:end+2])
+			buf.WriteByte(' ')
+			head = head[end+2:]
+		}
+		for i, sel := range strings.Split(head, ",") {
+			if i > 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString(scope)
+			buf.WriteByte(' ')
+			buf.WriteString(strings.TrimSpace(sel))
+		}
+		buf.WriteByte(' ')
+		buf.WriteString(body)
+		buf.WriteByte('\n')
+	}
 	return buf.String()
 }
 
