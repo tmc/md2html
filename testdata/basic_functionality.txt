@@ -2,7 +2,7 @@
 
 # Start server briefly to test it works
 md2html -http :8099 test_basic.md &
-sleep 2s
+wait-port :8099
 
 # Test server responds
 curl -s -w '%{http_code}' http://localhost:8099/

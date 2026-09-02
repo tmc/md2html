@@ -3,8 +3,8 @@
 # Start server in background on port 8090
 md2html -http :8090 test.md &
 
-# Wait for server to start
-sleep 2s
+# Wait for the server to accept connections
+wait-port :8090
 
 # Test basic HTML rendering
 curl -s http://localhost:8090/raw
