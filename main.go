@@ -3,6 +3,7 @@ package md2html
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -227,6 +228,10 @@ func flagInt(fs *flag.FlagSet, name string) int {
 }
 
 func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, args []string) error {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	// Set up signal handling
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -951,7 +956,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 
 	// Create output directory
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %v", err)
+		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
 	// Copy assets before rendering, so anything generated under the same
@@ -1043,6 +1048,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	}
 
 	// Process each markdown file
+	var renderErrors []error
 	for _, file := range files {
 		// Check for draft frontmatter and skip unless drafts are requested
 		if !cfg.Drafts && isDraft(filepath.Join(sourceDir, file.RelPath)) {
@@ -1072,6 +1078,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		}
 		if err := processMarkdownFileWithOpts(file, sourceDir, outputDir, cssContent, cfg, opts); err != nil {
 			logger.Error("Error processing file", "error", err, "file", file.RelPath)
+			renderErrors = append(renderErrors, fmt.Errorf("process %s: %w", file.RelPath, err))
 			continue
 		}
 		logger.Debug("Generated file", "file", file.RelPath)
@@ -1124,6 +1131,9 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		} else {
 			logger.Info("Generated llms files", "documents", n)
 		}
+	}
+	if len(renderErrors) > 0 {
+		return errors.Join(renderErrors...)
 	}
 
 	logger.Info("Static HTML generation completed")

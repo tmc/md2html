@@ -51,3 +51,46 @@ func TestRunChdir(t *testing.T) {
 		t.Errorf("output missing rendered heading:\n%s", out.String())
 	}
 }
+
+func TestRunNilLogger(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "page.md")
+	if err := os.WriteFile(path, []byte("# Hi\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := Run(context.Background(), Config{Source: path}, nil, &out, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Hi") {
+		t.Errorf("output missing rendered heading:\n%s", out.String())
+	}
+}
+
+func TestGenerateStaticHTMLReportsPageErrors(t *testing.T) {
+	source := t.TempDir()
+	if err := os.Mkdir(filepath.Join(source, "nested"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "nested", "page.md"), []byte("# Hi\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output := t.TempDir()
+	if err := os.WriteFile(filepath.Join(output, "nested"), []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := generateStaticHTML(context.Background(), Config{
+		Source:  source,
+		HTML:    output,
+		HTMLExt: "html",
+		Drafts:  true,
+	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err == nil {
+		t.Fatal("generateStaticHTML succeeded with an unwritable page path")
+	}
+	if !strings.Contains(err.Error(), "process nested/page.md") {
+		t.Fatalf("error = %v, want page path", err)
+	}
+}
