@@ -996,7 +996,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	// Find all markdown files
 	files, err := findMarkdownFiles(sourceDir, 100) // Use high depth for static generation
 	if err != nil {
-		return fmt.Errorf("failed to find markdown files: %v", err)
+		return fmt.Errorf("failed to find markdown files: %w", err)
 	}
 
 	logger.Info("Found markdown files to process", "count", len(files))

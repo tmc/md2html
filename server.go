@@ -1053,7 +1053,7 @@ func (s *server) Run(ctx context.Context) error {
 
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		s.logger.Error("Server error", "error", err)
-		return fmt.Errorf("server error: %v", err)
+		return fmt.Errorf("server error: %w", err)
 	}
 
 	<-idleConnsClosed
