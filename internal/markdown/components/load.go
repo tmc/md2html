@@ -40,7 +40,7 @@ func LoadRegistry(dir string) (Registry, error) {
 	}
 
 	reg := Registry{}
-	maps.Copy(reg, DefaultRegistry)
+	maps.Copy(reg, DefaultRegistry())
 	for _, name := range slices.Sorted(maps.Keys(m.Components)) {
 		def := m.Components[name]
 		if !isName(name) {

@@ -23,7 +23,7 @@ type Extender struct {
 func (e Extender) Extend(md goldmark.Markdown) {
 	reg := e.Registry
 	if reg == nil {
-		reg = DefaultRegistry
+		reg = DefaultRegistry()
 	}
 	md.Parser().AddOptions(
 		parser.WithBlockParsers(

@@ -111,10 +111,10 @@ func (c Component) validate(name string, attrs map[string]string) []string {
 	return msgs
 }
 
-// DefaultRegistry holds the components bundled with md2html. It is
+// defaultRegistry holds the components bundled with md2html. It is
 // deliberately fixed: rendering an unregistered tag would mean guessing
 // at markup the theme has no styles for.
-var DefaultRegistry = Registry{
+var defaultRegistry = Registry{
 	"Card": {
 		Attrs:    []string{"title", "icon", "iconType", "href"},
 		Required: []string{"title"},
@@ -202,6 +202,21 @@ var DefaultRegistry = Registry{
 				`{{with .Attrs.caption}}<figcaption class="md-frame-caption">{{.}}</figcaption>{{end}}` +
 				`</figure>`)),
 	},
+}
+
+// DefaultRegistry returns the built-in components.
+//
+// The returned map and attribute lists belong to the caller. Keeping the
+// package's copy private prevents one renderer or test from changing the
+// defaults seen by another.
+func DefaultRegistry() Registry {
+	reg := make(Registry, len(defaultRegistry))
+	for name, component := range defaultRegistry {
+		component.Attrs = slices.Clone(component.Attrs)
+		component.Required = slices.Clone(component.Required)
+		reg[name] = component
+	}
+	return reg
 }
 
 // cardGroup backs both CardGroup and Columns.

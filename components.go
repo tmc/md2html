@@ -36,5 +36,5 @@ func (cfg Config) componentsRegistry() components.Registry {
 	if cfg.componentRegistry != nil {
 		return cfg.componentRegistry
 	}
-	return components.DefaultRegistry
+	return components.DefaultRegistry()
 }

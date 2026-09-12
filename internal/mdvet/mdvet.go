@@ -195,7 +195,7 @@ func parseTreeWith(source []byte, reg components.Registry) (ast.Node, parser.Con
 // parseTree parses source with the built-in components, for callers
 // that only need the tree.
 func parseTree(source []byte) ast.Node {
-	tree, _ := parseTreeWith(source, components.DefaultRegistry)
+	tree, _ := parseTreeWith(source, components.DefaultRegistry())
 	return tree
 }
 

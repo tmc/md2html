@@ -156,8 +156,9 @@ func TestLowercaseTagsIgnored(t *testing.T) {
 }
 
 func TestTemplatesReferenceContentOnce(t *testing.T) {
-	for _, name := range DefaultRegistry.Names() {
-		comp, _ := DefaultRegistry.Lookup(name)
+	reg := DefaultRegistry()
+	for _, name := range reg.Names() {
+		comp, _ := reg.Lookup(name)
 		var buf bytes.Buffer
 		data := Data{Attrs: map[string]string{}, Content: contentPlaceholder}
 		if err := comp.Template.Execute(&buf, data); err != nil {
@@ -166,6 +167,20 @@ func TestTemplatesReferenceContentOnce(t *testing.T) {
 		if n := strings.Count(buf.String(), contentPlaceholder); n != 1 {
 			t.Errorf("%s: template references .Content %d times, want 1", name, n)
 		}
+	}
+}
+
+func TestDefaultRegistryIsolated(t *testing.T) {
+	first := DefaultRegistry()
+	first["Card"] = Component{}
+	first["Steps"].Attrs[0] = "changed"
+
+	second := DefaultRegistry()
+	if _, ok := second["Card"]; !ok {
+		t.Fatal("mutating one registry removed a built-in component")
+	}
+	if got := second["Steps"].Attrs[0]; got == "changed" {
+		t.Fatal("mutating one registry changed a built-in component")
 	}
 }
 

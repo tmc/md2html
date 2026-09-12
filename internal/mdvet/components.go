@@ -72,5 +72,5 @@ func componentRegistry(checks []Check) components.Registry {
 			return cc.Registry
 		}
 	}
-	return components.DefaultRegistry
+	return components.DefaultRegistry()
 }
