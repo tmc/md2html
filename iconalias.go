@@ -21,7 +21,7 @@ import (
 // only one group, since a name in two would resolve differently
 // depending on which was consulted first; [TestIconGroupsAreDisjoint]
 // enforces that.
-var iconGroups = iconsets.AliasGroups
+var iconGroups = iconsets.AliasGroups()
 
 // iconAliases maps each name to the other names for the same glyph, in
 // the order they are tried. It is derived from [iconGroups] so the two

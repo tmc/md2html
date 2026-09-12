@@ -1,7 +1,7 @@
 package iconsets
 
-// AliasGroups lists names used by different libraries for the same glyph.
-var AliasGroups = [][]string{
+// aliasGroups lists names used by different libraries for the same glyph.
+var aliasGroups = [][]string{
 	{"diagram-project", "arrows-turn-to-dots", "workflow", "sitemap", "git-fork"},
 	{"network-wired", "network", "share-2"},
 	{"signal-stream", "tower-broadcast", "broadcast-tower", "radio-tower", "broadcast"},
@@ -36,9 +36,19 @@ var AliasGroups = [][]string{
 	{"house", "home"},
 }
 
+// AliasGroups returns the icon-name groups. The returned groups belong to the
+// caller, so a consumer cannot change alias resolution for another caller.
+func AliasGroups() [][]string {
+	groups := make([][]string, len(aliasGroups))
+	for i, group := range aliasGroups {
+		groups[i] = append([]string(nil), group...)
+	}
+	return groups
+}
+
 // Aliases returns the other names in name's semantic group.
 func Aliases(name string) []string {
-	for _, group := range AliasGroups {
+	for _, group := range aliasGroups {
 		for i, candidate := range group {
 			if candidate == name {
 				aliases := append([]string(nil), group[i+1:]...)

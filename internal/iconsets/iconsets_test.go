@@ -39,3 +39,13 @@ func TestAliases(t *testing.T) {
 		}
 	}
 }
+
+func TestAliasGroupsAreIsolated(t *testing.T) {
+	first := AliasGroups()
+	first[0][0] = "changed"
+
+	second := AliasGroups()
+	if second[0][0] == "changed" {
+		t.Fatal("mutating one alias-group result changed another")
+	}
+}
