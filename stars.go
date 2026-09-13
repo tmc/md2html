@@ -90,13 +90,15 @@ func trimPointZero(v float64, unit string) string {
 // repoStars fetches and formats the star count when the caller asked for
 // one. A failure is logged and reported as no count: the repository link
 // is still correct without it.
-func repoStars(ctx context.Context, cfg Config, repo string, logger *slog.Logger) string {
-	if !cfg.Stars || repo == "" {
+func (s *preparedSite) repoStars(ctx context.Context, repo string, logger *slog.Logger) string {
+	if s == nil || !s.config.Stars || repo == "" {
 		return ""
 	}
-	n, err := fetchStars(ctx, cfg.starsAPI, repo)
+	n, err := fetchStars(ctx, s.starsAPI, repo)
 	if err != nil {
-		logger.Warn("Could not fetch repository stars", "repo", repo, "error", err)
+		if logger != nil {
+			logger.Warn("Could not fetch repository stars", "repo", repo, "error", err)
+		}
 		return ""
 	}
 	return formatStars(n)

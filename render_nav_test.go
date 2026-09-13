@@ -100,7 +100,7 @@ func TestRenderTemplateNavIconSVG(t *testing.T) {
 	nav.buildIndexes()
 	opts := RenderOptions{Nav: nav.ForPage("install.md"), SiteTitle: "Docs", FilePath: "install.md"}
 
-	got := mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "Install", "", false, nil, opts)
+	got := mustRenderSiteTemplateWithOptions(t, cfg, "<p>body</p>", "Install", "", false, nil, opts)
 	if !strings.Contains(got, `<path d="M12 15v5"/>`) {
 		t.Fatalf("rendered nav did not inline the icon:\n%s", got)
 	}
@@ -125,7 +125,7 @@ func TestRenderTemplateBuiltinIconStyleAndAttribution(t *testing.T) {
 	nav := &Navigation{Items: []*NavItem{item}}
 	nav.buildIndexes()
 	opts := RenderOptions{Nav: nav.ForPage("history.md"), SiteTitle: "Docs", FilePath: "history.md"}
-	got := mustRenderTemplateWithOptions(t, cfg, "<p>body</p>", "History", "", false, nil, opts)
+	got := mustRenderSiteTemplateWithOptions(t, cfg, "<p>body</p>", "History", "", false, nil, opts)
 	want := string(cfg.navIconType("clock", "regular"))
 	if want == "" || !strings.Contains(got, want) {
 		t.Fatalf("rendered navigation did not use the requested regular icon")

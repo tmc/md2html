@@ -18,43 +18,54 @@ type jsonSpecFile struct {
 	BadgeLabel string   `json:"badge_label"`
 }
 
-func prepareJSONSpec(cfg Config, logger *slog.Logger) (Config, error) {
-	if cfg.jsonSpecReady || strings.TrimSpace(cfg.JSONSpec) == "" {
-		return cfg, nil
+func (s *preparedSite) prepareJSONSpec(logger *slog.Logger) error {
+	if s.jsonSpecReady || strings.TrimSpace(s.config.JSONSpec) == "" {
+		return nil
 	}
-	dir, err := filepath.Abs(cfg.JSONSpec)
+	dir, err := filepath.Abs(s.config.JSONSpec)
 	if err != nil {
-		return cfg, fmt.Errorf("resolve jsonspec directory: %w", err)
+		return fmt.Errorf("resolve jsonspec directory: %w", err)
 	}
 	raw, err := os.ReadFile(filepath.Join(dir, "jsonspec.json"))
 	if err != nil {
-		return cfg, fmt.Errorf("read jsonspec config: %w", err)
+		return fmt.Errorf("read jsonspec config: %w", err)
 	}
 	var file jsonSpecFile
 	if err := json.Unmarshal(raw, &file); err != nil {
-		return cfg, fmt.Errorf("parse jsonspec config: %w", err)
+		return fmt.Errorf("parse jsonspec config: %w", err)
 	}
 	for i := range file.Prefixes {
 		file.Prefixes[i] = strings.TrimSpace(file.Prefixes[i])
 	}
-	cfg.jsonSpecConfig = jsonspec.Config{
+	s.jsonSpecConfig = jsonspec.Config{
 		DiscriminatorPrefixes: file.Prefixes,
 		BadgeURLTemplate:      file.BadgeURL,
 		BadgeLabelTemplate:    file.BadgeLabel,
 	}
 	bundle, warnings, err := jsonspec.LoadBundle(dir)
 	if err != nil {
-		return cfg, fmt.Errorf("load jsonspec bundle: %w", err)
+		return fmt.Errorf("load jsonspec bundle: %w", err)
 	}
-	for _, warning := range warnings {
-		logger.Warn("JSON schema load warning", "directory", dir, "error", warning)
+	if logger != nil {
+		for _, warning := range warnings {
+			logger.Warn("JSON schema load warning", "directory", dir, "error", warning)
+		}
 	}
 	raw, err = bundle.Marshal()
 	if err != nil {
-		return cfg, fmt.Errorf("marshal jsonspec bundle: %w", err)
+		return fmt.Errorf("marshal jsonspec bundle: %w", err)
 	}
-	cfg.JSONSpec = dir
-	cfg.jsonSpecBundle = template.JS(raw)
-	cfg.jsonSpecReady = true
-	return cfg, nil
+	s.config.JSONSpec = dir
+	s.jsonSpecBundle = template.JS(raw)
+	s.jsonSpecReady = true
+	return nil
+}
+
+// prepareJSONSpec prepares a site with only JSONSpec loaded from cfg.
+func prepareJSONSpec(cfg Config, logger *slog.Logger) (*preparedSite, error) {
+	s := &preparedSite{config: cfg}
+	if err := s.prepareJSONSpec(logger); err != nil {
+		return nil, err
+	}
+	return s, nil
 }

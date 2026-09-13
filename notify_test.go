@@ -11,7 +11,7 @@ import (
 // with an inverted select on time.After, so the default branch was always
 // taken and no client was ever notified — live reload silently never fired.
 func TestNotifyClientsDelivers(t *testing.T) {
-	s := newServer(context.Background(), Config{}, slog.Default())
+	s := newServer(context.Background(), &preparedSite{}, slog.Default())
 
 	ch := make(chan string, 1)
 	s.clientsMu.Lock()

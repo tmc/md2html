@@ -20,56 +20,79 @@ import (
 // error: a mistyped path should say so rather than render every page
 // without icons. A conventional directory that is not there is not an
 // error, since not every site has one.
-func prepareIcons(cfg Config) (Config, error) {
-	if cfg.iconSet != nil {
-		return cfg, nil
+func (s *preparedSite) prepareIcons() error {
+	if s.iconSet != nil {
+		return nil
 	}
-	if cfg.NoIcons {
-		cfg.iconSet = make(map[string]template.HTML)
-		cfg.iconMissing = new(sync.Map)
-		cfg.iconDisabled = true
-		return cfg, nil
+	if s.iconMissing == nil {
+		s.iconMissing = new(sync.Map)
 	}
-	if strings.TrimSpace(cfg.Icons) == "" {
-		dir, set := findIcons(cfg.Source)
+	if s.config.NoIcons {
+		s.iconSet = make(map[string]template.HTML)
+		s.iconDisabled = true
+		return nil
+	}
+	if strings.TrimSpace(s.config.Icons) == "" {
+		dir, set := findIcons(s.config.Source)
 		if len(set) != 0 {
-			cfg.Icons, cfg.iconSet = dir, set
-			cfg.iconMissing = new(sync.Map)
-			return cfg, nil
+			s.config.Icons, s.iconSet = dir, set
+			return nil
 		}
-		return prepareBuiltinIcons(cfg, iconLibraryForSource(cfg.Source))
+		return s.prepareBuiltinIcons(iconLibraryForSource(s.config.Source))
 	}
-	dir, err := filepath.Abs(cfg.Icons)
+	dir, err := filepath.Abs(s.config.Icons)
 	if err != nil {
-		return cfg, fmt.Errorf("resolve icons directory: %w", err)
+		return fmt.Errorf("resolve icons directory: %w", err)
 	}
 	set, err := loadIcons(dir)
 	if err != nil {
-		return cfg, fmt.Errorf("load icons: %w", err)
+		return fmt.Errorf("load icons: %w", err)
 	}
-	cfg.Icons = dir
-	cfg.iconSet = set
-	cfg.iconMissing = new(sync.Map)
-	return cfg, nil
+	s.config.Icons = dir
+	s.iconSet = set
+	return nil
 }
 
-func prepareBuiltinIcons(cfg Config, name string) (Config, error) {
+// prepareIcons prepares a site with only icons loaded from cfg.
+func prepareIcons(cfg Config) (*preparedSite, error) {
+	s := &preparedSite{
+		config:      cfg,
+		iconMissing: new(sync.Map),
+	}
+	if err := s.prepareIcons(); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// prepareBuiltinIcons prepares a site with only built-in icons loaded.
+func prepareBuiltinIcons(cfg Config, name string) (*preparedSite, error) {
+	s := &preparedSite{
+		config:      cfg,
+		iconMissing: new(sync.Map),
+	}
+	if err := s.prepareBuiltinIcons(name); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+func (s *preparedSite) prepareBuiltinIcons(name string) error {
 	lib, err := iconsets.Load(name)
 	if err != nil {
-		return cfg, fmt.Errorf("load built-in icons: %w", err)
+		return fmt.Errorf("load built-in icons: %w", err)
 	}
-	cfg.iconAttribution = lib.Attribution
-	cfg.iconMissing = new(sync.Map)
-	cfg.iconSet = make(map[string]template.HTML)
+	s.iconAttribution = lib.Attribution
+	s.iconSet = make(map[string]template.HTML)
 	if name != "fontawesome" {
 		for name, svg := range lib.Icons {
-			cfg.iconSet[name] = inlineSVG(svg)
+			s.iconSet[name] = inlineSVG(svg)
 		}
-		return cfg, nil
+		return nil
 	}
-	cfg.iconStyles = make(map[string]map[string]template.HTML)
+	s.iconStyles = make(map[string]map[string]template.HTML)
 	for _, style := range []string{"solid", "regular", "brands"} {
-		cfg.iconStyles[style] = make(map[string]template.HTML)
+		s.iconStyles[style] = make(map[string]template.HTML)
 	}
 	for key, svg := range lib.Icons {
 		style, name, ok := strings.Cut(key, "/")
@@ -77,16 +100,16 @@ func prepareBuiltinIcons(cfg Config, name string) (Config, error) {
 			continue
 		}
 		markup := inlineSVG(svg)
-		cfg.iconStyles[style][name] = markup
+		s.iconStyles[style][name] = markup
 	}
 	for _, style := range []string{"solid", "regular", "brands"} {
-		for name, markup := range cfg.iconStyles[style] {
-			if _, exists := cfg.iconSet[name]; !exists {
-				cfg.iconSet[name] = markup
+		for name, markup := range s.iconStyles[style] {
+			if _, exists := s.iconSet[name]; !exists {
+				s.iconSet[name] = markup
 			}
 		}
 	}
-	return cfg, nil
+	return nil
 }
 
 // iconDirName is the directory an icon set is kept in beside documentation.
@@ -200,50 +223,50 @@ func replaceFirst(s string, re *regexp.Regexp, f func(string) string) string {
 // no icon set is configured or the set does not have that name. A name
 // with no icon leaves the entry without one, which is how pages render
 // when no set is configured at all.
-func (cfg Config) navIcon(name string) template.HTML {
-	return cfg.navIconType(name, "")
+func (s *preparedSite) navIcon(name string) template.HTML {
+	return s.navIconType(name, "")
 }
 
-func (cfg Config) navIconType(name, style string) template.HTML {
-	if cfg.iconDisabled {
+func (s *preparedSite) navIconType(name, style string) template.HTML {
+	if s == nil || s.iconDisabled {
 		return ""
 	}
-	if style != "" && cfg.iconStyles != nil {
-		set, ok := cfg.iconStyles[style]
+	if style != "" && s.iconStyles != nil {
+		set, ok := s.iconStyles[style]
 		if !ok {
-			cfg.warnMissingIcon(name, style)
+			s.warnMissingIcon(name, style)
 			return ""
 		}
 		if svg := resolveIcon(set, name); svg != "" {
 			return svg
 		}
-		cfg.warnMissingIcon(name, style)
+		s.warnMissingIcon(name, style)
 		return ""
 	}
-	if svg := resolveIcon(cfg.iconSet, name); svg != "" {
+	if svg := resolveIcon(s.iconSet, name); svg != "" {
 		return svg
 	}
-	cfg.warnMissingIcon(name, style)
+	s.warnMissingIcon(name, style)
 	return ""
 }
 
-func (cfg Config) hasIcon(name, style string) bool {
-	if cfg.iconDisabled {
+func (s *preparedSite) hasIcon(name, style string) bool {
+	if s == nil || s.iconDisabled {
 		return false
 	}
-	if style != "" && cfg.iconStyles != nil {
-		return resolveIcon(cfg.iconStyles[style], name) != ""
+	if style != "" && s.iconStyles != nil {
+		return resolveIcon(s.iconStyles[style], name) != ""
 	}
-	return resolveIcon(cfg.iconSet, name) != ""
+	return resolveIcon(s.iconSet, name) != ""
 }
 
-func (cfg Config) warnMissingIcon(name, style string) {
-	if cfg.iconLogger == nil || cfg.iconMissing == nil {
+func (s *preparedSite) warnMissingIcon(name, style string) {
+	if s == nil || s.iconLogger == nil || s.iconMissing == nil {
 		return
 	}
 	key := style + "/" + name
-	if _, loaded := cfg.iconMissing.LoadOrStore(key, struct{}{}); loaded {
+	if _, loaded := s.iconMissing.LoadOrStore(key, struct{}{}); loaded {
 		return
 	}
-	cfg.iconLogger.Warn("Icon not found", "name", name, "style", style)
+	s.iconLogger.Warn("Icon not found", "name", name, "style", style)
 }

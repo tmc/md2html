@@ -16,15 +16,15 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-func newServer(ctx context.Context, cfg Config, logger *slog.Logger) *server {
-	if prepared, err := prepareJSONSpec(cfg, logger); err != nil {
-		logger.Error("Error preparing JSON schemas", "error", err)
-	} else {
-		cfg = prepared
+func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *server {
+	if site == nil {
+		site = &preparedSite{}
 	}
+	cfg := site.config
 	s := &server{
 		ctx:        ctx,
 		config:     cfg,
+		prepared:   site,
 		logger:     logger,
 		clients:    make(map[chan string]bool),
 		inputPath:  cfg.Source,
@@ -84,7 +84,7 @@ func newServer(ctx context.Context, cfg Config, logger *slog.Logger) *server {
 				s.site = site
 				s.title = siteTitle(s.config.Title, site.Name)
 				logger.Info("Loaded navigation", "pages", len(nav.Flat))
-				s.site.Stars = repoStars(context.Background(), cfg, site.Repo, logger)
+				s.site.Stars = s.prepared.repoStars(context.Background(), site.Repo, logger)
 			}
 		}
 	}
@@ -119,6 +119,7 @@ func newServer(ctx context.Context, cfg Config, logger *slog.Logger) *server {
 type server struct {
 	ctx        context.Context
 	config     Config
+	prepared   *preparedSite
 	logger     *slog.Logger
 	mu         sync.RWMutex
 	content    string
@@ -338,7 +339,7 @@ func (s *server) reloadNavigation() {
 	if site.Repo == previous.Repo {
 		site.Stars = previous.Stars
 	} else {
-		site.Stars = repoStars(s.ctx, s.config, site.Repo, s.logger)
+		site.Stars = s.prepared.repoStars(s.ctx, site.Repo, s.logger)
 	}
 
 	s.mu.Lock()
@@ -684,7 +685,7 @@ func (s *server) serveNotFound(w http.ResponseWriter, urlPath, css string) {
 
 // renderDocumentWithVersion renders a document with version information
 func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, filePath, version string) (string, error) {
-	html, err := markdownToHTMLWithContext(s.config, promoteTitleHeading(doc), filePath)
+	html, err := s.prepared.markdownToHTML(promoteTitleHeading(doc), filePath)
 	if err != nil {
 		return "", err
 	}
@@ -717,7 +718,7 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 		opts.Nav = nav.ForPage(filePath)
 	}
 
-	return renderTemplateWithOptions(s.config, html, title, customCSS, s.watchEnabled(), doc.Frontmatter, opts)
+	return s.prepared.renderTemplate(html, title, customCSS, s.watchEnabled(), doc.Frontmatter, opts)
 }
 
 func (s *server) watchEnabled() bool {
@@ -981,7 +982,7 @@ func (s *server) registerEndpoints(mux *http.ServeMux) {
 		mux.HandleFunc("/js/search.js", handleSearchAsset("static/js/search.js"))
 		mux.HandleFunc("/search-index.js", s.handleSearchIndex)
 	}
-	if s.config.jsonSpecBundle != "" {
+	if s.prepared != nil && s.prepared.jsonSpecBundle != "" {
 		mux.HandleFunc("/js/jsonspec.js", handleSearchAsset("static/js/jsonspec.js"))
 	}
 }

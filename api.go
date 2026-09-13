@@ -2,6 +2,7 @@ package md2html
 
 import (
 	"encoding/json"
+	"html/template"
 	"net/http"
 	"strings"
 )
@@ -47,7 +48,10 @@ func (s *server) handleJSONSpecSchemas(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "jsonspec schemas not configured", http.StatusNotFound)
 		return
 	}
-	payload := s.config.jsonSpecBundle
+	var payload template.JS
+	if s.prepared != nil {
+		payload = s.prepared.jsonSpecBundle
+	}
 	if payload == "" {
 		http.Error(w, "schema bundle unavailable", http.StatusInternalServerError)
 		return

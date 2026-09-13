@@ -20,7 +20,11 @@ func TestRunVet(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	cfg := Config{Source: filepath.Join(dir, "x.md"), Vet: true}
-	runVet(cfg, logger)
+	site, err := prepareSite(cfg, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runVet(site, logger)
 
 	out := buf.String()
 	if !strings.Contains(out, "missing.md") {
@@ -34,7 +38,8 @@ func TestRunVet(t *testing.T) {
 func TestRunVet_SkipStdin(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	runVet(Config{Source: "-", Vet: true}, logger)
+	site, _ := prepareSite(Config{Source: "-", Vet: true}, logger)
+	runVet(site, logger)
 	if buf.Len() != 0 {
 		t.Errorf("expected no output for stdin source, got %q", buf.String())
 	}
@@ -50,7 +55,11 @@ func TestRunVet_UnknownCheck(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
 	cfg := Config{Source: filepath.Join(dir, "x.md"), Vet: true, VetChecks: "links,nope"}
-	runVet(cfg, logger)
+	site, err := prepareSite(cfg, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runVet(site, logger)
 
 	out := buf.String()
 	if !strings.Contains(out, "unknown checks") {
@@ -69,8 +78,10 @@ func TestRunVet_OKFSkipsFrontmatterCheck(t *testing.T) {
 	}
 
 	var ordinary, okf bytes.Buffer
-	runVet(Config{Source: path, Vet: true, VetChecks: "frontmatter"}, slog.New(slog.NewTextHandler(&ordinary, nil)))
-	runVet(Config{Source: path, Format: "okf", Vet: true, VetChecks: "frontmatter"}, slog.New(slog.NewTextHandler(&okf, nil)))
+	site1, _ := prepareSite(Config{Source: path, Vet: true, VetChecks: "frontmatter"}, nil)
+	site2, _ := prepareSite(Config{Source: path, Format: "okf", Vet: true, VetChecks: "frontmatter"}, nil)
+	runVet(site1, slog.New(slog.NewTextHandler(&ordinary, nil)))
+	runVet(site2, slog.New(slog.NewTextHandler(&okf, nil)))
 	if !strings.Contains(ordinary.String(), "title is missing") {
 		t.Fatalf("ordinary vet output missing title diagnostic: %q", ordinary.String())
 	}

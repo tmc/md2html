@@ -7,10 +7,14 @@ import (
 	"github.com/tmc/md2html/internal/mdvet"
 )
 
-// runVet executes mdvet over cfg.Source and reports any diagnostics it
+// runVet executes mdvet over site.config.Source and reports any diagnostics it
 // finds via logger. It never returns an error — vet is advisory and
 // must not block rendering.
-func runVet(cfg Config, logger *slog.Logger) {
+func runVet(site *preparedSite, logger *slog.Logger) {
+	if site == nil {
+		return
+	}
+	cfg := site.config
 	src := cfg.Source
 	if src == "" || src == "-" {
 		// stdin or unspecified source: nothing on disk to vet.
@@ -27,18 +31,18 @@ func runVet(cfg Config, logger *slog.Logger) {
 	if normalizedFormat(cfg.Format) == "okf" {
 		checks = withoutVetCheck(checks, "frontmatter")
 	}
-	checks = withVetComponents(cfg, checks)
-	checks = withVetIcons(cfg, checks)
+	checks = withVetComponents(site, checks)
+	checks = withVetIcons(site, checks)
 
 	// md2html already knows the prefix the tree is served under, which
 	// is what makes a link written as "/docs/quickstart" resolvable back
 	// to the file that renders it.
-	site := mdvet.Site{Base: cfg.Base}
+	vetSite := mdvet.Site{Base: cfg.Base}
 	if root, err := sourceRoot(src); err == nil {
-		site.Root = root
+		vetSite.Root = root
 	}
 
-	diags, err := mdvet.RunSite([]string{src}, checks, site)
+	diags, err := mdvet.RunSite([]string{src}, checks, vetSite)
 	if err != nil {
 		logger.Warn("vet: run failed", "error", err)
 		return
@@ -56,15 +60,15 @@ func runVet(cfg Config, logger *slog.Logger) {
 	}
 }
 
-func withVetIcons(cfg Config, checks []mdvet.Check) []mdvet.Check {
-	if cfg.iconDisabled {
+func withVetIcons(site *preparedSite, checks []mdvet.Check) []mdvet.Check {
+	if site == nil || site.iconDisabled {
 		return withoutVetCheck(checks, "icons")
 	}
 	out := make([]mdvet.Check, len(checks))
 	copy(out, checks)
 	for i, check := range out {
 		if _, ok := check.(mdvet.IconCheck); ok {
-			out[i] = mdvet.IconCheck{Resolve: cfg.hasIcon}
+			out[i] = mdvet.IconCheck{Resolve: site.hasIcon}
 		}
 	}
 	return out
@@ -73,15 +77,15 @@ func withVetIcons(cfg Config, checks []mdvet.Check) []mdvet.Check {
 // withVetComponents points the components check at the same registry
 // used for rendering, so that -vet and -components agree about which
 // component names exist.
-func withVetComponents(cfg Config, checks []mdvet.Check) []mdvet.Check {
-	if cfg.componentRegistry == nil {
+func withVetComponents(site *preparedSite, checks []mdvet.Check) []mdvet.Check {
+	if site == nil || site.componentRegistry == nil {
 		return checks
 	}
 	out := make([]mdvet.Check, len(checks))
 	copy(out, checks)
 	for i, c := range out {
 		if _, ok := c.(mdvet.ComponentCheck); ok {
-			out[i] = mdvet.ComponentCheck{Registry: cfg.componentRegistry, Configured: true}
+			out[i] = mdvet.ComponentCheck{Registry: site.componentRegistry, Configured: true}
 		}
 	}
 	return out

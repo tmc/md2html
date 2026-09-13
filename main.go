@@ -101,6 +101,12 @@ type Config struct {
 	Icons string
 	// NoIcons disables both built-in and directory icon sets.
 	NoIcons bool
+}
+
+// preparedSite holds loaded components, icons, JSON schemas, and their
+// runtime state for a site build or server session.
+type preparedSite struct {
+	config Config
 
 	componentRegistry components.Registry
 	iconSet           map[string]template.HTML
@@ -109,13 +115,33 @@ type Config struct {
 	iconMissing       *sync.Map
 	iconLogger        *slog.Logger
 	iconDisabled      bool
-	// starsAPI overrides the host star counts are read from. Only tests
-	// set it; the empty value means the real API.
-	starsAPI string
 
 	jsonSpecConfig jsonspec.Config
 	jsonSpecBundle template.JS
 	jsonSpecReady  bool
+
+	starsAPI string
+}
+
+func prepareSite(cfg Config, logger *slog.Logger) (*preparedSite, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	s := &preparedSite{
+		config:      cfg,
+		iconMissing: new(sync.Map),
+		iconLogger:  logger,
+	}
+	if err := s.prepareJSONSpec(logger); err != nil {
+		return nil, err
+	}
+	if err := s.prepareComponents(); err != nil {
+		return nil, err
+	}
+	if err := s.prepareIcons(); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // NewFlagSet returns a FlagSet configured for the md2html CLI.
@@ -247,15 +273,6 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	if err := validateFormat(cfg.Format); err != nil {
 		return err
 	}
-	var err error
-	cfg, err = prepareJSONSpec(cfg, logger)
-	if err != nil {
-		return err
-	}
-	cfg, err = prepareComponents(cfg)
-	if err != nil {
-		return err
-	}
 
 	// Handle positional arguments
 	if len(args) > 0 {
@@ -263,13 +280,6 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	}
 	if len(args) > 1 {
 		return fmt.Errorf("too many positional arguments")
-	}
-
-	// Icons are looked for beside the documentation when no directory
-	// was named, so the source has to be known first.
-	cfg, err = prepareIcons(cfg)
-	if err != nil {
-		return err
 	}
 
 	// Configure logger level based on verbose flag
@@ -281,12 +291,16 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		handler := slog.NewTextHandler(os.Stderr, opts)
 		logger = slog.New(handler)
 	}
-	cfg.iconLogger = logger
+
+	site, err := prepareSite(cfg, logger)
+	if err != nil {
+		return err
+	}
 
 	// Run mdvet checks before any rendering. Diagnostics are reported
 	// to the logger but never cause Run to fail.
 	if cfg.Vet {
-		runVet(cfg, logger)
+		runVet(site, logger)
 	}
 
 	// TODO: clean up handling stdin and choosing between modes
@@ -300,14 +314,15 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		// served with the correct Content-Type by standard HTTP servers.
 		if cfg.HTMLExt == "" {
 			cfg.HTMLExt = "html"
+			site.config.HTMLExt = "html"
 		}
-		return generateStaticHTML(ctx, cfg, logger)
+		return site.generateStaticHTML(ctx, logger)
 	}
 
 	// If -http flag is provided, run server
 	if cfg.HTTP != "" {
 		logger.Info("Starting server", "address", cfg.HTTP)
-		err := runServer(ctx, cfg, logger)
+		err := runServer(ctx, site, logger)
 		// Don't treat context cancellation as an error (graceful shutdown)
 		if err == context.Canceled {
 			return nil
@@ -330,7 +345,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
 
-		html, err := markdownToHTMLWithContext(cfg, promoteTitleHeading(doc), cfg.Source)
+		html, err := site.markdownToHTML(promoteTitleHeading(doc), cfg.Source)
 		if err != nil {
 			return err
 		}
@@ -345,11 +360,11 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	return flag.ErrHelp
 }
 
-func runServer(ctx context.Context, cfg Config, logger *slog.Logger) error {
-	if _, err := watchEnabled(cfg.Watch, cfg.Source); err != nil {
+func runServer(ctx context.Context, site *preparedSite, logger *slog.Logger) error {
+	if _, err := watchEnabled(site.config.Watch, site.config.Source); err != nil {
 		return err
 	}
-	s := newServer(ctx, cfg, logger)
+	s := newServer(ctx, site, logger)
 	return s.Run(ctx)
 }
 
@@ -548,7 +563,10 @@ func openBrowser(ctx context.Context, url string) bool {
 	return cmd.Start() == nil
 }
 
-func loadAllTemplates(cfg Config) (*template.Template, error) {
+func loadAllTemplates(site *preparedSite) (*template.Template, error) {
+	if site == nil {
+		site = &preparedSite{}
+	}
 	tmpl, err := template.New("root").Funcs(template.FuncMap{
 		"default": func(def, val any) any {
 			if val == nil {
@@ -586,7 +604,7 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 		"navHref": func(currentFile, targetFile, htmlExt, indexFile string) string {
 			return relativeRenderedLink(currentFile, targetFile, htmlExt, indexFile)
 		},
-		"navIcon": cfg.navIconType,
+		"navIcon": site.navIconType,
 		"asset": func(assets map[string]string, name string) string {
 			if assets != nil {
 				if v := assets[name]; v != "" {
@@ -596,7 +614,7 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 			return name
 		},
 		"jsonSpec": func() template.JS {
-			return cfg.jsonSpecBundle
+			return site.jsonSpecBundle
 		},
 	}).ParseFS(templates, "templates/*.html", "templates/*/*.html")
 
@@ -605,9 +623,9 @@ func loadAllTemplates(cfg Config) (*template.Template, error) {
 		tmpl = template.New("root")
 	}
 
-	if cfg.TemplateDir != "" {
+	if site.config.TemplateDir != "" {
 		for _, pattern := range []string{"*.html", "*/*.html"} {
-			if t, err := tmpl.ParseGlob(filepath.Join(cfg.TemplateDir, pattern)); err == nil {
+			if t, err := tmpl.ParseGlob(filepath.Join(site.config.TemplateDir, pattern)); err == nil {
 				tmpl = t
 			}
 		}
@@ -722,7 +740,18 @@ func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload
 }
 
 func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any, opts RenderOptions) (string, error) {
-	tmpl, err := loadAllTemplates(cfg)
+	site, err := prepareSite(cfg, slog.Default())
+	if err != nil {
+		return "", err
+	}
+	return site.renderTemplate(htmlContent, title, customCSS, liveReload, frontmatter, opts)
+}
+
+func (s *preparedSite) renderTemplate(htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any, opts RenderOptions) (string, error) {
+	if s == nil {
+		s = &preparedSite{}
+	}
+	tmpl, err := loadAllTemplates(s)
 	if err != nil {
 		return "", fmt.Errorf("load templates: %w", err)
 	}
@@ -751,10 +780,10 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 
 	var buf bytes.Buffer
 	mermaidTheme, mermaidDarkTheme, mermaidAutoTheme := resolveMermaidThemes(frontmatter)
-	meta := pageMetadata(cfg, title, frontmatter, opts)
+	meta := pageMetadata(s.config, title, frontmatter, opts)
 	var iconAttribution template.HTML
-	if cfg.iconAttribution != "" {
-		iconAttribution = template.HTML("<!-- " + cfg.iconAttribution + " -->")
+	if s.iconAttribution != "" {
+		iconAttribution = template.HTML("<!-- " + s.iconAttribution + " -->")
 	}
 
 	data := templateData{
@@ -762,17 +791,17 @@ func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string,
 		Content:           template.HTML(htmlContent),
 		CustomCSS:         template.CSS(customCSS),
 		ChromaCSS:         template.CSS(generateChromaCSS()),
-		Verbose:           cfg.Verbose,
+		Verbose:           s.config.Verbose,
 		LiveReload:        liveReload,
-		HTMLExt:           cfg.HTMLExt,
+		HTMLExt:           s.config.HTMLExt,
 		Frontmatter:       frontmatter,
 		Version:           opts.Version,
 		Versions:          opts.Versions,
-		Search:            cfg.Search,
+		Search:            s.config.Search,
 		Nav:               opts.Nav,
 		SiteTitle:         opts.SiteTitle,
 		Data:              opts.Data,
-		IndexFile:         cfg.Index,
+		IndexFile:         s.config.Index,
 		MermaidTheme:      mermaidTheme,
 		MermaidDarkTheme:  mermaidDarkTheme,
 		MermaidAutoTheme:  mermaidAutoTheme,
@@ -945,6 +974,15 @@ func editURL(pattern, filePath string) string {
 }
 
 func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) error {
+	site, err := prepareSite(cfg, logger)
+	if err != nil {
+		return err
+	}
+	return site.generateStaticHTML(ctx, logger)
+}
+
+func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.Logger) error {
+	cfg := site.config
 	sourceDir := cfg.Source
 	if sourceDir == "" {
 		sourceDir = "."
@@ -1002,7 +1040,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	logger.Info("Found markdown files to process", "count", len(files))
 
 	var nav *Navigation
-	var site siteInfo
+	var sInfo siteInfo
 	if cfg.Nav {
 		// Load navigation from SUMMARY.md or build it from the markdown tree.
 		htmlExt := ""
@@ -1010,13 +1048,14 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			htmlExt = "." + cfg.HTMLExt
 		}
 		var err error
-		nav, site, err = navigationForDir(sourceDir, htmlExt)
+		nav, sInfo, err = navigationForDir(sourceDir, htmlExt)
 		if err != nil {
 			logger.Error("Error loading navigation", "error", err)
 		} else if nav != nil && len(nav.Items) > 0 {
-			cfg.Title = siteTitle(cfg.Title, site.Name)
+			cfg.Title = siteTitle(cfg.Title, sInfo.Name)
+			site.config.Title = cfg.Title
 			logger.Info("Loaded navigation", "pages", len(nav.Flat))
-			site.Stars = repoStars(ctx, cfg, site.Repo, logger)
+			sInfo.Stars = site.repoStars(ctx, sInfo.Repo, logger)
 		}
 	}
 	lastUpdated := map[string]string{}
@@ -1026,7 +1065,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		logger.Debug("git metadata unavailable", "error", err)
 	}
 	assets := map[string]string{}
-	if cfg.jsonSpecBundle != "" {
+	if site.jsonSpecBundle != "" {
 		if err := writeJSONSpecAsset(outputDir); err != nil {
 			return err
 		}
@@ -1062,12 +1101,12 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			EditURL:     editURL(cfg.EditURL, file.RelPath),
 			LastUpdated: lastUpdated[filepath.ToSlash(file.RelPath)],
 			Assets:      assets,
-			Accent:      site.Accent,
-			AccentDark:  site.AccentDark,
-			Repo:        site.Repo,
-			RepoURL:     site.RepoURL,
-			NavLinks:    site.Links,
-			Stars:       site.Stars,
+			Accent:      sInfo.Accent,
+			AccentDark:  sInfo.AccentDark,
+			Repo:        sInfo.Repo,
+			RepoURL:     sInfo.RepoURL,
+			NavLinks:    sInfo.Links,
+			Stars:       sInfo.Stars,
 			ShowStars:   cfg.Stars,
 		}
 		if cfg.LLMS {
@@ -1076,7 +1115,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		if nav != nil {
 			opts.Nav = nav.ForPage(file.RelPath)
 		}
-		if err := processMarkdownFileWithOpts(file, sourceDir, outputDir, cssContent, cfg, opts); err != nil {
+		if err := processMarkdownFileWithOpts(file, sourceDir, outputDir, cssContent, site, opts); err != nil {
 			logger.Error("Error processing file", "error", err, "file", file.RelPath)
 			renderErrors = append(renderErrors, fmt.Errorf("process %s: %w", file.RelPath, err))
 			continue
@@ -1095,12 +1134,12 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 				EditURL:     editURL(cfg.EditURL, cfg.Index),
 				LastUpdated: lastUpdated[filepath.ToSlash(cfg.Index)],
 				Assets:      assets,
-				Accent:      site.Accent,
-				AccentDark:  site.AccentDark,
-				Repo:        site.Repo,
-				RepoURL:     site.RepoURL,
-				NavLinks:    site.Links,
-				Stars:       site.Stars,
+				Accent:      sInfo.Accent,
+				AccentDark:  sInfo.AccentDark,
+				Repo:        sInfo.Repo,
+				RepoURL:     sInfo.RepoURL,
+				NavLinks:    sInfo.Links,
+				Stars:       sInfo.Stars,
 				ShowStars:   cfg.Stars,
 			}
 			if cfg.LLMS {
@@ -1109,7 +1148,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 			if nav != nil {
 				indexOpts.Nav = nav.ForPage(cfg.Index)
 			}
-			if err := processIndexFileWithOpts(indexFile, outputDir, cssContent, cfg, indexOpts); err != nil {
+			if err := processIndexFileWithOpts(indexFile, outputDir, cssContent, site, indexOpts); err != nil {
 				logger.Error("Error processing index file", "error", err, "file", indexFile)
 			} else {
 				logger.Debug("Processed index file", "file", indexFile)
@@ -1117,7 +1156,7 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 		}
 	} else {
 		// Generate table of contents as index.html
-		if err := generateTOCIndex(outputDir, files, cssContent, cfg, assets); err != nil {
+		if err := generateTOCIndex(outputDir, files, cssContent, site, assets); err != nil {
 			logger.Error("Error generating TOC index", "error", err)
 		} else {
 			logger.Debug("Generated TOC index")
@@ -1157,7 +1196,8 @@ func isDraft(path string) bool {
 	return false
 }
 
-func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssContent string, cfg Config, opts RenderOptions) error {
+func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssContent string, site *preparedSite, opts RenderOptions) error {
+	cfg := site.config
 	sourcePath := filepath.Join(sourceDir, file.RelPath)
 
 	content, err := os.ReadFile(sourcePath)
@@ -1171,7 +1211,7 @@ func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssCon
 		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 	}
 
-	htmlContent, err := markdownToHTMLWithContext(cfg, promoteTitleHeading(doc), file.RelPath)
+	htmlContent, err := site.markdownToHTML(promoteTitleHeading(doc), file.RelPath)
 	if err != nil {
 		return err
 	}
@@ -1195,7 +1235,7 @@ func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssCon
 
 	title := pageTitle(doc.Frontmatter, file.RelPath, cfg.Title)
 
-	finalHTML, err := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
+	finalHTML, err := site.renderTemplate(htmlContent, title, cssContent, false, doc.Frontmatter, opts)
 	if err != nil {
 		return err
 	}
@@ -1269,7 +1309,8 @@ func documentTitle(doc DocumentData, filePath, fallback string) string {
 	return fallback
 }
 
-func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Config, opts RenderOptions) error {
+func processIndexFileWithOpts(indexPath, outputDir, cssContent string, site *preparedSite, opts RenderOptions) error {
+	cfg := site.config
 	content, err := os.ReadFile(indexPath)
 	if err != nil {
 		return err
@@ -1285,7 +1326,7 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 	if htmlPath == "" {
 		htmlPath = filepath.Base(indexPath)
 	}
-	htmlContent, err := markdownToHTMLWithContext(cfg, promoteTitleHeading(doc), htmlPath)
+	htmlContent, err := site.markdownToHTML(promoteTitleHeading(doc), htmlPath)
 	if err != nil {
 		return err
 	}
@@ -1296,7 +1337,7 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 		title = docTitle
 	}
 
-	finalHTML, err := renderTemplateWithOptions(cfg, htmlContent, title, cssContent, false, doc.Frontmatter, opts)
+	finalHTML, err := site.renderTemplate(htmlContent, title, cssContent, false, doc.Frontmatter, opts)
 	if err != nil {
 		return err
 	}
@@ -1310,7 +1351,8 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, cfg Confi
 	return os.WriteFile(indexOutputPath, []byte(finalHTML), 0644)
 }
 
-func generateTOCIndex(outputDir string, files []markdownFile, cssContent string, cfg Config, assets map[string]string) error {
+func generateTOCIndex(outputDir string, files []markdownFile, cssContent string, site *preparedSite, assets map[string]string) error {
+	cfg := site.config
 	// Generate table of contents markdown
 	var buf strings.Builder
 	buf.WriteString(fmt.Sprintf("# %s\n\n", listingTitle("")))
@@ -1326,14 +1368,14 @@ func generateTOCIndex(outputDir string, files []markdownFile, cssContent string,
 	}
 
 	// Convert to HTML
-	htmlContent, err := markdownToHTMLWithContext(cfg, buf.String(), "")
+	htmlContent, err := site.markdownToHTML(buf.String(), "")
 	if err != nil {
 		return err
 	}
 
 	// Render with template
 	doc := DocumentData{Content: buf.String(), Frontmatter: make(map[string]any)}
-	finalHTML, err := renderTemplateWithOptions(cfg, htmlContent, listingTitle(""), cssContent, false, doc.Frontmatter, RenderOptions{Assets: assets, SiteTitle: cfg.Title})
+	finalHTML, err := site.renderTemplate(htmlContent, listingTitle(""), cssContent, false, doc.Frontmatter, RenderOptions{Assets: assets, SiteTitle: cfg.Title})
 	if err != nil {
 		return err
 	}

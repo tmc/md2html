@@ -197,13 +197,17 @@ func typographer() goldmark.Extender {
 	)
 }
 
-func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, error) {
+func (s *preparedSite) markdownToHTML(markdown, filePath string) (string, error) {
+	if s == nil {
+		s = &preparedSite{}
+	}
+	cfg := s.config
 	if cfg.AllowUnsafe {
 		markdown = rewriteLocalHTMLAttributes(markdown, filePath, cfg.HTMLExt, cfg.Index, cfg.Format)
 		markdown = preprocessHTMLBlocks(markdown)
 	}
 
-	jscfg := jsonSpecConfig(cfg)
+	jscfg := s.jsonSpecConfig
 
 	highlightOpts := []highlighting.Option{
 		highlighting.WithStyle("github"),
@@ -229,7 +233,7 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, e
 		&admonitions.Extender{},
 		alertsExtender{},
 		tabs.Extender{},
-		components.Extender{Registry: cfg.componentsRegistry(), Icons: cfg.navIconType},
+		components.Extender{Registry: s.componentsRegistry(), Icons: s.navIconType},
 		media.Extender{},
 		jsonspec.Extension(jscfg),
 	}
@@ -295,6 +299,14 @@ func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, e
 	}
 	logExtensionErrors(pc, filePath)
 	return buf.String(), nil
+}
+
+func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, error) {
+	site, err := prepareSite(cfg, slog.Default())
+	if err != nil {
+		return "", err
+	}
+	return site.markdownToHTML(markdown, filePath)
 }
 
 type alertsExtender struct{}
@@ -429,10 +441,6 @@ func renderAlertBlockquote(w util.BufWriter, source []byte, n ast.Node, entering
 		_, _ = w.WriteString("</div>\n")
 	}
 	return ast.WalkContinue, nil
-}
-
-func jsonSpecConfig(cfg Config) jsonspec.Config {
-	return cfg.jsonSpecConfig
 }
 
 // logExtensionErrors surfaces parse diagnostics recorded by the tabs and

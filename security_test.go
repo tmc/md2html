@@ -38,7 +38,7 @@ func TestHandleIndexRejectsTraversalPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := newServer(context.Background(), Config{Source: dir}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	s := newServer(context.Background(), &preparedSite{config: Config{Source: dir}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	for _, target := range []string{"/../secret", "/?file=../secret.md"} {
 		t.Run(target, func(t *testing.T) {
@@ -58,7 +58,7 @@ func TestHandleIndexServesStaticAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := newServer(context.Background(), Config{Source: dir}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	s := newServer(context.Background(), &preparedSite{config: Config{Source: dir}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	req := httptest.NewRequest(http.MethodGet, "/clip.mp4", nil)
 	rec := httptest.NewRecorder()
 	s.handleIndex(rec, req)

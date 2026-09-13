@@ -28,3 +28,12 @@ func mustRenderTemplateWithOptions(t *testing.T, cfg Config, htmlContent, title,
 	}
 	return html
 }
+
+func mustRenderSiteTemplateWithOptions(t *testing.T, site *preparedSite, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any, opts RenderOptions) string {
+	t.Helper()
+	html, err := site.renderTemplate(htmlContent, title, customCSS, liveReload, frontmatter, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return html
+}

@@ -75,17 +75,18 @@ func TestRepoStarsOptIn(t *testing.T) {
 	}))
 	defer srv.Close()
 	logger := discardLogger()
-	stars := Config{Stars: true, starsAPI: srv.URL}
-	if got := repoStars(context.Background(), Config{starsAPI: srv.URL}, "tmc/cdp", logger); got != "" {
+	starsSite := &preparedSite{config: Config{Stars: true}, starsAPI: srv.URL}
+	noStarsSite := &preparedSite{starsAPI: srv.URL}
+	if got := noStarsSite.repoStars(context.Background(), "tmc/cdp", logger); got != "" {
 		t.Errorf("repoStars() = %q without -github-stars, want empty", got)
 	}
 	if hits != 0 {
 		t.Errorf("made %d requests without -github-stars, want 0", hits)
 	}
-	if got := repoStars(context.Background(), stars, "", logger); got != "" {
+	if got := starsSite.repoStars(context.Background(), "", logger); got != "" {
 		t.Errorf("repoStars() = %q with no repository, want empty", got)
 	}
-	if got := repoStars(context.Background(), stars, "tmc/cdp", logger); got != "7" {
+	if got := starsSite.repoStars(context.Background(), "tmc/cdp", logger); got != "7" {
 		t.Errorf("repoStars() = %q, want %q", got, "7")
 	}
 }
