@@ -28,10 +28,13 @@ func freeAddr(t *testing.T) string {
 	return addr
 }
 
-// waitServing waits for addr to answer an HTTP request.
+// waitServing waits for addr to answer an HTTP request. The budget is
+// generous because it only bounds a failure: under -race, with the
+// script fixtures starting servers of their own, a listener can take
+// seconds to come up.
 func waitServing(t *testing.T, addr string) {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(time.Minute)
 	for {
 		resp, err := http.Get("http://" + addr + "/")
 		if err == nil {

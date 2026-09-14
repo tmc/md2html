@@ -44,7 +44,12 @@ func WaitPortCmd() script.Cmd {
 				return nil, fmt.Errorf("usage: wait-port addr [timeout]")
 			}
 
-			timeout := 5 * time.Second
+			// The default only bounds a failure, so it is generous:
+			// under the race detector, with a dozen fixtures starting
+			// servers at once, a listener can take several seconds to
+			// come up, and a fixture that timed out then would be
+			// reporting the machine's load rather than a bug.
+			timeout := 30 * time.Second
 			if len(args) == 2 {
 				d, err := time.ParseDuration(args[1])
 				if err != nil {
