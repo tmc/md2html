@@ -47,27 +47,9 @@ func walkOnDiskRefs(doc *Document, name string, images bool) ([]Diagnostic, erro
 	dir := filepath.Dir(doc.File)
 	var diags []Diagnostic
 
-	err := ast.Walk(doc.Tree, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if !entering {
-			return ast.WalkContinue, nil
-		}
-		var dest string
-		switch node := n.(type) {
-		case *ast.Link:
-			if images {
-				return ast.WalkContinue, nil
-			}
-			dest = string(node.Destination)
-		case *ast.Image:
-			if !images {
-				return ast.WalkContinue, nil
-			}
-			dest = string(node.Destination)
-		default:
-			return ast.WalkContinue, nil
-		}
+	check := func(dest string, line int) {
 		if !shouldCheckOnDisk(dest) {
-			return ast.WalkContinue, nil
+			return
 		}
 		// A rooted path inside the site's own prefix is a page URL, not
 		// a filesystem path. Resolve it to the source that renders it;
@@ -77,12 +59,12 @@ func walkOnDiskRefs(doc *Document, name string, images bool) ([]Diagnostic, erro
 			if _, _, ok := doc.env.site.resolve(dest); !ok {
 				diags = append(diags, Diagnostic{
 					File:    doc.File,
-					Line:    lineOf(doc.Source, n),
+					Line:    line,
 					Check:   name,
 					Message: fmt.Sprintf("link %q: no page in this tree renders that URL", dest),
 				})
 			}
-			return ast.WalkContinue, nil
+			return
 		}
 		if isAbsolutePathLink(dest) {
 			// An absolute filesystem path inside a markdown link is
@@ -93,39 +75,63 @@ func walkOnDiskRefs(doc *Document, name string, images bool) ([]Diagnostic, erro
 			// real problem.
 			diags = append(diags, Diagnostic{
 				File:    doc.File,
-				Line:    lineOf(doc.Source, n),
+				Line:    line,
 				Check:   name,
 				Message: fmt.Sprintf("link %q: absolute path; mdvet refuses to validate", dest),
 			})
-			return ast.WalkContinue, nil
+			return
 		}
 		target, frag, err := resolveLink(dir, dest)
 		if err != nil {
 			diags = append(diags, Diagnostic{
 				File:    doc.File,
-				Line:    lineOf(doc.Source, n),
+				Line:    line,
 				Check:   name,
 				Message: fmt.Sprintf("invalid link %q: %v", dest, err),
 			})
-			return ast.WalkContinue, nil
+			return
 		}
 		info, err := os.Stat(target)
 		if err != nil {
 			diags = append(diags, Diagnostic{
 				File:    doc.File,
-				Line:    lineOf(doc.Source, n),
+				Line:    line,
 				Check:   name,
 				Message: fmt.Sprintf("link %q: %s does not exist", dest, displayPath(doc.File, target)),
 			})
-			return ast.WalkContinue, nil
+			return
 		}
 		if info.IsDir() && frag != "" && !images {
 			diags = append(diags, Diagnostic{
 				File:    doc.File,
-				Line:    lineOf(doc.Source, n),
+				Line:    line,
 				Check:   name,
 				Message: fmt.Sprintf("link %q: anchor on directory target %s", dest, displayPath(doc.File, target)),
 			})
+		}
+	}
+
+	err := ast.Walk(doc.Tree, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		switch node := n.(type) {
+		case *ast.Link:
+			if !images {
+				check(string(node.Destination), lineOf(doc.Source, n))
+			}
+		case *ast.Image:
+			if images {
+				check(string(node.Destination), lineOf(doc.Source, n))
+			}
+		default:
+			// A component carries its destinations as attributes:
+			// href names a link, src an image.
+			for _, d := range componentDests(n) {
+				if d.image == images {
+					check(d.value, d.line)
+				}
+			}
 		}
 		return ast.WalkContinue, nil
 	})

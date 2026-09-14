@@ -23,32 +23,24 @@ func (AssetsCheck) Check(doc *Document) ([]Diagnostic, error) {
 	collectHeadingIDs(doc.Tree, localIDs)
 	var diags []Diagnostic
 
-	err := ast.Walk(doc.Tree, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if !entering {
-			return ast.WalkContinue, nil
-		}
-		dest, ok := nodeDest(n)
-		if !ok {
-			return ast.WalkContinue, nil
-		}
-		line := lineOf(doc.Source, n)
+	check := func(dest string, line int) {
 		if frag, ok := strings.CutPrefix(dest, "#"); ok {
 			if frag != "" && !localIDs[frag] {
 				diags = append(diags, assetDiag(doc.File, line, fmt.Sprintf("link %q: no heading with id %q in this file", dest, frag)))
 			}
-			return ast.WalkContinue, nil
+			return
 		}
 		if !shouldCheckOnDisk(dest) {
-			return ast.WalkContinue, nil
+			return
 		}
 		if isAbsolutePathLink(dest) {
 			diags = append(diags, assetDiag(doc.File, line, fmt.Sprintf("link %q: absolute path; mdvet refuses to validate", dest)))
-			return ast.WalkContinue, nil
+			return
 		}
 		target, frag, err := resolveLink(dir, dest)
 		if err != nil {
 			diags = append(diags, assetDiag(doc.File, line, fmt.Sprintf("invalid link %q: %v", dest, err)))
-			return ast.WalkContinue, nil
+			return
 		}
 		info, err := os.Stat(target)
 		if err != nil {
@@ -57,19 +49,32 @@ func (AssetsCheck) Check(doc *Document) ([]Diagnostic, error) {
 				kind = "media"
 			}
 			diags = append(diags, assetDiag(doc.File, line, fmt.Sprintf("%s %q: %s does not exist", kind, dest, displayPath(doc.File, target))))
-			return ast.WalkContinue, nil
+			return
 		}
 		if info.IsDir() {
 			if frag != "" {
 				diags = append(diags, assetDiag(doc.File, line, fmt.Sprintf("link %q: anchor on directory target %s", dest, displayPath(doc.File, target))))
 			}
-			return ast.WalkContinue, nil
+			return
 		}
 		if frag != "" && isMarkdown(target) {
 			ids := doc.env.anchorsFor(target)
 			if len(ids) != 0 && !ids[frag] {
 				diags = append(diags, assetDiag(doc.File, line, fmt.Sprintf("link %q: %s has no heading with id %q", dest, displayPath(doc.File, target), frag)))
 			}
+		}
+	}
+
+	err := ast.Walk(doc.Tree, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		if dest, ok := nodeDest(n); ok {
+			check(dest, lineOf(doc.Source, n))
+			return ast.WalkContinue, nil
+		}
+		for _, d := range componentDests(n) {
+			check(d.value, d.line)
 		}
 		return ast.WalkContinue, nil
 	})

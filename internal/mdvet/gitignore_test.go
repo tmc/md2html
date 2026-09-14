@@ -133,6 +133,19 @@ func TestGitIgnoredCheck(t *testing.T) {
 		wantSubstrings(t, diags, []string{"ignored by git"})
 	})
 
+	t.Run("component attributes", func(t *testing.T) {
+		dir := gitTree(t, map[string]string{
+			".gitignore":   "build/\n",
+			"a.md":         "<Card title=\"G\" href=\"build/gen.md\">\nbody\n</Card>\n",
+			"build/gen.md": "# Gen\n",
+		})
+		diags := checkGitIgnored(t, dir, "a.md", Site{})
+		wantSubstrings(t, diags, []string{"build/gen.md"})
+		if len(diags) == 1 && diags[0].Line != 1 {
+			t.Errorf("got line %d, want the opening tag's line 1", diags[0].Line)
+		}
+	})
+
 	t.Run("absolute path silent", func(t *testing.T) {
 		dir := gitTree(t, map[string]string{
 			".gitignore": "build/\n",

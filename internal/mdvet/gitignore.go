@@ -42,47 +42,30 @@ func (GitIgnoredCheck) Check(doc *Document) ([]Diagnostic, error) {
 	}
 	targets := make(map[string][]ref)
 	var order []string
+	add := func(dest string, line int) {
+		target, ok := resolveExisting(doc, dir, dest)
+		if !ok {
+			return
+		}
+		if _, seen := targets[target]; !seen {
+			order = append(order, target)
+		}
+		targets[target] = append(targets[target], ref{dest: dest, line: line})
+	}
 
 	err := ast.Walk(doc.Tree, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
-		dest, ok := nodeDest(n)
-		if !ok {
+		if dest, ok := nodeDest(n); ok {
+			add(dest, lineOf(doc.Source, n))
 			return ast.WalkContinue, nil
 		}
-		if !shouldCheckOnDisk(dest) {
-			return ast.WalkContinue, nil
+		// A component names its destinations in attributes, where no
+		// link or image node ever appears.
+		for _, d := range componentDests(n) {
+			add(d.value, d.line)
 		}
-		target := ""
-		// A rooted URL the site owns is a page address, so ask the
-		// site before judging it an absolute filesystem path.
-		if doc.env.site.owns(dest) {
-			file, _, ok := doc.env.site.resolve(dest)
-			if !ok {
-				return ast.WalkContinue, nil
-			}
-			target = file
-		} else {
-			if isAbsolutePathLink(dest) {
-				// LinkCheck reports these; they are not resolved here.
-				return ast.WalkContinue, nil
-			}
-			file, _, err := resolveLink(dir, dest)
-			if err != nil {
-				return ast.WalkContinue, nil
-			}
-			target = file
-		}
-		// Only existing targets: a missing one is the other checks'
-		// finding, and reporting it twice helps nobody.
-		if _, err := os.Stat(target); err != nil {
-			return ast.WalkContinue, nil
-		}
-		if _, seen := targets[target]; !seen {
-			order = append(order, target)
-		}
-		targets[target] = append(targets[target], ref{dest: dest, line: lineOf(doc.Source, n)})
 		return ast.WalkContinue, nil
 	})
 	if err != nil {
@@ -105,6 +88,40 @@ func (GitIgnoredCheck) Check(doc *Document) ([]Diagnostic, error) {
 		}
 	}
 	return diags, nil
+}
+
+// resolveExisting turns a link destination into the file it names, and
+// reports false for anything this check has no business judging: a
+// destination that names no path, an absolute one (LinkCheck's finding),
+// and one that resolves to nothing — a missing target is the link and
+// asset checks' finding, and reporting it twice helps nobody.
+func resolveExisting(doc *Document, dir, dest string) (string, bool) {
+	if !shouldCheckOnDisk(dest) {
+		return "", false
+	}
+	var target string
+	// A rooted URL the site owns is a page address, so ask the site
+	// before judging it an absolute filesystem path.
+	if doc.env.site.owns(dest) {
+		file, _, ok := doc.env.site.resolve(dest)
+		if !ok {
+			return "", false
+		}
+		target = file
+	} else {
+		if isAbsolutePathLink(dest) {
+			return "", false
+		}
+		file, _, err := resolveLink(dir, dest)
+		if err != nil {
+			return "", false
+		}
+		target = file
+	}
+	if _, err := os.Stat(target); err != nil {
+		return "", false
+	}
+	return target, true
 }
 
 // gitIgnorer answers "is this path excluded by git" for the paths the

@@ -345,3 +345,51 @@ func TestRunSelectsMultipleChecks(t *testing.T) {
 		t.Fatalf("got %d, want 2: %v", len(diags), diags)
 	}
 }
+
+// Component destinations live in attributes, where no link or image
+// node ever appears, so the on-disk checks have to read them directly.
+func TestComponentDestinations(t *testing.T) {
+	t.Run("missing href", func(t *testing.T) {
+		diags := runCheck(t, map[string]string{
+			"a.md": "<Card title=\"G\" href=\"missing.md\">\nbody\n</Card>\n",
+		}, "a.md", LinkCheck{})
+		wantSubstrings(t, diags, []string{"missing.md"})
+	})
+	t.Run("present href ok", func(t *testing.T) {
+		diags := runCheck(t, map[string]string{
+			"a.md": "<Card title=\"G\" href=\"b.md\">\nbody\n</Card>\n",
+			"b.md": "# B\n",
+		}, "a.md", LinkCheck{})
+		if len(diags) != 0 {
+			t.Errorf("got %v, want none", diags)
+		}
+	})
+	t.Run("href is not an image", func(t *testing.T) {
+		diags := runCheck(t, map[string]string{
+			"a.md": "<Card title=\"G\" href=\"missing.md\">\nbody\n</Card>\n",
+		}, "a.md", ImageCheck{})
+		if len(diags) != 0 {
+			t.Errorf("got %v, want none — href is LinkCheck's", diags)
+		}
+	})
+	t.Run("assets check reads attributes", func(t *testing.T) {
+		diags := runCheck(t, map[string]string{
+			"a.md": "<Card title=\"G\" href=\"missing.md\">\nbody\n</Card>\n",
+		}, "a.md", AssetsCheck{})
+		wantSubstrings(t, diags, []string{"missing.md"})
+	})
+	t.Run("self-closing tag", func(t *testing.T) {
+		diags := runCheck(t, map[string]string{
+			"a.md": "<Card title=\"G\" href=\"missing.md\"/>\n",
+		}, "a.md", LinkCheck{})
+		wantSubstrings(t, diags, []string{"missing.md"})
+	})
+	t.Run("external href skipped", func(t *testing.T) {
+		diags := runCheck(t, map[string]string{
+			"a.md": "<Card title=\"G\" href=\"https://example.com\">\nbody\n</Card>\n",
+		}, "a.md", LinkCheck{})
+		if len(diags) != 0 {
+			t.Errorf("got %v, want none", diags)
+		}
+	})
+}
