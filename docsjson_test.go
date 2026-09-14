@@ -299,3 +299,54 @@ func TestLoadDocsJSONRepo(t *testing.T) {
 		t.Errorf("repo = %q, %q, want %q, %q", site.Repo, site.RepoURL, "tmc/cdp", "https://github.com/tmc/cdp")
 	}
 }
+
+// TestIconLibraryForSource characterizes the docs.json lookup rendering
+// does. mdvet does its own, in documentIcons, and the two differ where
+// each has reason to: rendering matches the library name exactly and
+// stops at the first docs.json it finds, while vetting folds case and
+// keeps looking past a file it cannot read, so that a diagnostic always
+// names a config it managed to open. The duplication is small and the
+// behavior is not shared, so neither is factored into the other.
+func TestIconLibraryForSource(t *testing.T) {
+	tests := []struct {
+		name string
+		// config is the docs.json written at the site root, or ""
+		// to write none.
+		config string
+		want   string
+	}{
+		{"no docs.json", "", "fontawesome"},
+		{"no library named", `{"name": "example"}`, "fontawesome"},
+		{"lucide", `{"icons": {"library": "lucide"}}`, "lucide"},
+		{"tabler", `{"icons": {"library": "tabler"}}`, "tabler"},
+		{"fontawesome", `{"icons": {"library": "fontawesome"}}`, "fontawesome"},
+		{"unknown library", `{"icons": {"library": "heroicons"}}`, "fontawesome"},
+		{"library name is case sensitive", `{"icons": {"library": "Lucide"}}`, "fontawesome"},
+		{"malformed", `{"icons": `, "fontawesome"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			docs := filepath.Join(root, "docs")
+			if err := os.MkdirAll(docs, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if tt.config != "" {
+				if err := os.WriteFile(filepath.Join(root, docsJSONName), []byte(tt.config), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			page := filepath.Join(docs, "index.md")
+			if err := os.WriteFile(page, []byte("# Hi\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			// A docs.json above the source still governs it, and a
+			// source naming a file is read as the directory holding it.
+			for _, source := range []string{docs, page} {
+				if got := iconLibraryForSource("", source); got != tt.want {
+					t.Errorf("iconLibraryForSource(%q) = %q, want %q", source, got, tt.want)
+				}
+			}
+		})
+	}
+}
