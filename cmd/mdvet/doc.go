@@ -18,6 +18,7 @@
 //	heading-skip       no heading-level jumps; at most one h1
 //	case               link path matches on-disk casing
 //	raw-html           no raw HTML in prose, which renders to nothing
+//	gitignored         link targets are carried by the repository
 //
 // Flags:
 //

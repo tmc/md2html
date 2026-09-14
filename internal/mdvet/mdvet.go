@@ -75,6 +75,7 @@ func AllChecks() []Check {
 		RawHTMLCheck{},
 		ComponentCheck{},
 		IconCheck{},
+		GitIgnoredCheck{},
 	}
 }
 
@@ -246,6 +247,7 @@ type env struct {
 	dirs    map[string]map[string]bool // dir -> set of entry names (as on disk)
 	configs map[string]bool            // docs.json files already checked
 	site    Site                       // how rendered URLs map back to sources
+	git     *gitIgnorer                // git exclusion lookups, memoized
 }
 
 func newEnv(site Site) *env {
@@ -254,6 +256,7 @@ func newEnv(site Site) *env {
 		dirs:    make(map[string]map[string]bool),
 		configs: make(map[string]bool),
 		site:    site,
+		git:     newGitIgnorer(),
 	}
 }
 
