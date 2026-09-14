@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"path"
@@ -22,7 +23,6 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 	}
 	cfg := site.config
 	s := &server{
-		ctx:        ctx,
 		config:     cfg,
 		base:       site.base,
 		prepared:   site,
@@ -37,9 +37,9 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 		// Versions come from the repository the base directory is in,
 		// not from the source tree, which may be a subdirectory of it or
 		// not versioned at all.
-		s.versionMgr = newGitVersionManager(ctx, s.base)
-		if s.versionMgr.IsGitRepo() {
-			versions, err := s.versionMgr.ListVersions(cfg.VersionBranches, cfg.VersionPattern)
+		s.versionMgr = NewGitVersionManager(s.base)
+		if s.versionMgr.isGitRepo(ctx) {
+			versions, err := s.versionMgr.listVersions(ctx, cfg.VersionBranches, cfg.VersionPattern)
 			if err != nil {
 				logger.Error("Error listing versions", "error", err)
 			} else {
@@ -83,7 +83,7 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 				s.site = site
 				s.title = siteTitle(s.config.Title, site.Name)
 				logger.Info("Loaded navigation", "pages", len(nav.Flat))
-				s.site.Stars = s.prepared.repoStars(context.Background(), site.Repo, logger)
+				s.site.Stars = s.prepared.repoStars(ctx, site.Repo, logger)
 			}
 		}
 	}
@@ -115,8 +115,13 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 	return s
 }
 
+// A server serves one source tree over HTTP.
+//
+// It keeps no context of its own. Work that belongs to a request uses
+// the request's context, and work that lasts as long as the server uses
+// the one passed to [server.Run]; startup work in newServer uses its
+// caller's and does not outlive it.
 type server struct {
-	ctx    context.Context
 	config Config
 	// base is the directory the configuration's relative paths were
 	// resolved against. Requests resolve against it too, so serving does
@@ -131,10 +136,18 @@ type server struct {
 	cssContent string
 	inputPath  string
 	jsonData   any // Generic JSON data for templates
-	shutdownCh chan struct{}
-	watcher    *fsnotify.Watcher
-	watchMu    sync.Mutex
-	watched    map[string]bool
+	// shutdownCh is closed once, by Run, to release background work and
+	// tell connected browsers the server is going away.
+	shutdownCh   chan struct{}
+	shutdownOnce sync.Once
+	// stopRequests cancels the contexts of requests in flight. Run sets
+	// it; stop calls it, after the live-reload clients have been told,
+	// so a stream always sees the shutdown message before its request
+	// context goes away.
+	stopRequests context.CancelFunc
+	watcher      *fsnotify.Watcher
+	watchMu      sync.Mutex
+	watched      map[string]bool
 
 	// Version management
 	versionMgr *GitVersionManager
@@ -154,11 +167,10 @@ type server struct {
 	// title is the effective site title. It is derived from navTitle and
 	// the site name, so a reload can change it while requests are being
 	// served; read it with siteTitle rather than config.Title.
-	title           string
-	lastUpdatedMu   sync.Mutex
-	lastUpdated     map[string]string
-	gitMetadataOnce map[string]*sync.Once
-	gitMetadataOK   map[string]bool
+	title         string
+	lastUpdatedMu sync.Mutex
+	lastUpdated   map[string]string
+	gitMetadata   map[string]gitProbe
 }
 
 // sourceRoot returns the directory requests are served from.
@@ -166,10 +178,13 @@ func (s *server) sourceRoot() (string, error) {
 	return sourceRoot(s.base, s.inputPath)
 }
 
-func (s *server) startWatching() error {
+// startWatching registers the paths whose changes reload the page and
+// returns the watcher. Run owns it from there: it decides when the
+// events are consumed and when the watcher is closed.
+func (s *server) startWatching() (*fsnotify.Watcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("create watcher: %w", err)
+		return nil, fmt.Errorf("create watcher: %w", err)
 	}
 	s.watchMu.Lock()
 	s.watcher = watcher
@@ -207,8 +222,7 @@ func (s *server) startWatching() error {
 		s.logger.Debug("Watch setup complete", "paths", n)
 	}
 
-	go s.watchEvents(watcher)
-	return nil
+	return watcher, nil
 }
 
 func (s *server) watchOpenedPath(path string) error {
@@ -248,7 +262,9 @@ func (s *server) watchPath(path string) error {
 	return nil
 }
 
-func (s *server) watchEvents(watcher *fsnotify.Watcher) {
+// watchEvents consumes watcher until the server's lifetime ends. It
+// owns the watcher for that time and closes it on the way out.
+func (s *server) watchEvents(ctx context.Context, watcher *fsnotify.Watcher) {
 	defer watcher.Close()
 	for {
 		select {
@@ -256,19 +272,21 @@ func (s *server) watchEvents(watcher *fsnotify.Watcher) {
 			if !ok {
 				return
 			}
-			s.handleWatchEvent(event)
+			s.handleWatchEvent(ctx, event)
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				return
 			}
 			s.logger.Error("Watcher error", "error", err)
+		case <-ctx.Done():
+			return
 		case <-s.shutdownCh:
 			return
 		}
 	}
 }
 
-func (s *server) handleWatchEvent(event fsnotify.Event) {
+func (s *server) handleWatchEvent(ctx context.Context, event fsnotify.Event) {
 	if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename|fsnotify.Chmod) == 0 {
 		return
 	}
@@ -301,7 +319,7 @@ func (s *server) handleWatchEvent(event fsnotify.Event) {
 	// A navigation source describes the whole site, so a change to it
 	// changes every page, not only the one being viewed.
 	if samePath(event.Name, s.navConfig) || strings.HasSuffix(name, "summary.md") {
-		s.reloadNavigation()
+		s.reloadNavigation(ctx)
 		s.notifyClients()
 		return
 	}
@@ -319,7 +337,7 @@ func (s *server) handleWatchEvent(event fsnotify.Event) {
 // The star count is carried over rather than refetched, since editing
 // the file that names the repository is not news about how many stars it
 // has, and a request per keystroke would be rate limited in short order.
-func (s *server) reloadNavigation() {
+func (s *server) reloadNavigation(ctx context.Context) {
 	if s.navRoot == "" {
 		return
 	}
@@ -347,7 +365,7 @@ func (s *server) reloadNavigation() {
 	if site.Repo == previous.Repo {
 		site.Stars = previous.Stars
 	} else {
-		site.Stars = s.prepared.repoStars(s.ctx, site.Repo, s.logger)
+		site.Stars = s.prepared.repoStars(ctx, site.Repo, s.logger)
 	}
 
 	s.mu.Lock()
@@ -387,6 +405,7 @@ func samePath(a, b string) bool {
 }
 
 func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	s.mu.RLock()
 	content := s.content
 	css := s.cssContent
@@ -427,7 +446,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 		indexPath := resolveAgainst(s.base, s.config.Index)
 		if requestedVersion != "" && s.versionMgr != nil {
-			fileContent, err = s.versionMgr.GetFileContent(requestedVersion, s.config.Index)
+			fileContent, err = s.versionMgr.fileContent(ctx, requestedVersion, s.config.Index)
 		} else {
 			fileContent, err = os.ReadFile(indexPath)
 		}
@@ -441,7 +460,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 				s.logger.Error("Error parsing frontmatter", "file", s.config.Index, "error", err)
 				doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
 			}
-			html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, s.config.Index, s.siteTitle()), css, s.config.Index, requestedVersion)
+			html, err := s.renderDocumentWithVersion(ctx, doc, documentTitle(doc, s.config.Index, s.siteTitle()), css, s.config.Index, requestedVersion)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -469,7 +488,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			if full, joinErr := secureJoin(root, filepath.FromSlash(cleanPath)); joinErr == nil {
 				info, statErr := os.Stat(full)
 				if ignore.excludes(full, statErr == nil && info.IsDir()) {
-					s.serveNotFound(w, requestedURL(r), css)
+					s.serveNotFound(ctx, w, requestedURL(r), css)
 					return
 				}
 			}
@@ -491,7 +510,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			var err error
 
 			if requestedVersion != "" && s.versionMgr != nil {
-				fileContent, err = s.versionMgr.GetFileContent(requestedVersion, candidate)
+				fileContent, err = s.versionMgr.fileContent(ctx, requestedVersion, candidate)
 			} else {
 				var joinErr error
 				fullPath, joinErr = secureJoin(root, filepath.FromSlash(candidate))
@@ -511,7 +530,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 					s.logger.Error("Error parsing frontmatter", "file", candidate, "error", err)
 					doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
 				}
-				html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, candidate, s.siteTitle()), css, candidate, requestedVersion)
+				html, err := s.renderDocumentWithVersion(ctx, doc, documentTitle(doc, candidate, s.siteTitle()), css, candidate, requestedVersion)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
@@ -534,7 +553,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 						http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
 						return
 					}
-					s.serveDirectory(w, fullPath, strings.TrimSuffix(cleanPath, "/"), css, requestedVersion)
+					s.serveDirectory(ctx, w, fullPath, strings.TrimSuffix(cleanPath, "/"), css, requestedVersion)
 					return
 				}
 				_ = s.watchOpenedPath(fullPath)
@@ -543,7 +562,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		s.serveNotFound(w, requestedURL(r), css)
+		s.serveNotFound(ctx, w, requestedURL(r), css)
 		return
 	}
 
@@ -561,7 +580,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 		content, err := os.ReadFile(fullPath)
 		if err != nil {
-			s.serveNotFound(w, requestedURL(r), css)
+			s.serveNotFound(ctx, w, requestedURL(r), css)
 			return
 		}
 		_ = s.watchOpenedPath(fullPath)
@@ -571,7 +590,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			s.logger.Error("Error parsing frontmatter", "file", file, "error", err)
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
-		html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, file, s.siteTitle()), css, file, requestedVersion)
+		html, err := s.renderDocumentWithVersion(ctx, doc, documentTitle(doc, file, s.siteTitle()), css, file, requestedVersion)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -584,7 +603,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	// If no input file specified and content is empty, serve the root
 	// directory: its index file if it has one, otherwise a listing.
 	if s.inputPath == "" && content == "" {
-		s.serveDirectory(w, root, "", css, "")
+		s.serveDirectory(ctx, w, root, "", css, "")
 		return
 	}
 
@@ -593,7 +612,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("Error parsing frontmatter", "error", err)
 		doc = DocumentData{Content: content, Frontmatter: make(map[string]any)}
 	}
-	html, err := s.renderDocumentWithVersion(doc, s.siteTitle(), css, "", "")
+	html, err := s.renderDocumentWithVersion(ctx, doc, s.siteTitle(), css, "", "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -615,7 +634,7 @@ func (s *server) dirIndexNames() []string {
 // serveDirectory serves the directory at dir, whose path relative to the
 // served root is relDir. A directory with an index file renders that file;
 // one without renders a listing of the Markdown files beneath it.
-func (s *server) serveDirectory(w http.ResponseWriter, dir, relDir, css, version string) {
+func (s *server) serveDirectory(ctx context.Context, w http.ResponseWriter, dir, relDir, css, version string) {
 	for _, name := range s.dirIndexNames() {
 		indexPath := filepath.Join(dir, filepath.FromSlash(name))
 		content, err := os.ReadFile(indexPath)
@@ -629,7 +648,7 @@ func (s *server) serveDirectory(w http.ResponseWriter, dir, relDir, css, version
 			s.logger.Error("Error parsing frontmatter", "file", relIndex, "error", err)
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
-		html, err := s.renderDocumentWithVersion(doc, documentTitle(doc, relIndex, s.siteTitle()), css, relIndex, version)
+		html, err := s.renderDocumentWithVersion(ctx, doc, documentTitle(doc, relIndex, s.siteTitle()), css, relIndex, version)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -645,7 +664,7 @@ func (s *server) serveDirectory(w http.ResponseWriter, dir, relDir, css, version
 		return
 	}
 	doc := DocumentData{Content: listing, Frontmatter: make(map[string]any)}
-	html, err := s.renderDocumentWithVersion(doc, listingTitle(relDir), css, "", "")
+	html, err := s.renderDocumentWithVersion(ctx, doc, listingTitle(relDir), css, "", "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -674,10 +693,10 @@ func requestedURL(r *http.Request) string {
 // It names only what the client already sent: the paths md2html searched
 // are server-side detail, and echoing them tells a visitor where the
 // source tree lives on disk.
-func (s *server) serveNotFound(w http.ResponseWriter, urlPath, css string) {
+func (s *server) serveNotFound(ctx context.Context, w http.ResponseWriter, urlPath, css string) {
 	body := fmt.Sprintf("# Not found\n\nNo page matches `%s`.\n", strings.ReplaceAll(urlPath, "`", ""))
 	doc := DocumentData{Content: body, Frontmatter: make(map[string]any)}
-	html, err := s.renderDocumentWithVersion(doc, "Not found", css, "", "")
+	html, err := s.renderDocumentWithVersion(ctx, doc, "Not found", css, "", "")
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -688,7 +707,7 @@ func (s *server) serveNotFound(w http.ResponseWriter, urlPath, css string) {
 }
 
 // renderDocumentWithVersion renders a document with version information
-func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, filePath, version string) (string, error) {
+func (s *server) renderDocumentWithVersion(ctx context.Context, doc DocumentData, title, customCSS, filePath, version string) (string, error) {
 	html, err := s.prepared.markdownToHTML(promoteTitleHeading(doc), filePath)
 	if err != nil {
 		return "", err
@@ -717,7 +736,7 @@ func (s *server) renderDocumentWithVersion(doc DocumentData, title, customCSS, f
 		Description: llmsSummary(doc),
 		EditURL:     editURL(s.config.EditURL, filePath),
 	}
-	opts.LastUpdated = s.lastUpdatedFor(filePath)
+	opts.LastUpdated = s.lastUpdatedFor(ctx, filePath)
 	if nav != nil {
 		opts.Nav = nav.ForPage(filePath)
 	}
@@ -730,7 +749,7 @@ func (s *server) watchEnabled() bool {
 	return err == nil && watch
 }
 
-func (s *server) lastUpdatedFor(filePath string) string {
+func (s *server) lastUpdatedFor(ctx context.Context, filePath string) string {
 	filePath = filepath.ToSlash(filePath)
 	if filePath == "" {
 		return ""
@@ -751,14 +770,20 @@ func (s *server) lastUpdatedFor(filePath string) string {
 	if err != nil {
 		return ""
 	}
-	if !s.gitMetadataAvailable(root) {
+	if !s.gitMetadataAvailable(ctx, root) {
 		return ""
 	}
-	times, err := gitLastUpdatedPaths(s.ctx, root, []string{filePath})
+	times, err := gitLastUpdatedPaths(ctx, root, []string{filePath})
 	if err != nil {
 		if s.config.Verbose {
 			s.logger.Debug("git metadata unavailable", "error", err)
 		}
+		return ""
+	}
+	// A request that went away tells us nothing about the file. Caching
+	// the empty answer it produced would leave the page dateless for as
+	// long as the server ran.
+	if ctx.Err() != nil {
 		return ""
 	}
 	stamp := times[filePath]
@@ -769,30 +794,48 @@ func (s *server) lastUpdatedFor(filePath string) string {
 	return stamp
 }
 
-func (s *server) gitMetadataAvailable(root string) bool {
-	s.lastUpdatedMu.Lock()
-	if s.gitMetadataOnce == nil {
-		s.gitMetadataOnce = make(map[string]*sync.Once)
-		s.gitMetadataOK = make(map[string]bool)
-	}
-	once := s.gitMetadataOnce[root]
-	if once == nil {
-		once = new(sync.Once)
-		s.gitMetadataOnce[root] = once
-	}
-	s.lastUpdatedMu.Unlock()
+// A gitProbe records what asking a directory for git metadata found.
+// Only a probe that finished is worth remembering.
+type gitProbe int
 
-	once.Do(func() {
-		ok := gitHasHead(s.ctx, root)
-		s.lastUpdatedMu.Lock()
-		s.gitMetadataOK[root] = ok
-		s.lastUpdatedMu.Unlock()
-	})
+const (
+	gitUnknown gitProbe = iota
+	gitAbsent
+	gitPresent
+)
+
+// gitMetadataAvailable reports whether root has the history page dates
+// are read from.
+//
+// The answer is cached, but only when the probe ran to completion: a
+// request canceled while git was still running says nothing about the
+// repository, and remembering its failure would leave every later page
+// without a date. The subprocess runs outside the lock, so a duplicate
+// concurrent probe is possible; that is cheaper than coordinating to
+// prevent one.
+func (s *server) gitMetadataAvailable(ctx context.Context, root string) bool {
+	s.lastUpdatedMu.Lock()
+	known := s.gitMetadata[root]
+	s.lastUpdatedMu.Unlock()
+	if known != gitUnknown {
+		return known == gitPresent
+	}
+
+	result := gitPresent
+	if !gitHasHead(ctx, root) {
+		if ctx.Err() != nil {
+			return false
+		}
+		result = gitAbsent
+	}
 
 	s.lastUpdatedMu.Lock()
-	ok := s.gitMetadataOK[root]
+	if s.gitMetadata == nil {
+		s.gitMetadata = make(map[string]gitProbe)
+	}
+	s.gitMetadata[root] = result
 	s.lastUpdatedMu.Unlock()
-	return ok
+	return result == gitPresent
 }
 
 // handleSearchAsset serves an embedded JS asset (minisearch, search.js) as
@@ -941,6 +984,14 @@ func (s *server) handleSSE(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "data: %s\n\n", msg)
 			w.(http.Flusher).Flush()
 		case <-r.Context().Done():
+			// The server cancels requests when it stops. Say so, rather
+			// than leaving the browser to notice the stream went quiet.
+			select {
+			case <-shutdownCh:
+				fmt.Fprintf(w, "data: shutdown\n\n")
+				w.(http.Flusher).Flush()
+			default:
+			}
 			return
 		case <-shutdownCh:
 			// Server is shutting down
@@ -991,19 +1042,37 @@ func (s *server) registerEndpoints(mux *http.ServeMux) {
 	}
 }
 
+// Run serves until ctx is canceled. It owns every background worker it
+// starts — the file watcher, the browser opener, the shutdown — and
+// stops them on the way out whatever ends the call: a bad option, a
+// listener that will not bind, or ordinary cancellation. Cleanup is
+// established before any of them start, so a failure part of the way
+// through startup leaves nothing running.
 func (s *server) Run(ctx context.Context) error {
-	// Set up file watching
-	if watch, err := watchEnabled(s.config.Watch, s.config.Source); err != nil {
-		return err
-	} else if watch {
-		if err := s.startWatching(); err != nil {
-			return err
-		}
-	}
+	ctx, cancel := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	defer s.stop()
+	defer cancel()
 
 	base, err := normalizeBasePath(s.config.Base)
 	if err != nil {
 		return err
+	}
+
+	// Set up file watching
+	if watch, err := watchEnabled(s.config.Watch, s.config.Source); err != nil {
+		return err
+	} else if watch {
+		watcher, err := s.startWatching()
+		if err != nil {
+			return err
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.watchEvents(ctx, watcher)
+		}()
 	}
 
 	// Setup HTTP handlers
@@ -1011,9 +1080,18 @@ func (s *server) Run(ctx context.Context) error {
 	mux.HandleFunc("/", s.handleIndex)
 	s.registerEndpoints(mux)
 
+	// Requests descend from a context the server stops, so work a
+	// request started does not outlive the server it was made to. It is
+	// not ctx itself: stop has to reach the live-reload streams before
+	// their requests are canceled out from under them.
+	reqCtx, stopRequests := context.WithCancel(context.WithoutCancel(ctx))
+	s.stopRequests = stopRequests
+	defer stopRequests()
+
 	srv := &http.Server{
-		Addr:    s.config.HTTP,
-		Handler: mountAt(base, mux, s.registerEndpoints),
+		Addr:        s.config.HTTP,
+		Handler:     mountAt(base, mux, s.registerEndpoints),
+		BaseContext: func(net.Listener) context.Context { return reqCtx },
 	}
 
 	// Format URL for display and browser opening
@@ -1021,7 +1099,9 @@ func (s *server) Run(ctx context.Context) error {
 
 	// Open browser if requested
 	if s.config.Open {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			if !openBrowser(ctx, displayURL) {
 				s.logger.Warn("Failed to open browser", "url", displayURL)
 			} else {
@@ -1031,29 +1111,21 @@ func (s *server) Run(ctx context.Context) error {
 	}
 
 	idleConnsClosed := make(chan struct{})
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+		defer close(idleConnsClosed)
 		<-ctx.Done()
-		// Close shutdown channel to notify all goroutines
-		close(s.shutdownCh)
-		// Send shutdown signal to all clients
-		s.clientsMu.Lock()
-		for client := range s.clients {
-			select {
-			case client <- "shutdown":
-			default:
-			}
-		}
-		s.clients = make(map[chan string]bool)
-		s.clientsMu.Unlock()
+		s.stop()
 
-		// Shutdown server with timeout
+		// Shutdown drains connections, so it needs a context of its
+		// own: the lifetime context is already canceled, and handing it
+		// over would abandon them instead.
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			s.logger.Error("Server shutdown error", "error", err)
 		}
-		close(idleConnsClosed)
 	}()
 
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
@@ -1063,4 +1135,24 @@ func (s *server) Run(ctx context.Context) error {
 
 	<-idleConnsClosed
 	return nil
+}
+
+// stop releases background work and tells connected browsers the server
+// is going away. Run calls it, once, however the call ends.
+func (s *server) stop() {
+	s.shutdownOnce.Do(func() {
+		close(s.shutdownCh)
+		s.clientsMu.Lock()
+		for client := range s.clients {
+			select {
+			case client <- "shutdown":
+			default:
+			}
+		}
+		s.clients = make(map[chan string]bool)
+		s.clientsMu.Unlock()
+		if s.stopRequests != nil {
+			s.stopRequests()
+		}
+	})
 }

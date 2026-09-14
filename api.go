@@ -28,7 +28,7 @@ func (s *server) handleVersionsAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Try to get current version if we're in a git repo
 	if s.versionMgr != nil {
-		if current, err := s.versionMgr.GetCurrentVersion(); err == nil {
+		if current, err := s.versionMgr.currentVersion(r.Context()); err == nil {
 			response.CurrentVersion = current
 		}
 	}

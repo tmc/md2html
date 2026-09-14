@@ -1,6 +1,7 @@
 package md2html
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,7 +82,7 @@ func TestReloadNavigationPicksUpDocsJSON(t *testing.T) {
 
 	// A second page and a new site name.
 	write(`{"name":"Second","navigation":{"groups":[{"group":"G","pages":["docs/a","docs/b"]}]}}`)
-	s.reloadNavigation()
+	s.reloadNavigation(context.Background())
 	if got := len(s.nav.Flat); got != 2 {
 		t.Errorf("navigation has %d pages after reload, want 2", got)
 	}
@@ -97,7 +98,7 @@ func TestReloadNavigationPicksUpDocsJSON(t *testing.T) {
 
 	// A config saved mid-edit must not empty the sidebar.
 	write(`{"name":"Second","navigation":{`)
-	s.reloadNavigation()
+	s.reloadNavigation(context.Background())
 	if got := len(s.nav.Flat); got != 2 {
 		t.Errorf("navigation has %d pages after an unparsable config, want the previous 2", got)
 	}
@@ -136,7 +137,7 @@ func TestReloadNavigationKeepsStars(t *testing.T) {
 
 	// githubAPI is left pointing at the real host: a reload that kept
 	// the count makes no request at all, which is the point.
-	s.reloadNavigation()
+	s.reloadNavigation(context.Background())
 	if s.site.Stars != "4" {
 		t.Errorf("stars = %q after reloading the same repository, want %q", s.site.Stars, "4")
 	}
@@ -191,7 +192,7 @@ func TestReloadNavigationDuringRequests(t *testing.T) {
 		defer close(done)
 		for i := 0; i < 50; i++ {
 			write("Site" + string(rune('A'+i%26)))
-			s.reloadNavigation()
+			s.reloadNavigation(context.Background())
 		}
 	}()
 	go func() {

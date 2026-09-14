@@ -19,34 +19,48 @@ type GitVersion struct {
 	Commit string // Short commit hash
 }
 
-// GitVersionManager handles git operations for versioned documentation
+// GitVersionManager handles git operations for versioned documentation.
+//
+// It holds the repository location and nothing else. Every git
+// subprocess it runs belongs to whatever asked for it — a request, a
+// build — so the context comes in with the call rather than being kept
+// here. The exported methods, which have no context parameter, use
+// [context.Background].
 type GitVersionManager struct {
 	repoPath string
-	ctx      context.Context
 }
 
 // NewGitVersionManager creates a new git version manager for the given repository
 func NewGitVersionManager(repoPath string) *GitVersionManager {
-	return newGitVersionManager(context.Background(), repoPath)
+	return &GitVersionManager{repoPath: repoPath}
 }
 
-func newGitVersionManager(ctx context.Context, repoPath string) *GitVersionManager {
-	return &GitVersionManager{repoPath: repoPath, ctx: ctx}
+// git returns a git command rooted at the repository.
+func (gvm *GitVersionManager) git(ctx context.Context, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = gvm.repoPath
+	return cmd
 }
 
 // IsGitRepo checks if the given path is inside a git repository
 func (gvm *GitVersionManager) IsGitRepo() bool {
-	cmd := exec.CommandContext(gvm.ctx, "git", "rev-parse", "--git-dir")
-	cmd.Dir = gvm.repoPath
-	return cmd.Run() == nil
+	return gvm.isGitRepo(context.Background())
+}
+
+func (gvm *GitVersionManager) isGitRepo(ctx context.Context) bool {
+	return gvm.git(ctx, "rev-parse", "--git-dir").Run() == nil
 }
 
 // ListVersions returns all available versions (tags and optionally branches)
 func (gvm *GitVersionManager) ListVersions(includeBranches bool, tagPattern string) ([]GitVersion, error) {
+	return gvm.listVersions(context.Background(), includeBranches, tagPattern)
+}
+
+func (gvm *GitVersionManager) listVersions(ctx context.Context, includeBranches bool, tagPattern string) ([]GitVersion, error) {
 	var versions []GitVersion
 
 	// Get tags
-	tags, err := gvm.listTags(tagPattern)
+	tags, err := gvm.listTags(ctx, tagPattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tags: %w", err)
 	}
@@ -54,7 +68,7 @@ func (gvm *GitVersionManager) ListVersions(includeBranches bool, tagPattern stri
 
 	// Get branches if requested
 	if includeBranches {
-		branches, err := gvm.listBranches()
+		branches, err := gvm.listBranches(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list branches: %w", err)
 		}
@@ -73,16 +87,14 @@ func (gvm *GitVersionManager) ListVersions(includeBranches bool, tagPattern stri
 }
 
 // listTags returns all git tags matching the optional pattern
-func (gvm *GitVersionManager) listTags(pattern string) ([]GitVersion, error) {
+func (gvm *GitVersionManager) listTags(ctx context.Context, pattern string) ([]GitVersion, error) {
 	args := []string{"tag", "-l"}
 	if pattern != "" {
 		args = append(args, pattern)
 	}
 	args = append(args, "--sort=-version:refname")
 
-	cmd := exec.CommandContext(gvm.ctx, "git", args...)
-	cmd.Dir = gvm.repoPath
-	output, err := cmd.Output()
+	output, err := gvm.git(ctx, args...).Output()
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +107,7 @@ func (gvm *GitVersionManager) listTags(pattern string) ([]GitVersion, error) {
 			continue
 		}
 
-		commit, err := gvm.getCommitHash("refs/tags/" + line)
+		commit, err := gvm.commitHash(ctx, "refs/tags/"+line)
 		if err != nil {
 			commit = "unknown"
 		}
@@ -112,10 +124,8 @@ func (gvm *GitVersionManager) listTags(pattern string) ([]GitVersion, error) {
 }
 
 // listBranches returns all git branches
-func (gvm *GitVersionManager) listBranches() ([]GitVersion, error) {
-	cmd := exec.CommandContext(gvm.ctx, "git", "branch", "-r", "--format=%(refname:short)")
-	cmd.Dir = gvm.repoPath
-	output, err := cmd.Output()
+func (gvm *GitVersionManager) listBranches(ctx context.Context) ([]GitVersion, error) {
+	output, err := gvm.git(ctx, "branch", "-r", "--format=%(refname:short)").Output()
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +141,7 @@ func (gvm *GitVersionManager) listBranches() ([]GitVersion, error) {
 		// Remove 'origin/' prefix
 		branchName := strings.TrimPrefix(line, "origin/")
 
-		commit, err := gvm.getCommitHash(line)
+		commit, err := gvm.commitHash(ctx, line)
 		if err != nil {
 			commit = "unknown"
 		}
@@ -147,11 +157,9 @@ func (gvm *GitVersionManager) listBranches() ([]GitVersion, error) {
 	return versions, nil
 }
 
-// getCommitHash returns the short commit hash for a given ref
-func (gvm *GitVersionManager) getCommitHash(ref string) (string, error) {
-	cmd := exec.CommandContext(gvm.ctx, "git", "rev-parse", "--short", ref)
-	cmd.Dir = gvm.repoPath
-	output, err := cmd.Output()
+// commitHash returns the short commit hash for a given ref
+func (gvm *GitVersionManager) commitHash(ctx context.Context, ref string) (string, error) {
+	output, err := gvm.git(ctx, "rev-parse", "--short", ref).Output()
 	if err != nil {
 		return "", err
 	}
@@ -160,19 +168,21 @@ func (gvm *GitVersionManager) getCommitHash(ref string) (string, error) {
 
 // GetFileContent returns the content of a file at a specific version
 func (gvm *GitVersionManager) GetFileContent(version, filePath string) ([]byte, error) {
+	return gvm.fileContent(context.Background(), version, filePath)
+}
+
+func (gvm *GitVersionManager) fileContent(ctx context.Context, version, filePath string) ([]byte, error) {
 	// Resolve version to a git ref
 	ref := version
 	if !strings.HasPrefix(ref, "refs/") {
 		// Try as tag first
-		if _, err := gvm.getCommitHash("refs/tags/" + version); err == nil {
+		if _, err := gvm.commitHash(ctx, "refs/tags/"+version); err == nil {
 			ref = "refs/tags/" + version
 		}
 	}
 
 	// Use git show to get file content
-	cmd := exec.CommandContext(gvm.ctx, "git", "show", ref+":"+filePath)
-	cmd.Dir = gvm.repoPath
-	output, err := cmd.Output()
+	output, err := gvm.git(ctx, "show", ref+":"+filePath).Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file content for %s at %s: %w", filePath, version, err)
 	}
@@ -182,16 +192,18 @@ func (gvm *GitVersionManager) GetFileContent(version, filePath string) ([]byte, 
 
 // ListFiles returns all files at a specific version matching a pattern
 func (gvm *GitVersionManager) ListFiles(version, pattern string) ([]string, error) {
+	return gvm.listFiles(context.Background(), version, pattern)
+}
+
+func (gvm *GitVersionManager) listFiles(ctx context.Context, version, pattern string) ([]string, error) {
 	ref := version
 	if !strings.HasPrefix(ref, "refs/") {
-		if _, err := gvm.getCommitHash("refs/tags/" + version); err == nil {
+		if _, err := gvm.commitHash(ctx, "refs/tags/"+version); err == nil {
 			ref = "refs/tags/" + version
 		}
 	}
 
-	cmd := exec.CommandContext(gvm.ctx, "git", "ls-tree", "-r", "--name-only", ref)
-	cmd.Dir = gvm.repoPath
-	output, err := cmd.Output()
+	output, err := gvm.git(ctx, "ls-tree", "-r", "--name-only", ref).Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list files at %s: %w", version, err)
 	}
@@ -220,17 +232,17 @@ func (gvm *GitVersionManager) ListFiles(version, pattern string) ([]string, erro
 
 // GetCurrentVersion returns the current version (tag or branch)
 func (gvm *GitVersionManager) GetCurrentVersion() (string, error) {
+	return gvm.currentVersion(context.Background())
+}
+
+func (gvm *GitVersionManager) currentVersion(ctx context.Context) (string, error) {
 	// Try to get current tag
-	cmd := exec.CommandContext(gvm.ctx, "git", "describe", "--tags", "--exact-match")
-	cmd.Dir = gvm.repoPath
-	if output, err := cmd.Output(); err == nil {
+	if output, err := gvm.git(ctx, "describe", "--tags", "--exact-match").Output(); err == nil {
 		return strings.TrimSpace(string(output)), nil
 	}
 
 	// Fall back to branch name
-	cmd = exec.CommandContext(gvm.ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
-	cmd.Dir = gvm.repoPath
-	output, err := cmd.Output()
+	output, err := gvm.git(ctx, "rev-parse", "--abbrev-ref", "HEAD").Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current version: %w", err)
 	}
@@ -321,8 +333,11 @@ func parseUnix(s string) (int64, error) {
 
 // CheckoutVersion checks out a specific version (for local development)
 func (gvm *GitVersionManager) CheckoutVersion(version string) error {
-	cmd := exec.CommandContext(gvm.ctx, "git", "checkout", version)
-	cmd.Dir = gvm.repoPath
+	return gvm.checkout(context.Background(), version)
+}
+
+func (gvm *GitVersionManager) checkout(ctx context.Context, version string) error {
+	cmd := gvm.git(ctx, "checkout", version)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
