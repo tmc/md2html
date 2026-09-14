@@ -1,0 +1,56 @@
+# -C names the directory every filesystem path resolves against.
+# It does not change the process working directory, so a path that is
+# already absolute keeps working and the tree outside it is untouched.
+
+# Relative source, output and resource paths all resolve against -C.
+md2html -C site -html out -html-ext html -css theme.css -data-json data.json -templates tmpl docs
+exists site/out/index.html
+grep 'background: #eee' site/out/guide.html
+grep 'data: Widgets' site/out/guide.html
+! exists out
+
+# The same run named from inside the directory produces the same page.
+cd site
+md2html -html out2 -html-ext html -css theme.css -data-json data.json -templates tmpl docs
+cmp out/guide.html out2/guide.html
+cd ..
+
+# An absolute source still renders under -C, which is only a base.
+md2html -C site $WORK/site/docs/guide.md
+stdout 'Guide'
+
+# A default (empty) source is rooted at -C, and so is stdin: neither
+# names a directory of its own.
+md2html -C site -html out3 -html-ext html
+exists site/out3/docs/guide.html
+
+md2html -C site -http :9061 - &
+wait-port :9061
+curl -s http://localhost:9061/docs/guide
+stdout 'Guide'
+
+# A -C that is not a directory is reported, even with nothing relative
+# left to resolve.
+! md2html -C site/theme.css $WORK/site/docs/guide.md
+stderr 'chdir'
+! md2html -C site/nowhere $WORK/site/docs/guide.md
+stderr 'chdir'
+
+-- site/docs/guide.md --
+# Guide
+
+A page about widgets.
+
+-- site/tmpl/layout.html --
+{{define "layout"}}<!doctype html>
+<title>{{.Title}}</title>
+<style>{{.CustomCSS}}</style>
+<p>{{with .Data}}data: {{.product}}{{end}}</p>
+{{.Content}}
+{{end}}
+
+-- site/theme.css --
+body { background: #eee; }
+
+-- site/data.json --
+{"product": "Widgets"}

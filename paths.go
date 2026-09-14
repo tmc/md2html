@@ -8,10 +8,77 @@ import (
 	"strings"
 )
 
-func sourceRoot(source string) (string, error) {
+// resolveBase returns the absolute directory that a Config's relative
+// filesystem paths resolve against: the process working directory, or
+// Config.Chdir resolved against it.
+//
+// -C names a base rather than changing the process working directory,
+// so an embedding caller keeps its own directory and two configurations
+// can be used at the same time. The directory is checked here, even
+// when every named path is absolute, so a mistyped -C still says so.
+func resolveBase(chdir string) (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("working directory: %w", err)
+	}
+	if chdir == "" {
+		return wd, nil
+	}
+	base := chdir
+	if !filepath.IsAbs(base) {
+		base = filepath.Join(wd, base)
+	}
+	base = filepath.Clean(base)
+	info, err := os.Stat(base)
+	if err != nil {
+		return "", fmt.Errorf("chdir: %w", err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("chdir: %s is not a directory", base)
+	}
+	return base, nil
+}
+
+// resolveAgainst resolves a filesystem path against base. An empty path
+// keeps its meaning — "not configured" — and an absolute one is already
+// resolved. An empty base leaves the path relative to the process
+// working directory, which is what a zero-value site wants.
+func resolveAgainst(base, name string) string {
+	if name == "" || base == "" || filepath.IsAbs(name) {
+		return name
+	}
+	return filepath.Join(base, name)
+}
+
+// resolveConfigPaths returns cfg with every filesystem path resolved
+// against base. URL paths — Base, SiteURL, EditURL — and document names
+// relative to the rendered tree — Index — are not filesystem paths and
+// are left alone.
+func resolveConfigPaths(cfg Config, base string) Config {
+	if cfg.Source != "-" {
+		cfg.Source = resolveAgainst(base, cfg.Source)
+	}
+	cfg.HTML = resolveAgainst(base, cfg.HTML)
+	cfg.CSS = resolveAgainst(base, cfg.CSS)
+	cfg.TemplateDir = resolveAgainst(base, cfg.TemplateDir)
+	cfg.DataJSON = resolveAgainst(base, cfg.DataJSON)
+	cfg.JSONSpec = resolveAgainst(base, cfg.JSONSpec)
+	cfg.Components = resolveAgainst(base, cfg.Components)
+	cfg.Icons = resolveAgainst(base, cfg.Icons)
+	return cfg
+}
+
+// sourceRoot returns the directory the served or rendered tree is rooted
+// at. A source that names nothing, or stdin, has no directory of its
+// own and is rooted at base.
+func sourceRoot(base, source string) (string, error) {
 	if source == "" || source == "-" {
+		if base != "" {
+			return base, nil
+		}
 		return os.Getwd()
 	}
+	source = resolveAgainst(base, source)
 
 	info, err := os.Stat(source)
 	if err == nil {

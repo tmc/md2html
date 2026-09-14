@@ -28,6 +28,13 @@
 //
 // For navigation and structured parsing, use ParseSummary and Loader.
 //
+// Run is a library call: it neither changes the process working
+// directory nor installs signal handlers. [Config.Chdir] names the
+// directory the configuration's relative paths resolve against, so two
+// configurations can be rendered at once, and cancelling the context
+// stops a running server. The md2html command installs the interrupt
+// handler itself.
+//
 // # Markdown dialect
 //
 // Rendering follows GFM: a single newline is a space, so paragraphs reflow

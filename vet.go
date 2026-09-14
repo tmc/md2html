@@ -38,7 +38,7 @@ func runVet(site *preparedSite, logger *slog.Logger) {
 	// is what makes a link written as "/docs/quickstart" resolvable back
 	// to the file that renders it.
 	vetSite := mdvet.Site{Base: cfg.Base}
-	if root, err := sourceRoot(src); err == nil {
+	if root, err := sourceRoot(site.base, src); err == nil {
 		vetSite.Root = root
 	}
 

@@ -223,7 +223,7 @@ func TestMissingIconWarnsOnce(t *testing.T) {
 
 func TestIconSearchPathHasNoGlobalDirectories(t *testing.T) {
 	root := t.TempDir()
-	for _, dir := range iconSearchPath(root) {
+	for _, dir := range iconSearchPath("", root) {
 		if !strings.HasPrefix(dir, root+string(filepath.Separator)) {
 			t.Errorf("icon search path contains machine-global directory %q", dir)
 		}
@@ -413,7 +413,7 @@ func TestFindIconsSearchPath(t *testing.T) {
 			t.Fatalf("prepareIcons() error = %v", err)
 		}
 		if cfg.navIcon("rocket") == "" {
-			t.Errorf("icons beside the documentation were not found; searched %v", iconSearchPath(root))
+			t.Errorf("icons beside the documentation were not found; searched %v", iconSearchPath("", root))
 		}
 	})
 
@@ -441,7 +441,7 @@ func TestFindIconsSearchPath(t *testing.T) {
 			t.Fatalf("prepareIcons() error = %v", err)
 		}
 		if cfg.navIcon("rocket") == "" {
-			t.Errorf("icons at the site root were not found; searched %v", iconSearchPath(docsDir))
+			t.Errorf("icons at the site root were not found; searched %v", iconSearchPath("", docsDir))
 		}
 	})
 
@@ -452,7 +452,7 @@ func TestFindIconsSearchPath(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(root, "icons"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		dir, set := findIcons(root)
+		dir, set := findIcons("", root)
 		if dir == filepath.Join(root, "icons") || len(set) != 0 {
 			t.Errorf("findIcons() accepted an empty directory: %q, %d icons", dir, len(set))
 		}

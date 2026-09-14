@@ -46,8 +46,12 @@ type docsJSONIcons struct {
 
 // iconLibraryForSource reports the library selected by docs.json.
 // Mintlify defaults to Font Awesome when the setting is absent.
-func iconLibraryForSource(source string) string {
-	root, found := findDocsJSON(source)
+func iconLibraryForSource(base, source string) string {
+	dir, err := sourceRoot(base, source)
+	if err != nil {
+		return "fontawesome"
+	}
+	root, found := findDocsJSON(dir)
 	if !found {
 		return "fontawesome"
 	}

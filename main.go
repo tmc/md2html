@@ -12,13 +12,11 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/tmc/md2html/internal/markdown/components"
@@ -26,9 +24,12 @@ import (
 )
 
 type Config struct {
-	// Chdir is a directory to change to before anything else, like
-	// go -C or make -C. Every relative path — the source, output,
-	// css, and configuration files — then resolves against it.
+	// Chdir is the directory relative paths resolve against, like
+	// go -C or make -C: the source, output, css, and configuration
+	// files. Unlike those commands, Run resolves against it rather
+	// than changing the process working directory, so an embedding
+	// caller keeps its own. It is validated even when every named
+	// path is absolute.
 	Chdir             string
 	Source            string // file, directory, or "-" for stdin
 	HTTP              string
@@ -107,6 +108,12 @@ type Config struct {
 // runtime state for a site build or server session.
 type preparedSite struct {
 	config Config
+	// base is the absolute directory config's relative filesystem paths
+	// were resolved against. It is kept because paths discovered later —
+	// the source root, the icon search path, the repository git metadata
+	// is read from — are anchored to it rather than to the process
+	// working directory, which Run does not change.
+	base string
 
 	componentRegistry components.Registry
 	iconSet           map[string]template.HTML
@@ -123,14 +130,31 @@ type preparedSite struct {
 	starsAPI string
 }
 
+// newPreparedSite returns a site whose configuration paths are resolved
+// against the base Config.Chdir names, with no resources loaded yet.
+func newPreparedSite(cfg Config, logger *slog.Logger) (*preparedSite, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	base, err := resolveBase(cfg.Chdir)
+	if err != nil {
+		return nil, err
+	}
+	return &preparedSite{
+		config:      resolveConfigPaths(cfg, base),
+		base:        base,
+		iconMissing: new(sync.Map),
+		iconLogger:  logger,
+	}, nil
+}
+
 func prepareSite(cfg Config, logger *slog.Logger) (*preparedSite, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	s := &preparedSite{
-		config:      cfg,
-		iconMissing: new(sync.Map),
-		iconLogger:  logger,
+	s, err := newPreparedSite(cfg, logger)
+	if err != nil {
+		return nil, err
 	}
 	if err := s.prepareJSONSpec(logger); err != nil {
 		return nil, err
@@ -253,21 +277,19 @@ func flagInt(fs *flag.FlagSet, name string) int {
 	return value
 }
 
+// Run renders cfg, writing a single converted document to out or, in
+// server and static modes, serving or generating a site. args holds the
+// positional arguments; the first names the source, overriding
+// [Config.Source].
+//
+// Run does not change the process working directory: [Config.Chdir]
+// names the base that relative paths in cfg resolve against, so a caller
+// can run two configurations at once without them interfering. It also
+// installs no signal handlers; cancel ctx to stop a running server. The
+// md2html command installs its own, so ^C still shuts the server down.
 func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, args []string) error {
 	if logger == nil {
 		logger = slog.Default()
-	}
-
-	// Set up signal handling
-	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	// Change directory first so every later relative path resolves
-	// against it. This is process-global, which is what -C means.
-	if cfg.Chdir != "" {
-		if err := os.Chdir(cfg.Chdir); err != nil {
-			return fmt.Errorf("chdir: %w", err)
-		}
 	}
 
 	if err := validateFormat(cfg.Format); err != nil {
@@ -332,8 +354,9 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 
 	// If source is provided but no mode specified, convert to HTML and output to stdout
 	if cfg.Source != "" && cfg.Source != "." {
-		// Read the markdown file
-		content, err := os.ReadFile(cfg.Source)
+		// Read the resolved path, but keep naming the document the way
+		// the caller did: the name is what local links resolve against.
+		content, err := os.ReadFile(site.config.Source)
 		if err != nil {
 			return fmt.Errorf("error reading file: %w", err)
 		}
@@ -578,7 +601,10 @@ func loadAllTemplates(site *preparedSite) (*template.Template, error) {
 			return val
 		},
 		"loadJSON": func(filename string) any {
-			data, err := loadJSONFile(filename)
+			// A template names its data relative to the same base as the
+			// rest of the configuration, not to the process working
+			// directory, which Run leaves alone.
+			data, err := loadJSONFile(resolveAgainst(site.base, filename))
 			if err != nil {
 				slog.Default().Error("Error loading JSON", "file", filename, "error", err)
 				return nil
@@ -981,12 +1007,22 @@ func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) er
 	return site.generateStaticHTML(ctx, logger)
 }
 
+// sourceDir returns the directory a static build reads from. A source
+// that names nothing, or stdin, has no directory of its own and is
+// rooted at the base its configuration was resolved against.
+func (s *preparedSite) sourceDir() string {
+	if s.config.Source == "" || s.config.Source == "-" {
+		if s.base != "" {
+			return s.base
+		}
+		return "."
+	}
+	return s.config.Source
+}
+
 func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.Logger) error {
 	cfg := site.config
-	sourceDir := cfg.Source
-	if sourceDir == "" {
-		sourceDir = "."
-	}
+	sourceDir := site.sourceDir()
 
 	outputDir := cfg.HTML
 

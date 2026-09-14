@@ -24,6 +24,7 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 	s := &server{
 		ctx:        ctx,
 		config:     cfg,
+		base:       site.base,
 		prepared:   site,
 		logger:     logger,
 		clients:    make(map[chan string]bool),
@@ -33,22 +34,20 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 
 	// Initialize version management if enabled
 	if cfg.Versions {
-		wd, err := os.Getwd()
-		if err != nil {
-			logger.Error("Error getting working directory", "error", err)
-		} else {
-			s.versionMgr = newGitVersionManager(ctx, wd)
-			if s.versionMgr.IsGitRepo() {
-				versions, err := s.versionMgr.ListVersions(cfg.VersionBranches, cfg.VersionPattern)
-				if err != nil {
-					logger.Error("Error listing versions", "error", err)
-				} else {
-					s.versions = versions
-					logger.Info("Loaded versions", "count", len(versions))
-				}
+		// Versions come from the repository the base directory is in,
+		// not from the source tree, which may be a subdirectory of it or
+		// not versioned at all.
+		s.versionMgr = newGitVersionManager(ctx, s.base)
+		if s.versionMgr.IsGitRepo() {
+			versions, err := s.versionMgr.ListVersions(cfg.VersionBranches, cfg.VersionPattern)
+			if err != nil {
+				logger.Error("Error listing versions", "error", err)
 			} else {
-				logger.Warn("Versions enabled but not in a git repository")
+				s.versions = versions
+				logger.Info("Loaded versions", "count", len(versions))
 			}
+		} else {
+			logger.Warn("Versions enabled but not in a git repository")
 		}
 	}
 
@@ -65,7 +64,7 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 
 	// Load navigation from SUMMARY.md or build it from the markdown tree.
 	if cfg.Nav {
-		root, err := sourceRoot(cfg.Source)
+		root, err := sourceRoot(s.base, cfg.Source)
 		if err == nil {
 			htmlExt := ""
 			if cfg.HTMLExt != "" {
@@ -117,8 +116,12 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 }
 
 type server struct {
-	ctx        context.Context
-	config     Config
+	ctx    context.Context
+	config Config
+	// base is the directory the configuration's relative paths were
+	// resolved against. Requests resolve against it too, so serving does
+	// not depend on the process working directory.
+	base       string
 	prepared   *preparedSite
 	logger     *slog.Logger
 	mu         sync.RWMutex
@@ -158,6 +161,11 @@ type server struct {
 	gitMetadataOK   map[string]bool
 }
 
+// sourceRoot returns the directory requests are served from.
+func (s *server) sourceRoot() (string, error) {
+	return sourceRoot(s.base, s.inputPath)
+}
+
 func (s *server) startWatching() error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -173,7 +181,7 @@ func (s *server) startWatching() error {
 			s.logger.Debug("watch source", "path", s.inputPath, "error", err)
 		}
 	} else {
-		root, err := sourceRoot(s.inputPath)
+		root, err := s.sourceRoot()
 		if err == nil {
 			if err := s.watchPath(root); err != nil && s.config.Verbose {
 				s.logger.Debug("watch root", "path", root, "error", err)
@@ -384,7 +392,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	css := s.cssContent
 	s.mu.RUnlock()
 
-	root, err := sourceRoot(s.inputPath)
+	root, err := s.sourceRoot()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error resolving source root: %v", err), http.StatusInternalServerError)
 		return
@@ -417,15 +425,16 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		var fileContent []byte
 		var err error
 
+		indexPath := resolveAgainst(s.base, s.config.Index)
 		if requestedVersion != "" && s.versionMgr != nil {
 			fileContent, err = s.versionMgr.GetFileContent(requestedVersion, s.config.Index)
 		} else {
-			fileContent, err = os.ReadFile(s.config.Index)
+			fileContent, err = os.ReadFile(indexPath)
 		}
 
 		if err == nil {
 			if requestedVersion == "" {
-				_ = s.watchOpenedPath(s.config.Index)
+				_ = s.watchOpenedPath(indexPath)
 			}
 			doc, err := parseFrontmatter(string(fileContent))
 			if err != nil {
@@ -575,12 +584,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	// If no input file specified and content is empty, serve the root
 	// directory: its index file if it has one, otherwise a listing.
 	if s.inputPath == "" && content == "" {
-		wd, err := os.Getwd()
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Error getting working directory: %v", err), http.StatusInternalServerError)
-			return
-		}
-		s.serveDirectory(w, wd, "", css, "")
+		s.serveDirectory(w, root, "", css, "")
 		return
 	}
 
@@ -743,7 +747,7 @@ func (s *server) lastUpdatedFor(filePath string) string {
 	}
 	s.lastUpdatedMu.Unlock()
 
-	root, err := sourceRoot(s.inputPath)
+	root, err := s.sourceRoot()
 	if err != nil {
 		return ""
 	}
@@ -811,7 +815,7 @@ func handleSearchAsset(name string) http.HandlerFunc {
 // show up without a server restart. The index is small enough that the cost
 // is negligible for a development server.
 func (s *server) handleSearchIndex(w http.ResponseWriter, r *http.Request) {
-	root, err := sourceRoot(s.inputPath)
+	root, err := s.sourceRoot()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("resolve source root: %v", err), http.StatusInternalServerError)
 		return
@@ -835,7 +839,7 @@ func (s *server) handleSearchIndex(w http.ResponseWriter, r *http.Request) {
 // the search index it is rebuilt per request, so an edit shows up
 // without restarting the server.
 func (s *server) llmsPages() ([]llmsPage, error) {
-	root, err := sourceRoot(s.inputPath)
+	root, err := s.sourceRoot()
 	if err != nil {
 		return nil, fmt.Errorf("resolve source root: %w", err)
 	}

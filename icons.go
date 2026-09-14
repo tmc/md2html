@@ -33,12 +33,12 @@ func (s *preparedSite) prepareIcons() error {
 		return nil
 	}
 	if strings.TrimSpace(s.config.Icons) == "" {
-		dir, set := findIcons(s.config.Source)
+		dir, set := findIcons(s.base, s.config.Source)
 		if len(set) != 0 {
 			s.config.Icons, s.iconSet = dir, set
 			return nil
 		}
-		return s.prepareBuiltinIcons(iconLibraryForSource(s.config.Source))
+		return s.prepareBuiltinIcons(iconLibraryForSource(s.base, s.config.Source))
 	}
 	dir, err := filepath.Abs(s.config.Icons)
 	if err != nil {
@@ -55,9 +55,9 @@ func (s *preparedSite) prepareIcons() error {
 
 // prepareIcons prepares a site with only icons loaded from cfg.
 func prepareIcons(cfg Config) (*preparedSite, error) {
-	s := &preparedSite{
-		config:      cfg,
-		iconMissing: new(sync.Map),
+	s, err := newPreparedSite(cfg, nil)
+	if err != nil {
+		return nil, err
 	}
 	if err := s.prepareIcons(); err != nil {
 		return nil, err
@@ -67,9 +67,9 @@ func prepareIcons(cfg Config) (*preparedSite, error) {
 
 // prepareBuiltinIcons prepares a site with only built-in icons loaded.
 func prepareBuiltinIcons(cfg Config, name string) (*preparedSite, error) {
-	s := &preparedSite{
-		config:      cfg,
-		iconMissing: new(sync.Map),
+	s, err := newPreparedSite(cfg, nil)
+	if err != nil {
+		return nil, err
 	}
 	if err := s.prepareBuiltinIcons(name); err != nil {
 		return nil, err
@@ -122,9 +122,9 @@ const iconDirName = "icons"
 // Icons that ship with a site belong to it and should be found without
 // being named. Machine-global directories are deliberately omitted so
 // the same source tree renders the same way on every machine.
-func iconSearchPath(source string) []string {
+func iconSearchPath(base, source string) []string {
 	var dirs []string
-	if root, err := sourceRoot(source); err == nil && root != "" {
+	if root, err := sourceRoot(base, source); err == nil && root != "" {
 		dirs = append(dirs, filepath.Join(root, iconDirName))
 		if siteDir, found := findDocsJSON(root); found {
 			dirs = append(dirs, filepath.Join(siteDir, iconDirName))
@@ -137,8 +137,8 @@ func iconSearchPath(source string) []string {
 // that holds no SVG files is passed over rather than accepted as an
 // empty set, so an unrelated "icons" directory does not mask the one
 // further along.
-func findIcons(source string) (string, map[string]template.HTML) {
-	for _, dir := range iconSearchPath(source) {
+func findIcons(base, source string) (string, map[string]template.HTML) {
+	for _, dir := range iconSearchPath(base, source) {
 		set, err := loadIcons(dir)
 		if err != nil || len(set) == 0 {
 			continue
