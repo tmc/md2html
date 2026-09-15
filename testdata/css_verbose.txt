@@ -8,13 +8,17 @@ wait-port :9011
 curl -s http://localhost:9011/
 stdout 'background: #f0f0f0'
 
-# Test with non-existent CSS file (error path)
+# A CSS file that does not exist is reported, and the page still renders.
 md2html -css nonexistent.css -v -http :9012 doc.md &
-sleep 200ms
+wait-port :9012
+curl -s http://localhost:9012/
+stdout '<!DOCTYPE html>'
 
-# Test verbose mode with directory depth
+# Verbose mode with a directory depth serves the tree it was given.
 md2html -v -depth 3 -http :9013 &
-sleep 200ms
+wait-port :9013
+curl -s http://localhost:9013/
+stdout '<!DOCTYPE html>'
 
 # Clean up background process
 

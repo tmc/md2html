@@ -8,13 +8,17 @@ wait-port :9001
 curl -s http://localhost:9001/
 stdout '<!DOCTYPE html>'
 
-# Test with invalid JSON file (error path)
+# Invalid JSON is reported, and the page still renders without the data.
 md2html -data-json bad.json -http :9002 test_json.md &
-sleep 200ms
+wait-port :9002
+curl -s http://localhost:9002/
+stdout '<!DOCTYPE html>'
 
-# Test with non-existent JSON file (error path)
+# A data file that does not exist is treated the same way.
 md2html -data-json nonexistent.json -http :9103 test_json.md &
-sleep 200ms
+wait-port :9103
+curl -s http://localhost:9103/
+stdout '<!DOCTYPE html>'
 
 # Clean up background process
 
