@@ -1,7 +1,25 @@
 # Test deeply nested markdown structures
 
-# Create deeply nested markdown
-cat <<'EOF' > nested.md
+# Single-file mode so the nested document is served at "/".
+md2html -http :9003 nested.md &
+wait-port :9003
+
+curl -s http://localhost:9003/
+
+# All six heading levels are rendered.
+stdout '<h1'
+stdout '<h6'
+
+# The deepest list item survives nesting.
+stdout 'Nested item 1\.1\.1\.1\.1\.1\.1\.1\.1\.1'
+
+# So does the deepest blockquote.
+stdout 'Blockquote level 5'
+
+# Stop the script; the background server is terminated with it.
+stop
+
+-- nested.md --
 # Level 1
 
 ## Level 2
@@ -45,26 +63,3 @@ Code block with nested structures
     }
 }
 ```
-EOF
-
-# Start server
-md2html -http :9003 &
-wait-port :9003
-
-# Test all heading levels are rendered
-curl -s http://localhost:9003/ | grep '<h1'
-stdout '<h1'
-
-curl -s http://localhost:9003/ | grep '<h6'
-stdout '<h6'
-
-# Test nested lists are rendered
-curl -s http://localhost:9003/ | grep 'Nested item 1.1.1.1.1.1.1.1.1.1'
-stdout 'Nested item'
-
-# Cleanup
-pkill -f 'md2html.*9003'
-rm nested.md
-
-# Clean up background process
-wait

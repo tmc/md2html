@@ -31,11 +31,11 @@ curl -s http://localhost:9028/
 stdout '<!DOCTYPE html>'
 
 # Test static HTML with non-existent output dir parent
-md2html -html /nonexistent/path/output -input doc.md
-sleep 200ms
+! md2html -html /nonexistent/path/output doc.md
+stderr 'failed to create output directory'
 
-# Clean up background process
-wait
+# Stop the script; the background server is terminated with it.
+stop
 
 -- doc.md --
 # Test Document

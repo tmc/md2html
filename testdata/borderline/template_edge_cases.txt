@@ -1,30 +1,29 @@
 # Test template loading and rendering edge cases
 
-# Test with malformed template directory structure
+# A template directory that parses to nothing usable falls back to the
+# embedded templates rather than failing to serve.
 md2html -templates bad-templates -http :9039 &
 wait-port :9039
 
-# Should fall back to embedded templates
-curl -s http://localhost:9039/
+curl -s http://localhost:9039/doc
 stdout '<!DOCTYPE html>'
 
-# Test with data JSON in templates
+# -data-json makes the decoded document available to templates as .Data.
 md2html -data-json data.json -templates data-templates -http :9040 &
 wait-port :9040
 
-# Verify JSON data is accessible in template
-curl -s http://localhost:9040/
-stdout 'Test Value'
+curl -s http://localhost:9040/doc
+stdout 'JSON Data: Test Value'
 
-# Test template with various names
+# A directory may override only the block it cares about.
 md2html -templates named-templates -http :9041 &
 wait-port :9041
 
-curl -s http://localhost:9041/
+curl -s http://localhost:9041/doc
 stdout 'Custom Layout Template'
 
-# Clean up background process
-wait
+# Stop the script; the background server is terminated with it.
+stop
 
 -- doc.md --
 # Template Test Document
@@ -42,7 +41,8 @@ Testing template system.
 -- bad-templates/invalid.html --
 {{invalid template syntax without proper closing
 
--- data-templates/base.html --
+-- data-templates/layout.html --
+{{define "layout"}}
 <!DOCTYPE html>
 <html>
 <head><title>{{.Title}}</title></head>
@@ -53,16 +53,13 @@ Testing template system.
 {{.Content}}
 </body>
 </html>
+{{end}}
 
 -- named-templates/layout.html --
+{{define "layout"}}
 <!DOCTYPE html>
 <html>
 <head><title>Custom Layout Template</title></head>
 <body>{{.Content}}</body>
 </html>
-
--- named-templates/docs.html --
-{{template "layout.html" .}}
-
--- named-templates/page.html --
-{{template "layout.html" .}}
+{{end}}

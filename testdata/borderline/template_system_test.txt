@@ -1,25 +1,20 @@
 # Test template system with custom templates
 
-# Create custom template directory
-mkdir custom-templates
-
-# Start server with custom templates
+# A custom directory can override a single named block; "styles" is injected
+# into the embedded layout, so the rest of the page chrome is kept.
 md2html -templates custom-templates -http :8194 &
 wait-port :8194
 
 # Check custom styles are applied
-curl -s http://localhost:8094/
+curl -s http://localhost:8194/template_test
 stdout 'background: #123456'
 
 # Test that template includes custom CSS class
-curl -s http://localhost:8094/
+curl -s http://localhost:8194/template_test
 stdout 'custom-test'
 
-# Clean up background process
-wait
-
-# Cleanup
-rm -rf custom-templates
+# Stop the script; the background server is terminated with it.
+stop
 
 -- template_test.md --
 # Custom Template Test

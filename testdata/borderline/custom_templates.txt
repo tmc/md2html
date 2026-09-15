@@ -1,11 +1,13 @@
 # Test custom template loading and rendering
 
-# Start server with custom templates directory
+# A template directory overrides embedded templates by DEFINED NAME, not by
+# file name: the renderer executes "layout", so that is what a custom
+# directory must define.
 md2html -templates my-templates -http :9004 &
 wait-port :9004
 
 # Verify custom template is being used
-curl -s http://localhost:9004/
+curl -s http://localhost:9004/doc
 stdout 'Custom Template Loaded'
 
 # Test with non-existent template directory (should fall back to embedded)
@@ -13,18 +15,19 @@ md2html -templates nonexistent-dir -http :9005 &
 wait-port :9005
 
 # Should still work with embedded templates
-curl -s http://localhost:9005/
+curl -s http://localhost:9005/doc
 stdout '<!DOCTYPE html>'
 
-# Clean up background process
-wait
+# Stop the script; the background server is terminated with it.
+stop
 
 -- doc.md --
 # Test Document
 
 This document tests custom template functionality.
 
--- my-templates/base.html --
+-- my-templates/layout.html --
+{{define "layout"}}
 <!DOCTYPE html>
 <html>
 <head>
@@ -36,9 +39,4 @@ This document tests custom template functionality.
     {{.Content}}
 </body>
 </html>
-
--- my-templates/page.html --
-{{template "base.html" .}}
-
--- my-templates/docs.html --
-{{template "base.html" .}}
+{{end}}

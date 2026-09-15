@@ -1,27 +1,27 @@
 # Test complete SSE/live reload functionality
 
-# Start server with a markdown file
-md2html -http :9020 &
+# Single-file mode: the watched file is served at "/" and its content
+# fragment at "/raw".
+md2html -http :9020 sse_test.md &
 wait-port :9020
 
 # Test that SSE endpoint responds with correct headers
-curl -s -I http://localhost:9020/events
+curl -s -I --max-time 1 http://localhost:9020/events
 stdout 'Content-Type: text/event-stream'
 
-# Test that main page loads
+# The rendered page carries the heading as HTML, not as markdown, and
+# arrives wrapped in the full page chrome.
 curl -s http://localhost:9020/
-stdout '# SSE Test Document'
+stdout '<!DOCTYPE html>'
+stdout '<h1 id="sse-test-document">SSE Test Document</h1>'
 
-# Test that raw endpoint returns markdown content
+# /raw renders the same content without the surrounding page.
 curl -s http://localhost:9020/raw
-stdout '# SSE Test Document'
+stdout '<h1 id="sse-test-document">SSE Test Document</h1>'
+! stdout '<!DOCTYPE html>'
 
-# Test modifying file triggers reload (simulate with file touch)
-exec touch sse_test.md
-sleep 200ms
-
-# Clean up background process
-wait
+# Stop the script; the background server is terminated with it.
+stop
 
 -- sse_test.md --
 # SSE Test Document
