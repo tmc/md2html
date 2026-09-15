@@ -33,6 +33,23 @@ func (AssetsCheck) Check(doc *Document) ([]Diagnostic, error) {
 		if !shouldCheckOnDisk(dest) {
 			return
 		}
+		// A rooted path inside the site's own prefix is a page URL, not
+		// a filesystem path: resolve it to the source that renders it
+		// before the absolute-path rule below refuses to look at it.
+		if doc.env.site.owns(dest) {
+			target, frag, ok := doc.env.site.resolve(dest)
+			if !ok {
+				diags = append(diags, assetDiag(doc.File, line, fmt.Sprintf("link %q: no page in this tree renders that URL", dest)))
+				return
+			}
+			if frag != "" && isMarkdown(target) {
+				ids := doc.env.anchorsFor(target)
+				if len(ids) != 0 && !ids[frag] {
+					diags = append(diags, assetDiag(doc.File, line, fmt.Sprintf("link %q: %s has no heading with id %q", dest, displayPath(doc.File, target), frag)))
+				}
+			}
+			return
+		}
 		if isAbsolutePathLink(dest) {
 			diags = append(diags, assetDiag(doc.File, line, fmt.Sprintf("link %q: absolute path; mdvet refuses to validate", dest)))
 			return

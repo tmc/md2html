@@ -106,3 +106,37 @@ func TestRunSkipsLegacyAssetChecksWhenAssetsEnabled(t *testing.T) {
 		t.Fatalf("got %d missing.md diagnostics, want 1: %v", n, diags)
 	}
 }
+
+// AssetsCheck supersedes LinkCheck in a default run, so it has to
+// resolve site-rooted URLs the same way: without this it reported every
+// "/docs/page" link in a -base tree as an unvalidatable absolute path.
+func TestAssetsCheckResolvesSiteURLs(t *testing.T) {
+	t.Run("resolvable URL is silent", func(t *testing.T) {
+		diags := runCheckSite(t, map[string]string{
+			"a.md":     "[guide](/docs/guide)\n",
+			"guide.md": "# Guide\n\n## Setup\n",
+		}, "a.md", AssetsCheck{}, Site{Base: "/docs"})
+		if len(diags) != 0 {
+			t.Errorf("got %v, want none", diags)
+		}
+	})
+	t.Run("unresolvable URL is reported", func(t *testing.T) {
+		diags := runCheckSite(t, map[string]string{
+			"a.md": "[gone](/docs/missing)\n",
+		}, "a.md", AssetsCheck{}, Site{Base: "/docs"})
+		wantSubstrings(t, diags, []string{"no page in this tree renders that URL"})
+	})
+	t.Run("anchor in a site URL is checked", func(t *testing.T) {
+		diags := runCheckSite(t, map[string]string{
+			"a.md":     "[setup](/docs/guide#nope)\n",
+			"guide.md": "# Guide\n\n## Setup\n",
+		}, "a.md", AssetsCheck{}, Site{Base: "/docs"})
+		wantSubstrings(t, diags, []string{`has no heading with id "nope"`})
+	})
+	t.Run("URL outside the prefix is still absolute", func(t *testing.T) {
+		diags := runCheckSite(t, map[string]string{
+			"a.md": "[x](/elsewhere/page)\n",
+		}, "a.md", AssetsCheck{}, Site{Base: "/docs"})
+		wantSubstrings(t, diags, []string{"absolute path"})
+	})
+}
