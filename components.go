@@ -30,15 +30,6 @@ func (s *preparedSite) prepareComponents() error {
 	return nil
 }
 
-// prepareComponents prepares a site with only components loaded from cfg.
-func prepareComponents(cfg Config) (*preparedSite, error) {
-	s := &preparedSite{config: cfg}
-	if err := s.prepareComponents(); err != nil {
-		return nil, err
-	}
-	return s, nil
-}
-
 // componentsRegistry returns the registry to render with, falling back to
 // the built-in components when no directory was configured.
 func (s *preparedSite) componentsRegistry() components.Registry {

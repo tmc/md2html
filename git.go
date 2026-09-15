@@ -1,7 +1,6 @@
 package md2html
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
@@ -329,21 +328,4 @@ func parseUnix(s string) (int64, error) {
 		n = n*10 + int64(r-'0')
 	}
 	return n, nil
-}
-
-// CheckoutVersion checks out a specific version (for local development)
-func (gvm *GitVersionManager) CheckoutVersion(version string) error {
-	return gvm.checkout(context.Background(), version)
-}
-
-func (gvm *GitVersionManager) checkout(ctx context.Context, version string) error {
-	cmd := gvm.git(ctx, "checkout", version)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to checkout %s: %w\n%s", version, err, stderr.String())
-	}
-
-	return nil
 }
