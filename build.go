@@ -61,7 +61,12 @@ type markdownFile struct {
 	ModTime time.Time
 }
 
+// minDepth is the smallest traversal depth findMarkdownFiles honors, so
+// that a zero Config.Depth still finds the pages at the root.
+const minDepth = 2
+
 func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
+	maxDepth = max(maxDepth, minDepth)
 	var files []markdownFile
 	seen := make(map[string]bool) // track real paths to avoid symlink cycles
 

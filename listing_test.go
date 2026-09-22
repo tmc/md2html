@@ -47,3 +47,22 @@ func TestFindMarkdownFilesSkipsUnreadableDir(t *testing.T) {
 		t.Errorf("expected only readme.md, got %v", got)
 	}
 }
+
+func TestFindMarkdownFilesZeroDepth(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "guide"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"index.md", "guide/start.md"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte("# x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	files, err := findMarkdownFiles(root, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("findMarkdownFiles(root, 0) found %d files, want 2", len(files))
+	}
+}

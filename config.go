@@ -25,7 +25,7 @@ type Config struct {
 	Verbose           bool
 	Title             string
 	CSS               string
-	Depth             int
+	Depth             int // directory traversal depth; values below 2 mean 2
 	TOC               bool
 	AllowUnsafe       bool
 	TemplateDir       string
