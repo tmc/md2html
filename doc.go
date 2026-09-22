@@ -22,7 +22,9 @@
 // For command-style integration, build a Config and call Run:
 //
 //	fs := md2html.NewFlagSet("md2html")
-//	_ = fs.Parse([]string{"-http", ":8080", "README.md"})
+//	if err := fs.Parse([]string{"-http", ":8080", "README.md"}); err != nil {
+//		return err
+//	}
 //	cfg := md2html.ConfigFromFlags(fs)
 //	err := md2html.Run(context.Background(), cfg, slog.Default(), os.Stdout, fs.Args())
 //

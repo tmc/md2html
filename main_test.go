@@ -3,6 +3,7 @@ package md2html
 import (
 	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,7 +20,12 @@ import (
 func TestMain(m *testing.M) {
 	scripttest.TestMain(m, func() {
 		flags := NewFlagSet("md2html")
-		flags.Parse(os.Args[1:])
+		if err := flags.Parse(os.Args[1:]); err != nil {
+			if err == flag.ErrHelp {
+				os.Exit(0)
+			}
+			os.Exit(2)
+		}
 		cfg := ConfigFromFlags(flags)
 		// Stand in for cmd/md2html, which owns signal handling: Run
 		// installs none, so script fixtures that interrupt the server

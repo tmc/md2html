@@ -3,3 +3,7 @@
 md2html -h
 stderr 'Usage of md2html'
 stderr 'HTTP server bind address'
+
+# An unknown flag is a usage error.
+! md2html -no-such-flag
+stderr 'flag provided but not defined: -no-such-flag'

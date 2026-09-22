@@ -156,8 +156,10 @@ func prepareSite(cfg Config, logger *slog.Logger) (*preparedSite, error) {
 }
 
 // NewFlagSet returns a FlagSet configured for the md2html CLI.
+// It uses [flag.ContinueOnError], so Parse reports a bad command line
+// to the caller instead of exiting the program.
 func NewFlagSet(name string) *flag.FlagSet {
-	fs := flag.NewFlagSet(name, flag.ExitOnError)
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.String("C", "", "change to directory before doing anything else")
 	fs.String("http", "", "HTTP server bind address")
 	fs.String("html", "", "output directory for static HTML generation (disables server mode)")

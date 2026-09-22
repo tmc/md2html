@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"log/slog"
 	"os"
@@ -13,7 +14,12 @@ import (
 
 func main() {
 	flags := md2html.NewFlagSet("md2html")
-	flags.Parse(os.Args[1:])
+	if err := flags.Parse(os.Args[1:]); err != nil {
+		if err == flag.ErrHelp {
+			os.Exit(0)
+		}
+		os.Exit(2)
+	}
 
 	// Interrupting the command stops it. Run itself installs no signal
 	// handler, because a library that did would change the behavior of
