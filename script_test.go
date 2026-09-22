@@ -24,7 +24,7 @@ func TestScripts(t *testing.T) {
 	env := []string{
 		"PATH=" + os.Getenv("PATH"),
 		"HOME=" + os.Getenv("HOME"),
-		"TMPDIR=/tmp",
+		"TMPDIR=" + t.TempDir(),
 	}
 	if gcd := os.Getenv("GOCOVERDIR"); gcd != "" {
 		env = append(env, "GOCOVERDIR="+gcd)
