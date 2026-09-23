@@ -115,6 +115,10 @@ type preparedSite struct {
 	jsonSpecReady  bool
 
 	starsAPI string
+
+	// links resolves root-absolute page links. It is set only for
+	// static builds; the server serves those paths directly.
+	links *siteLinks
 }
 
 // newPreparedSite returns a site whose configuration paths are resolved

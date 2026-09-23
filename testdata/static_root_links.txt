@@ -1,0 +1,36 @@
+# Static builds rewrite root-absolute links to pages in the tree, as
+# written for a hosted docs site, so the output works under any prefix.
+
+md2html -html out .
+grep 'href="foo.html#setup"' out/docs/bar.html
+grep 'href="\.\./foo.html"' out/docs/sub/x.html
+grep 'href="/docs/missing"' out/docs/bar.html
+grep 'href="https://example.com/docs/foo"' out/docs/bar.html
+
+# Raw HTML links are rewritten too.
+rm -rf out
+md2html -allow-unsafe -html out .
+grep 'href="\.\./foo.html"' out/docs/sub/x.html
+
+# Building docs/ alone resolves against the docs.json directory.
+cd docs
+md2html -html ../out2 .
+grep 'href="foo.html#setup"' ../out2/bar.html
+
+-- docs.json --
+{"name": "example", "navigation": {"pages": ["docs/foo", "docs/bar"]}}
+-- docs/foo.md --
+# Foo
+
+## Setup
+-- docs/bar.md --
+# Bar
+
+See [setup](/docs/foo#setup), [missing](/docs/missing),
+and [elsewhere](https://example.com/docs/foo).
+-- docs/sub/x.md --
+# X
+
+Back to [foo](/docs/foo).
+
+<div><a href="/docs/foo">Foo</a></div>

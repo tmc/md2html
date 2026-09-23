@@ -203,7 +203,7 @@ func (s *preparedSite) markdownToHTML(markdown, filePath string) (string, error)
 	}
 	cfg := s.config
 	if cfg.AllowUnsafe {
-		markdown = rewriteLocalHTMLAttributes(markdown, filePath, cfg.HTMLExt, cfg.Index, cfg.Format)
+		markdown = rewriteLocalHTMLAttributes(markdown, filePath, s.rewriteLink)
 		markdown = preprocessHTMLBlocks(markdown)
 	}
 
@@ -279,7 +279,7 @@ func (s *preparedSite) markdownToHTML(markdown, filePath string) (string, error)
 				return ast.WalkContinue, nil
 			}
 			href := string(link.Destination)
-			if rewritten, ok := rewriteMarkdownReference(cfg.Format, filePath, href, cfg.HTMLExt, cfg.Index); ok {
+			if rewritten, ok := s.rewriteLink(filePath, href); ok {
 				link.Destination = []byte(rewritten)
 			}
 			return ast.WalkContinue, nil
@@ -471,7 +471,20 @@ func logExtensionErrors(pc parser.Context, filePath string) {
 	}
 }
 
-func rewriteLocalHTMLAttributes(content, filePath, htmlExt, indexFile, format string) string {
+// rewriteLink returns href rewritten for the page at filePath, and reports
+// whether it changed.
+func (s *preparedSite) rewriteLink(filePath, href string) (string, bool) {
+	cfg := s.config
+	if rewritten, ok := rewriteMarkdownReference(cfg.Format, filePath, href, cfg.HTMLExt, cfg.Index); ok {
+		return rewritten, true
+	}
+	if target, suffix, ok := s.links.resolve(href); ok {
+		return relativeRenderedLink(filePath, target, cfg.HTMLExt, cfg.Index) + suffix, true
+	}
+	return "", false
+}
+
+func rewriteLocalHTMLAttributes(content, filePath string, rewrite func(filePath, href string) (string, bool)) string {
 	if filePath == "" {
 		return content
 	}
@@ -495,7 +508,7 @@ func rewriteLocalHTMLAttributes(content, filePath, htmlExt, indexFile, format st
 			out.WriteString(line)
 			continue
 		}
-		out.WriteString(rewriteHTMLAttributes(line, filePath, htmlExt, indexFile, format))
+		out.WriteString(rewriteHTMLAttributes(line, filePath, rewrite))
 	}
 	return out.String()
 }
@@ -512,7 +525,7 @@ func markdownFence(line string) (byte, int) {
 	return marker, n
 }
 
-func rewriteHTMLAttributes(content, filePath, htmlExt, indexFile, format string) string {
+func rewriteHTMLAttributes(content, filePath string, rewrite func(filePath, href string) (string, bool)) string {
 	return htmlLinkAttrPattern.ReplaceAllStringFunc(content, func(attr string) string {
 		match := htmlLinkAttrPattern.FindStringSubmatch(attr)
 		if len(match) != 4 {
@@ -524,7 +537,7 @@ func rewriteHTMLAttributes(content, filePath, htmlExt, indexFile, format string)
 			raw = match[3]
 			quote = `'`
 		}
-		rewritten, ok := rewriteMarkdownReference(format, filePath, raw, htmlExt, indexFile)
+		rewritten, ok := rewrite(filePath, raw)
 		if !ok {
 			return attr
 		}

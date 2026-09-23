@@ -231,6 +231,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	}
 
 	logger.Info("Found markdown files to process", "count", len(files))
+	site.links = newSiteLinks(sourceDir, files)
 
 	var nav *Navigation
 	var sInfo siteInfo
