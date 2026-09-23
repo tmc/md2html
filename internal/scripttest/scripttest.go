@@ -1,4 +1,3 @@
-// Package scripttest helps with script-based testing.
 package scripttest
 
 import (
@@ -93,34 +92,25 @@ func waitPort(ctx context.Context, addr string, timeout time.Duration) error {
 	}
 }
 
-// BackgroundCmd returns a command that runs prog in the background
-// with graceful shutdown support via SIGTERM instead of SIGKILL.
+// BackgroundCmd returns a command that runs prog in the background. It
+// takes the same arguments as [script.Program] and can replace it.
 //
-// The signature matches script.Program exactly for drop-in replacement.
+// prog is looked up in PATH unless it is absolute or contains a path
+// separator. When the script ends, the command stops the program by
+// calling cancel, or by sending SIGTERM if cancel is nil, and waits up to
+// waitDelay for it to exit before killing it (see [exec.Cmd.WaitDelay]).
 //
-// Parameters:
-//   - prog: The program to run. Can be a program name (looked up in PATH),
-//     an absolute path, or a relative path containing separators.
-//   - cancel: Optional function called when the script's context is cancelled.
-//     If nil, sends SIGTERM for graceful shutdown.
-//     If provided, called with the *exec.Cmd to allow custom shutdown logic.
-//   - waitDelay: Maximum time to wait for the program to exit after cancellation
-//     before forcibly killing it. Passed to exec.Cmd.WaitDelay.
+// Unlike script.Program, which kills the program outright by default,
+// SIGTERM lets a server shut down cleanly and write its coverage data.
+// Any exit after the script's context is canceled counts as success, and
+// the test's GOCOVERDIR is passed through to the program.
 //
-// Differences from script.Program:
-//   - Default cancellation sends SIGTERM instead of SIGKILL, allowing:
-//   - Graceful shutdown with cleanup
-//   - Coverage data to be written
-//   - Exit code 0 on clean shutdown
-//   - Context cancellation with exit code 0 is treated as success, not error
-//   - Ensures GOCOVERDIR environment variable is preserved for coverage
+// For example:
 //
-// Example:
-//
-//	// Drop-in replacement with graceful shutdown
+//	// Stop with SIGTERM.
 //	engine.Cmds["myserver"] = scripttest.BackgroundCmd(exe, nil, 0)
 //
-//	// Custom shutdown signal
+//	// Stop with SIGINT, allowing two seconds to exit.
 //	engine.Cmds["myapp"] = scripttest.BackgroundCmd(exe, func(cmd *exec.Cmd) error {
 //	    return cmd.Process.Signal(os.Interrupt)
 //	}, 2*time.Second)
@@ -147,16 +137,9 @@ func BackgroundCmd(prog string, cancel func(*exec.Cmd) error, waitDelay time.Dur
 	)
 }
 
-// startBackgroundCommand starts a command with graceful shutdown support.
-// It follows the same pattern as rsc.io/script's startCommand but with key differences:
-//   - Default cancel sends SIGTERM instead of SIGKILL for graceful shutdown
-//   - Exit code 0 with context.Canceled is treated as success
-//   - Ensures GOCOVERDIR is set for test coverage collection
-//   - Handles ETXTBSY errors by retrying (executable still being written)
-//   - Detects early failures (within 500ms) and reports them immediately
-//
-// This allows background servers to shut down cleanly, write coverage data,
-// and exit successfully when the test ends.
+// startBackgroundCommand starts path, named name, with args, in the
+// manner of rsc.io/script's startCommand. It retries a start that fails
+// with ETXTBSY and stops the program as described at [BackgroundCmd].
 func startBackgroundCommand(s *script.State, name, path string, args []string, cancel func(*exec.Cmd) error, waitDelay time.Duration) (script.WaitFunc, error) {
 	var (
 		cmd            *exec.Cmd
@@ -173,7 +156,6 @@ func startBackgroundCommand(s *script.State, name, path string, args []string, c
 		cmd.Stderr = &stderr
 		cmd.WaitDelay = waitDelay
 
-		// Set cancel function - default to SIGTERM for graceful shutdown
 		if cancel == nil {
 			cmd.Cancel = func() error {
 				if cmd.Process != nil {
