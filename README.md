@@ -36,6 +36,12 @@ Use `-icons dir` to replace the selected library with a directory of SVG files n
 
 `-github-stars` shows the star count of the repository named in `docs.json` beside the repository link. The count is fetched at build time and refreshed in the browser, so a deployed page does not show the number frozen at the build; the fetch is cached for five minutes per reader. Without the flag no page makes any request.
 
+`-jsonspec dir` labels JSON examples with the schema they follow. A fenced `json` block whose `"type"` value starts with one of the prefixes in `dir/jsonspec.json` gets a badge naming its type, and the fields of the matching `dir/<type>.schema.json` show their descriptions on hover:
+
+	{"prefixes": ["acme/"], "badge_url": "schemas.html#%s", "badge_label": "%s schema"}
+
+With that file, a block containing `"type": "acme/order"` is labeled "order schema", links to `schemas.html#order`, and takes its field descriptions from `order.schema.json`. The server also serves the loaded schemas at `/_jsonspec/schemas.json`.
+
 Pages a repository keeps out of its site are listed in a `.md2htmlignore`, in gitignore syntax, at or above the directory being served; a `.mintignore` is read under the same rules, so a tree that already declares its exclusions does not have to repeat them.
 
 Generate static output with agent-readable summaries:
