@@ -25,10 +25,6 @@ stdout '/nope'
 curl -s http://localhost:8096/nope
 stdout 'Guide'
 
-# The ?file= form reports the same way
-curl -s -o /dev/null -w '%{http_code}' 'http://localhost:8096/?file=missing.md'
-stdout '404'
-
 # Under a prefix the page names the URL the client asked for, not the
 # one left after the prefix was stripped
 md2html -http :8097 -base /docs &

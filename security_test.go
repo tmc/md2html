@@ -40,7 +40,7 @@ func TestHandleIndexRejectsTraversalPaths(t *testing.T) {
 
 	s := newServer(context.Background(), &preparedSite{config: Config{Source: dir}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
-	for _, target := range []string{"/../secret", "/?file=../secret.md"} {
+	for _, target := range []string{"/../secret"} {
 		t.Run(target, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, target, nil)
 			rec := httptest.NewRecorder()

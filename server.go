@@ -566,40 +566,6 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if a specific file is requested via query parameter (for backward compatibility)
-	if file := r.URL.Query().Get("file"); file != "" {
-		cleanPath, err := secureURLPath(file)
-		if err != nil {
-			http.Error(w, "invalid path", http.StatusBadRequest)
-			return
-		}
-		fullPath, err := secureJoin(root, filepath.FromSlash(cleanPath))
-		if err != nil {
-			http.Error(w, "invalid path", http.StatusBadRequest)
-			return
-		}
-		content, err := os.ReadFile(fullPath)
-		if err != nil {
-			s.serveNotFound(ctx, w, requestedURL(r), css)
-			return
-		}
-		_ = s.watchOpenedPath(fullPath)
-
-		doc, err := parseFrontmatter(string(content))
-		if err != nil {
-			s.logger.Error("Error parsing frontmatter", "file", file, "error", err)
-			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
-		}
-		html, err := s.renderDocumentWithVersion(ctx, doc, documentTitle(doc, file, s.siteTitle()), css, file, requestedVersion)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(html))
-		return
-	}
-
 	// If no input file specified and content is empty, serve the root
 	// directory: its index file if it has one, otherwise a listing.
 	if s.inputPath == "" && content == "" {
