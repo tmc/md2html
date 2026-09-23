@@ -54,9 +54,6 @@ func renderSeeds(t *testing.F) []string {
 			return err
 		}
 		if d.IsDir() {
-			if d.Name() == "_md2html" {
-				return filepath.SkipDir
-			}
 			return nil
 		}
 		switch strings.ToLower(filepath.Ext(path)) {
