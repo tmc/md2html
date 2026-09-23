@@ -1,47 +1,34 @@
-# Template Examples
+# Template examples
 
-This directory contains example template variations for testing different appearances and features.
+Each directory here is a set of templates to pass to md2html with
+`-templates`. md2html parses the embedded templates first and then the
+`.html` files in the named directory, so a file that defines a template
+(`{{define "styles"}}` and so on) replaces the embedded one of that name,
+and every template it leaves alone keeps its embedded definition.
 
-## Usage
-
-To test an example template set, use the `-templates` flag:
-
-```bash
-# Test auto-appearance templates (light/dark based on system preference)
-./md2html -http :8080 -templates examples/auto-appearance-templates
-
-# Test dark-mode templates (always dark)
-./md2html -http :8080 -templates examples/dark-mode-templates
-
-# Use default templates
-./md2html -http :8080 -templates templates
+```
+md2html -http :8080 -templates examples/auto-appearance-templates
 ```
 
-## Available Examples
+## auto-appearance-templates
 
-### `auto-appearance-templates/`
-- Automatically switches between light and dark themes based on system preference
-- Uses CSS `prefers-color-scheme` media query
-- Mermaid diagrams automatically adapt to theme
-- Smooth transitions between themes
+Replaces `styles` with GitHub Primer colors for both light and dark
+themes, choosing between them with the `prefers-color-scheme` media
+query.
 
-### `dark-mode-templates/`
-- Always uses dark theme regardless of system preference
-- GitHub Dark theme colors
-- Optimized for dark theme viewing
-- Custom scrollbar styling
+## dark-mode-templates
 
-## Creating New Examples
+Replaces `styles` with GitHub's dark theme colors, used whatever the
+system preference, and styles the scrollbar to match.
 
-To create a new template variant:
+## primer-cdn-templates
 
-1. Create a new directory under `examples/`
-2. Override only the templates you want to change
-3. Most commonly, you'll only need to override `styles.html`
-4. The base templates (`layout`, `header`, `content`, `scripts`) will be used automatically
+Replaces `layout`, `styles`, and `content` with a single-column page
+styled by Primer CSS loaded from unpkg.com, so pages rendered with it
+need network access to look right.
 
-Example structure:
-```
-examples/my-custom-theme/
-└── styles.html    # Override the styles block
-```
+## Writing a template set
+
+Make a directory and put in it only the templates you want to change.
+Most sets need only `styles.html`. The embedded templates are in
+[../templates](../templates) and show the names and data each one uses.
