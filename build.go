@@ -286,19 +286,15 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		}
 	}
 
-	var renderErrors []error
-	renderedRootIndex := false
-	for _, file := range files {
-		if !cfg.Drafts && isDraft(filepath.Join(sourceDir, file.RelPath)) {
-			logger.Debug("Skipping draft", "file", file.RelPath)
-			continue
-		}
+	// pageOptions returns the options for rendering the page whose source
+	// is relPath under sourceDir.
+	pageOptions := func(relPath string) RenderOptions {
 		opts := RenderOptions{
 			SiteTitle:   cfg.Title,
 			Data:        jsonData,
-			FilePath:    file.RelPath,
-			EditURL:     editURL(cfg.EditURL, file.RelPath),
-			LastUpdated: lastUpdated[filepath.ToSlash(file.RelPath)],
+			FilePath:    relPath,
+			EditURL:     editURL(cfg.EditURL, relPath),
+			LastUpdated: lastUpdated[filepath.ToSlash(relPath)],
 			Assets:      assets,
 			Accent:      sInfo.Accent,
 			AccentDark:  sInfo.AccentDark,
@@ -309,12 +305,22 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 			ShowStars:   cfg.Stars,
 		}
 		if cfg.LLMS {
-			opts.RawMDURL = rawMarkdownURL(file.RelPath)
+			opts.RawMDURL = rawMarkdownURL(relPath)
 		}
 		if nav != nil {
-			opts.Nav = nav.ForPage(file.RelPath)
+			opts.Nav = nav.ForPage(relPath)
 		}
-		if err := processMarkdownFileWithOpts(file, sourceDir, outputDir, cssContent, site, opts); err != nil {
+		return opts
+	}
+
+	var renderErrors []error
+	renderedRootIndex := false
+	for _, file := range files {
+		if !cfg.Drafts && isDraft(filepath.Join(sourceDir, file.RelPath)) {
+			logger.Debug("Skipping draft", "file", file.RelPath)
+			continue
+		}
+		if err := processMarkdownFileWithOpts(file, sourceDir, outputDir, cssContent, site, pageOptions(file.RelPath)); err != nil {
 			logger.Error("Error processing file", "error", err, "file", file.RelPath)
 			renderErrors = append(renderErrors, fmt.Errorf("process %s: %w", file.RelPath, err))
 			continue
@@ -328,28 +334,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	if cfg.Index != "" {
 		indexFile := filepath.Join(sourceDir, cfg.Index)
 		if _, err := os.Stat(indexFile); err == nil {
-			indexOpts := RenderOptions{
-				SiteTitle:   cfg.Title,
-				Data:        jsonData,
-				FilePath:    cfg.Index,
-				EditURL:     editURL(cfg.EditURL, cfg.Index),
-				LastUpdated: lastUpdated[filepath.ToSlash(cfg.Index)],
-				Assets:      assets,
-				Accent:      sInfo.Accent,
-				AccentDark:  sInfo.AccentDark,
-				Repo:        sInfo.Repo,
-				RepoURL:     sInfo.RepoURL,
-				NavLinks:    sInfo.Links,
-				Stars:       sInfo.Stars,
-				ShowStars:   cfg.Stars,
-			}
-			if cfg.LLMS {
-				indexOpts.RawMDURL = rawMarkdownURL(cfg.Index)
-			}
-			if nav != nil {
-				indexOpts.Nav = nav.ForPage(cfg.Index)
-			}
-			if err := processIndexFileWithOpts(indexFile, outputDir, cssContent, site, indexOpts); err != nil {
+			if err := processIndexFileWithOpts(indexFile, outputDir, cssContent, site, pageOptions(cfg.Index)); err != nil {
 				logger.Error("Error processing index file", "error", err, "file", indexFile)
 			} else {
 				logger.Debug("Processed index file", "file", indexFile)
