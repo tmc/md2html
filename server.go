@@ -558,11 +558,10 @@ func (s *server) serveDocument(ctx context.Context, w http.ResponseWriter, doc D
 // dirIndexNames are the file names tried, in order, when a request resolves
 // to a directory. The configured index file wins when one is set.
 func (s *server) dirIndexNames() []string {
-	names := []string{"index.md", "index.markdown", "README.md", "readme.md", "SKILL.md"}
-	if s.config.Index != "" {
-		names = append([]string{s.config.Index}, names...)
+	if s.config.Index == "" {
+		return indexNames
 	}
-	return names
+	return append([]string{s.config.Index}, indexNames...)
 }
 
 // serveDirectory serves the directory at dir, whose path relative to the

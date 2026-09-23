@@ -314,7 +314,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	}
 
 	var renderErrors []error
-	renderedRootIndex := false
+	rendered := make(map[string]bool)
 	for _, file := range files {
 		if !cfg.Drafts && isDraft(filepath.Join(sourceDir, file.RelPath)) {
 			logger.Debug("Skipping draft", "file", file.RelPath)
@@ -326,9 +326,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 			continue
 		}
 		logger.Debug("Generated file", "file", file.RelPath)
-		if isRootIndex(file.RelPath) {
-			renderedRootIndex = true
-		}
+		rendered[filepath.ToSlash(file.RelPath)] = true
 	}
 
 	if cfg.Index != "" {
@@ -340,11 +338,24 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 				logger.Debug("Processed index file", "file", indexFile)
 			}
 		}
-	} else if !renderedRootIndex {
-		if err := generateTOCIndex(outputDir, files, cssContent, site, assets); err != nil {
-			logger.Error("Error generating TOC index", "error", err)
-		} else {
-			logger.Debug("Generated TOC index")
+	} else {
+		// With no -index, the root page is chosen as the server chooses
+		// it. An index.md or index.markdown is already index.html.
+		switch name := rootIndexName(rendered); name {
+		case "index.md", "index.markdown":
+		case "":
+			if err := generateTOCIndex(outputDir, files, cssContent, site, assets); err != nil {
+				logger.Error("Error generating TOC index", "error", err)
+			} else {
+				logger.Debug("Generated TOC index")
+			}
+		default:
+			indexFile := filepath.Join(sourceDir, name)
+			if err := processIndexFileWithOpts(indexFile, outputDir, cssContent, site, pageOptions(name)); err != nil {
+				logger.Error("Error processing index file", "error", err, "file", indexFile)
+			} else {
+				logger.Debug("Processed index file", "file", indexFile)
+			}
 		}
 	}
 
@@ -566,8 +577,17 @@ func generateTOCIndex(outputDir string, files []markdownFile, cssContent string,
 	return os.WriteFile(indexOutputPath, []byte(finalHTML), 0644)
 }
 
-// isRootIndex reports whether relPath is an index.md at the top of the
-// source tree, whose page is the site's index.html.
-func isRootIndex(relPath string) bool {
-	return filepath.ToSlash(relPath) == "index.md"
+// indexNames are the file names that stand for the directory holding
+// them, in order of preference.
+var indexNames = []string{"index.md", "index.markdown", "README.md", "readme.md", "SKILL.md"}
+
+// rootIndexName returns the first of indexNames at the top of the source
+// tree that is among the rendered pages, or "" if there is none.
+func rootIndexName(rendered map[string]bool) string {
+	for _, name := range indexNames {
+		if rendered[name] {
+			return name
+		}
+	}
+	return ""
 }

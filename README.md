@@ -58,7 +58,7 @@ Docs that link to themselves with root-absolute paths, such as `/docs/quickstart
 
 Pages are then served under `/docs/`, and a request outside the prefix redirects into it. Serving the parent directory instead works whenever the directory name already matches the prefix.
 
-Served pages take their title from the frontmatter `title`, then the first heading, then the file name. A directory URL serves that directory's index file (`index.md` or `README.md`, or the file named by `-index`) and otherwise a listing of the Markdown files beneath it, to `-depth` levels.
+Served pages take their title from the frontmatter `title`, then the first heading, then the file name. A directory URL serves that directory's index file (`index.md` or `README.md`, or the file named by `-index`) and otherwise a listing of the Markdown files beneath it, to `-depth` levels. A static build chooses the root `index.html` the same way.
 
 Static output carries the files pages point at, keeping their paths: images, media, fonts, stylesheets and scripts, PDFs, and what a host asks for by name such as `robots.txt`, `favicon.ico`, and a web app manifest. The set is an allowlist rather than everything that is not Markdown, because a docs tree usually sits inside a repository holding source and configuration that has no business on a web host. Dot files, the output directory, and anything the ignore file excludes stay out. The development server serves whatever it finds, so a page that renders locally now deploys the same way.
 
