@@ -412,168 +412,147 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	filePath := strings.TrimPrefix(r.URL.Path, "/")
 	var requestedVersion string
-	var filePath string
 	if s.config.Versions && len(s.versions) > 0 {
 		// URL format: /v/{version}/{path} or /{path}
-		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")
-		if len(parts) > 1 && parts[0] == "v" {
-			requestedVersion = parts[1]
-			filePath = strings.Join(parts[2:], "/")
+		if rest, ok := strings.CutPrefix(filePath, "v/"); ok {
+			requestedVersion, filePath, _ = strings.Cut(rest, "/")
+		} else if s.config.VersionDefault != "" {
+			requestedVersion = s.config.VersionDefault
 		} else {
-			filePath = strings.Join(parts, "/")
-			if s.config.VersionDefault != "" {
-				requestedVersion = s.config.VersionDefault
-			} else if len(s.versions) > 0 {
-				requestedVersion = s.versions[0].Name
-			}
+			requestedVersion = s.versions[0].Name
 		}
-	} else {
-		filePath = strings.TrimPrefix(r.URL.Path, "/")
 	}
 
 	if (filePath == "" || filePath == "/") && s.config.Index != "" {
 		var fileContent []byte
 		var err error
-
 		indexPath := resolveAgainst(s.base, s.config.Index)
 		if requestedVersion != "" && s.versionMgr != nil {
 			fileContent, err = s.versionMgr.fileContent(ctx, requestedVersion, s.config.Index)
 		} else {
 			fileContent, err = os.ReadFile(indexPath)
 		}
-
 		if err == nil {
 			if requestedVersion == "" {
 				_ = s.watchOpenedPath(indexPath)
 			}
-			doc, err := parseFrontmatter(string(fileContent))
-			if err != nil {
-				s.logger.Error("Error parsing frontmatter", "file", s.config.Index, "error", err)
-				doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
-			}
-			html, err := s.renderDocumentWithVersion(ctx, doc, documentTitle(doc, s.config.Index, s.siteTitle()), css, s.config.Index, requestedVersion)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Write([]byte(html))
+			s.serveMarkdown(ctx, w, string(fileContent), s.config.Index, css, requestedVersion)
 			return
-		} else if s.config.Verbose {
+		}
+		if s.config.Verbose {
 			s.logger.Warn("Index file not found, falling back to directory listing", "file", s.config.Index)
 		}
 	}
 
-	if filePath != "" && filePath != "/" {
-		cleanPath, err := secureURLPath(filePath)
-		if err != nil {
-			http.Error(w, "invalid path", http.StatusBadRequest)
+	if filePath == "" || filePath == "/" {
+		// With no source file and no content, serve the root directory:
+		// its index file if it has one, otherwise a listing.
+		if s.inputPath == "" && content == "" {
+			s.serveDirectory(ctx, w, root, "", css, "")
 			return
 		}
+		s.serveMarkdown(ctx, w, content, "", css, "")
+		return
+	}
 
-		// A page the repository excludes from its site is not served
-		// here either. Listing it nowhere but answering for it anyway
-		// would still publish it to anyone holding the URL.
-		if ignore, err := loadIgnoreSet(root); err == nil && ignore != nil {
-			if full, joinErr := secureJoin(root, filepath.FromSlash(cleanPath)); joinErr == nil {
-				info, statErr := os.Stat(full)
-				if ignore.excludes(full, statErr == nil && info.IsDir()) {
-					s.serveNotFound(ctx, w, requestedURL(r), css)
-					return
-				}
+	cleanPath, err := secureURLPath(filePath)
+	if err != nil {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+
+	// A page the repository excludes from its site is not served
+	// here either. Listing it nowhere but answering for it anyway
+	// would still publish it to anyone holding the URL.
+	if ignore, err := loadIgnoreSet(root); err == nil && ignore != nil {
+		if full, joinErr := secureJoin(root, filepath.FromSlash(cleanPath)); joinErr == nil {
+			info, statErr := os.Stat(full)
+			if ignore.excludes(full, statErr == nil && info.IsDir()) {
+				s.serveNotFound(ctx, w, requestedURL(r), css)
+				return
 			}
 		}
+	}
 
-		var candidates []string
-		if strings.HasSuffix(cleanPath, ".md") || strings.HasSuffix(cleanPath, ".markdown") {
-			candidates = append(candidates, cleanPath)
+	candidates := []string{cleanPath}
+	if !strings.HasSuffix(cleanPath, ".md") && !strings.HasSuffix(cleanPath, ".markdown") {
+		candidates = []string{cleanPath + ".md", cleanPath + ".markdown"}
+	}
+	for _, candidate := range candidates {
+		var fileContent []byte
+		var fullPath string
+		var err error
+		if requestedVersion != "" && s.versionMgr != nil {
+			fileContent, err = s.versionMgr.fileContent(ctx, requestedVersion, candidate)
 		} else {
-			candidates = append(candidates, cleanPath+".md")
-			candidates = append(candidates, cleanPath+".markdown")
-		}
-
-		for _, candidate := range candidates {
-			var fileContent []byte
-			var fullPath string
-			var err error
-
-			if requestedVersion != "" && s.versionMgr != nil {
-				fileContent, err = s.versionMgr.fileContent(ctx, requestedVersion, candidate)
-			} else {
-				var joinErr error
-				fullPath, joinErr = secureJoin(root, filepath.FromSlash(candidate))
-				if joinErr != nil {
-					http.Error(w, "invalid path", http.StatusBadRequest)
-					return
-				}
-				fileContent, err = os.ReadFile(fullPath)
-			}
-
-			if err == nil {
-				if requestedVersion == "" {
-					_ = s.watchOpenedPath(fullPath)
-				}
-				doc, err := parseFrontmatter(string(fileContent))
-				if err != nil {
-					s.logger.Error("Error parsing frontmatter", "file", candidate, "error", err)
-					doc = DocumentData{Content: string(fileContent), Frontmatter: make(map[string]any)}
-				}
-				html, err := s.renderDocumentWithVersion(ctx, doc, documentTitle(doc, candidate, s.siteTitle()), css, candidate, requestedVersion)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				w.Write([]byte(html))
+			fullPath, err = secureJoin(root, filepath.FromSlash(candidate))
+			if err != nil {
+				http.Error(w, "invalid path", http.StatusBadRequest)
 				return
 			}
+			fileContent, err = os.ReadFile(fullPath)
 		}
-
-		// Fall back to serving the path as a static asset relative to the
-		// source root, or as a directory page when it names a directory.
-		fullPath, joinErr := secureJoin(root, filepath.FromSlash(cleanPath))
-		if joinErr == nil {
-			if info, statErr := os.Stat(fullPath); statErr == nil {
-				if info.IsDir() {
-					// Listing links are relative to the directory, so the
-					// URL needs its trailing slash for them to resolve.
-					if !strings.HasSuffix(r.URL.Path, "/") {
-						http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
-						return
-					}
-					s.serveDirectory(ctx, w, fullPath, strings.TrimSuffix(cleanPath, "/"), css, requestedVersion)
-					return
-				}
-				_ = s.watchOpenedPath(fullPath)
-				http.ServeFile(w, r, fullPath)
-				return
-			}
+		if err != nil {
+			continue
 		}
-
-		s.serveNotFound(ctx, w, requestedURL(r), css)
+		if requestedVersion == "" {
+			_ = s.watchOpenedPath(fullPath)
+		}
+		s.serveMarkdown(ctx, w, string(fileContent), candidate, css, requestedVersion)
 		return
 	}
 
-	// If no input file specified and content is empty, serve the root
-	// directory: its index file if it has one, otherwise a listing.
-	if s.inputPath == "" && content == "" {
-		s.serveDirectory(ctx, w, root, "", css, "")
-		return
+	// Fall back to serving the path as a static asset relative to the
+	// source root, or as a directory page when it names a directory.
+	if fullPath, err := secureJoin(root, filepath.FromSlash(cleanPath)); err == nil {
+		if info, err := os.Stat(fullPath); err == nil {
+			if info.IsDir() {
+				// Listing links are relative to the directory, so the
+				// URL needs its trailing slash for them to resolve.
+				if !strings.HasSuffix(r.URL.Path, "/") {
+					http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
+					return
+				}
+				s.serveDirectory(ctx, w, fullPath, strings.TrimSuffix(cleanPath, "/"), css, requestedVersion)
+				return
+			}
+			_ = s.watchOpenedPath(fullPath)
+			http.ServeFile(w, r, fullPath)
+			return
+		}
 	}
 
+	s.serveNotFound(ctx, w, requestedURL(r), css)
+}
+
+// serveMarkdown renders the Markdown source content as the page for
+// filePath and writes it. A page is titled from its content or file
+// name; content with no file name, such as standard input, takes the
+// site title.
+func (s *server) serveMarkdown(ctx context.Context, w http.ResponseWriter, content, filePath, css, version string) {
 	doc, err := parseFrontmatter(content)
 	if err != nil {
-		s.logger.Error("Error parsing frontmatter", "error", err)
+		s.logger.Error("Error parsing frontmatter", "file", filePath, "error", err)
 		doc = DocumentData{Content: content, Frontmatter: make(map[string]any)}
 	}
-	html, err := s.renderDocumentWithVersion(ctx, doc, s.siteTitle(), css, "", "")
+	title := s.siteTitle()
+	if filePath != "" {
+		title = documentTitle(doc, filePath, title)
+	}
+	s.serveDocument(ctx, w, doc, title, css, filePath, version)
+}
+
+// serveDocument renders doc through the page template and writes it.
+func (s *server) serveDocument(ctx context.Context, w http.ResponseWriter, doc DocumentData, title, css, filePath, version string) {
+	html, err := s.renderDocumentWithVersion(ctx, doc, title, css, filePath, version)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(html))
+	io.WriteString(w, html)
 }
 
 // dirIndexNames are the file names tried, in order, when a request resolves
@@ -597,19 +576,7 @@ func (s *server) serveDirectory(ctx context.Context, w http.ResponseWriter, dir,
 			continue
 		}
 		_ = s.watchOpenedPath(indexPath)
-		relIndex := path.Join(filepath.ToSlash(relDir), name)
-		doc, err := parseFrontmatter(string(content))
-		if err != nil {
-			s.logger.Error("Error parsing frontmatter", "file", relIndex, "error", err)
-			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
-		}
-		html, err := s.renderDocumentWithVersion(ctx, doc, documentTitle(doc, relIndex, s.siteTitle()), css, relIndex, version)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(html))
+		s.serveMarkdown(ctx, w, string(content), path.Join(filepath.ToSlash(relDir), name), css, version)
 		return
 	}
 
@@ -619,13 +586,7 @@ func (s *server) serveDirectory(ctx context.Context, w http.ResponseWriter, dir,
 		return
 	}
 	doc := DocumentData{Content: listing, Frontmatter: make(map[string]any)}
-	html, err := s.renderDocumentWithVersion(ctx, doc, listingTitle(relDir), css, "", "")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(html))
+	s.serveDocument(ctx, w, doc, listingTitle(relDir), css, "", "")
 }
 
 // requestedURL returns the path the client asked for. Under -base the
@@ -923,12 +884,7 @@ func (s *server) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		select {
-		case msg, ok := <-clientChan:
-			if !ok {
-				fmt.Fprintf(w, "data: shutdown\n\n")
-				w.(http.Flusher).Flush()
-				return
-			}
+		case msg := <-clientChan:
 			fmt.Fprintf(w, "data: %s\n\n", msg)
 			w.(http.Flusher).Flush()
 		case <-r.Context().Done():
