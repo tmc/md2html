@@ -30,3 +30,12 @@ func TestPrepareJSONSpec(t *testing.T) {
 		t.Fatal("jsonSpecBundle is empty")
 	}
 }
+
+// prepareJSONSpec prepares a site with only JSONSpec loaded from cfg.
+func prepareJSONSpec(cfg Config, logger *slog.Logger) (*preparedSite, error) {
+	s := &preparedSite{config: cfg}
+	if err := s.prepareJSONSpec(logger); err != nil {
+		return nil, err
+	}
+	return s, nil
+}

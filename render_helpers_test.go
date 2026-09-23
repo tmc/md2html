@@ -1,6 +1,9 @@
 package md2html
 
-import "testing"
+import (
+	"log/slog"
+	"testing"
+)
 
 func mustRenderMarkdown(t *testing.T, cfg Config, markdown, filePath string) string {
 	t.Helper()
@@ -36,4 +39,18 @@ func mustRenderSiteTemplateWithOptions(t *testing.T, site *preparedSite, htmlCon
 		t.Fatal(err)
 	}
 	return html
+}
+
+// renderTemplate renders a page with a site prepared from cfg.
+func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any) (string, error) {
+	return renderTemplateWithOptions(cfg, htmlContent, title, customCSS, liveReload, frontmatter, RenderOptions{})
+}
+
+// renderTemplateWithOptions is renderTemplate with explicit options.
+func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any, opts RenderOptions) (string, error) {
+	site, err := prepareSite(cfg, slog.Default())
+	if err != nil {
+		return "", err
+	}
+	return site.renderTemplate(htmlContent, title, customCSS, liveReload, frontmatter, opts)
 }

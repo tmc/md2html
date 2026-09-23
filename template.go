@@ -185,18 +185,6 @@ func resolveMermaidThemes(frontmatter map[string]any) (theme, darkTheme string, 
 	return theme, darkTheme, auto
 }
 
-func renderTemplate(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any) (string, error) {
-	return renderTemplateWithOptions(cfg, htmlContent, title, customCSS, liveReload, frontmatter, RenderOptions{})
-}
-
-func renderTemplateWithOptions(cfg Config, htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any, opts RenderOptions) (string, error) {
-	site, err := prepareSite(cfg, slog.Default())
-	if err != nil {
-		return "", err
-	}
-	return site.renderTemplate(htmlContent, title, customCSS, liveReload, frontmatter, opts)
-}
-
 func (s *preparedSite) renderTemplate(htmlContent, title, customCSS string, liveReload bool, frontmatter map[string]any, opts RenderOptions) (string, error) {
 	if s == nil {
 		s = &preparedSite{}

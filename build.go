@@ -168,14 +168,6 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 	return files, err
 }
 
-func generateStaticHTML(ctx context.Context, cfg Config, logger *slog.Logger) error {
-	site, err := prepareSite(cfg, logger)
-	if err != nil {
-		return err
-	}
-	return site.generateStaticHTML(ctx, logger)
-}
-
 // sourceDir returns the directory a static build reads from. A source
 // that names nothing, or stdin, has no directory of its own and is
 // rooted at the base its configuration was resolved against.

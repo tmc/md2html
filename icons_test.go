@@ -492,3 +492,35 @@ func TestFindIconsSearchPath(t *testing.T) {
 		}
 	})
 }
+
+// prepareIcons prepares a site with only icons loaded from cfg.
+func prepareIcons(cfg Config) (*preparedSite, error) {
+	s, err := newPreparedSite(cfg, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.prepareIcons(); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// prepareBuiltinIcons prepares a site with only built-in icons loaded.
+func prepareBuiltinIcons(cfg Config, name string) (*preparedSite, error) {
+	s, err := newPreparedSite(cfg, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.prepareBuiltinIcons(name); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// navIcon returns the markup for an icon name, or the empty string when
+// no icon set is configured or the set does not have that name. A name
+// with no icon leaves the entry without one, which is how pages render
+// when no set is configured at all.
+func (s *preparedSite) navIcon(name string) template.HTML {
+	return s.navIconType(name, "")
+}
