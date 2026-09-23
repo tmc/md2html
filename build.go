@@ -287,6 +287,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	}
 
 	var renderErrors []error
+	renderedRootIndex := false
 	for _, file := range files {
 		if !cfg.Drafts && isDraft(filepath.Join(sourceDir, file.RelPath)) {
 			logger.Debug("Skipping draft", "file", file.RelPath)
@@ -319,6 +320,9 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 			continue
 		}
 		logger.Debug("Generated file", "file", file.RelPath)
+		if isRootIndex(file.RelPath) {
+			renderedRootIndex = true
+		}
 	}
 
 	if cfg.Index != "" {
@@ -351,7 +355,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 				logger.Debug("Processed index file", "file", indexFile)
 			}
 		}
-	} else {
+	} else if !renderedRootIndex {
 		if err := generateTOCIndex(outputDir, files, cssContent, site, assets); err != nil {
 			logger.Error("Error generating TOC index", "error", err)
 		} else {
@@ -575,4 +579,10 @@ func generateTOCIndex(outputDir string, files []markdownFile, cssContent string,
 
 	indexOutputPath := filepath.Join(outputDir, "index.html")
 	return os.WriteFile(indexOutputPath, []byte(finalHTML), 0644)
+}
+
+// isRootIndex reports whether relPath is an index.md at the top of the
+// source tree, whose page is the site's index.html.
+func isRootIndex(relPath string) bool {
+	return filepath.ToSlash(relPath) == "index.md"
 }

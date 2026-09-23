@@ -18,6 +18,13 @@ md2html -html output
 exists output/index.html
 grep -q 'Index of /' output/index.html
 
+# An index.md is the site index; no listing replaces it
+rm -rf output
+cp guide.md index.md
+md2html -html output
+grep -q 'Complete user guide content' output/index.html
+! grep -q 'Index of /' output/index.html
+
 # Clean up
 rm -rf output
 
