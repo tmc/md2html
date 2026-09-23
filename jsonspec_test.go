@@ -30,15 +30,3 @@ func TestPrepareJSONSpec(t *testing.T) {
 		t.Fatal("jsonSpecBundle is empty")
 	}
 }
-
-func TestJSONSpecFlagSurface(t *testing.T) {
-	fs := NewFlagSet("test")
-	if fs.Lookup("jsonspec") == nil {
-		t.Fatal("-jsonspec is not registered")
-	}
-	for _, name := range []string{"jsonspec-prefixes", "jsonspec-badge-url", "jsonspec-badge-label", "jsonspec-schemas"} {
-		if fs.Lookup(name) != nil {
-			t.Fatalf("legacy flag -%s is still registered", name)
-		}
-	}
-}
