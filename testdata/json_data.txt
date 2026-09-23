@@ -20,8 +20,6 @@ wait-port :9103
 curl -s http://localhost:9103/
 stdout '<!DOCTYPE html>'
 
-# Clean up background process
-
 -- test_data.json --
 {
   "title": "Test Title",

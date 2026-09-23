@@ -19,8 +19,6 @@ stdout 'class="language-yaml"'
 stdout 'Test Author'
 stdout 'Document with Frontmatter'
 
-# Clean up background process
-
 -- doc_with_headers.md --
 # Main Title
 

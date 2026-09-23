@@ -21,8 +21,6 @@ stdout '<table'
 stdout '<section'
 stdout '<script>'
 
-# Clean up background process
-
 -- html_test.md --
 # Document with HTML Blocks
 

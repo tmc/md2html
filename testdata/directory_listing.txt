@@ -35,8 +35,6 @@ curl -s http://localhost:8092/file2
 stdout '<h1.*>File Two</h1>'
 stdout '<title>File Two</title>'
 
-# Clean up background process
-
 -- testdir/index.md --
 # Welcome
 

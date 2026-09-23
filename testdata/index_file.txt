@@ -24,8 +24,6 @@ wait-port :9008
 curl -s http://localhost:9008/
 stdout 'Index Page'
 
-# Clean up background process
-
 -- README.md --
 # Project README
 

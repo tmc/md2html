@@ -31,8 +31,6 @@ wait-port :9038
 curl -s http://localhost:9038/
 stdout '<!DOCTYPE html>'
 
-# Clean up background process
-
 -- test.md --
 # Test Document
 

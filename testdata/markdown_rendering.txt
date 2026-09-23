@@ -17,8 +17,6 @@ stdout '<code.*>inline code</code>'
 # Test that code blocks are highlighted
 stdout '<pre.*class="chroma".*><code>'
 
-# Clean up background process
-
 -- test.md --
 # Test Document
 

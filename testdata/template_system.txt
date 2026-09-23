@@ -18,8 +18,6 @@ stdout 'custom-test'
 # Cleanup
 rm -rf custom-templates
 
-# Clean up background process
-
 -- template_test.md --
 # Custom Template Test
 

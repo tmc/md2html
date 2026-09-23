@@ -15,8 +15,6 @@ wait-port :9017
 curl -s -o /dev/null -w '%{http_code}' http://localhost:9017/
 stdout '200'
 
-# Clean up background process
-
 -- entry_test.md --
 # Test Entry Point
 

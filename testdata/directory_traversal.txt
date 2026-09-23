@@ -29,8 +29,6 @@ stdout 'document.markdown'
 # Clean up
 rm -rf output
 
-# Clean up background process
-
 -- level1.md --
 # Level 1 Document
 

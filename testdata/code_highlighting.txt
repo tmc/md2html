@@ -12,8 +12,6 @@ stdout 'chroma'
 curl -s http://localhost:8097/
 stdout 'Hello, World!'
 
-# Clean up background process
-
 -- code.md --
 # Code Examples
 

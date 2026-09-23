@@ -22,8 +22,6 @@ stdout '<table'
 stdout '<script'
 stdout 'console.log'
 
-# Clean up background process
-
 -- complex_html.md --
 # Document with Complex HTML
 

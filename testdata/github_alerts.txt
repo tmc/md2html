@@ -20,8 +20,6 @@ stdout 'class="admonition adm-warning"'
 curl -s http://localhost:8093/
 stdout 'class="admonition adm-danger"'
 
-# Clean up background process
-
 -- alerts.md --
 # GitHub Alerts Test
 

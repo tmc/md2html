@@ -9,8 +9,6 @@ curl -s -w '%{http_code}' http://localhost:8099/
 stdout '200'
 stdout 'hello'
 
-# Clean up background process
-
 -- test_basic.md --
 # basic test
 hello

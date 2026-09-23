@@ -23,8 +23,6 @@ stdout 'class="frontmatter"'
 stdout 'class="language-yaml"'
 stdout 'Test Author'
 
-# Clean up background process
-
 -- frontmatter.md --
 ---
 title: Test Document
