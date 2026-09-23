@@ -347,9 +347,9 @@ func TestIconGroupsAreDisjoint(t *testing.T) {
 }
 
 // TestIconAliasesAreSymmetric checks that every name in a group reaches
-// every other one. Aliases used to be written by hand in one direction,
-// so "diagram-project" found a Lucide "workflow" while a page naming
-// "workflow" found nothing in a Font Awesome directory.
+// every other one: a page naming "workflow" finds a Font Awesome
+// "diagram-project" just as a page naming "diagram-project" finds a
+// Lucide "workflow".
 func TestIconAliasesAreSymmetric(t *testing.T) {
 	for _, group := range iconGroups {
 		for _, from := range group {
@@ -367,8 +367,8 @@ func TestIconAliasesAreSymmetric(t *testing.T) {
 	}
 }
 
-// TestResolveIconDiagramProject pins the case that prompted grouping:
-// the same page renders against a Font Awesome, Lucide, or Tabler
+// TestResolveIconDiagramProject checks that a page naming
+// diagram-project renders against a Font Awesome, Lucide, or Tabler
 // directory.
 func TestResolveIconDiagramProject(t *testing.T) {
 	sets := map[string]string{

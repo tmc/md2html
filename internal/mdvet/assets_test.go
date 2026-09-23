@@ -88,7 +88,7 @@ func TestAssetsCheck(t *testing.T) {
 	}
 }
 
-func TestRunSkipsLegacyAssetChecksWhenAssetsEnabled(t *testing.T) {
+func TestRunSkipsChecksCoveredByAssets(t *testing.T) {
 	dir := writeFiles(t, map[string]string{
 		"a.md": "[missing](missing.md)\n",
 	})

@@ -206,8 +206,8 @@ func TestReferenceDefCheck(t *testing.T) {
 		}
 	})
 	t.Run("does not panic on inline code spans", func(t *testing.T) {
-		// Regression: inCode was calling .Lines() on *ast.CodeSpan,
-		// which panics because CodeSpan is an inline node.
+		// A code span is an inline node, and calling Lines on one
+		// panics, so inCode must not.
 		diags := runCheck(t, map[string]string{
 			"a.md": "Use the `flag` package. See `[x][y]` syntax.\n",
 		}, "a.md", ReferenceDefCheck{})

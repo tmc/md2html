@@ -64,8 +64,8 @@ func (s Site) owns(dest string) bool {
 // resolve maps a site-absolute URL to the source file that renders it,
 // along with any fragment. It reports false when s cannot resolve the
 // URL (no Root configured, a different prefix, or no source file for
-// that path), so callers keep whatever they did before rather than
-// inventing a diagnostic about a file they cannot see.
+// that path), so callers fall back to their unresolved handling rather
+// than inventing a diagnostic about a file they cannot see.
 func (s Site) resolve(dest string) (file, frag string, ok bool) {
 	if s.Root == "" {
 		return "", "", false

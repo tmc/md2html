@@ -39,9 +39,8 @@ func TestWatchEnabled(t *testing.T) {
 }
 
 // TestReloadNavigationPicksUpDocsJSON checks that editing docs.json is
-// reflected without restarting the server. Navigation used to be built
-// once at startup, so a reordered sidebar or a renamed site needed a
-// restart to appear.
+// reflected without restarting the server: a reordered sidebar or a
+// renamed site appears on the next request.
 func TestReloadNavigationPicksUpDocsJSON(t *testing.T) {
 	siteDir := t.TempDir()
 	docsDir := filepath.Join(siteDir, "docs")
@@ -89,9 +88,8 @@ func TestReloadNavigationPicksUpDocsJSON(t *testing.T) {
 	if s.site.Name != "Second" {
 		t.Errorf("site name = %q after reload, want %q", s.site.Name, "Second")
 	}
-	// The title has to follow the renamed site. It used to stick,
-	// because the name applied at startup was mistaken for a title the
-	// caller had chosen.
+	// The title follows the renamed site. The name applied at startup
+	// is not a title the caller chose, so it does not outrank the new one.
 	if got := s.siteTitle(); got != "Second" {
 		t.Errorf("title = %q after reload, want %q", got, "Second")
 	}

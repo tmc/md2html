@@ -35,8 +35,7 @@ func TestRenderTemplateNavGroupsAreLabels(t *testing.T) {
 }
 
 // TestRenderTemplateNavGroupChildren checks that the pages inside a group
-// are rendered. A group whose children were dropped left the sidebar with
-// nothing but headings.
+// are rendered, so the sidebar holds pages and not only group headings.
 func TestRenderTemplateNavGroupChildren(t *testing.T) {
 	install := &NavItem{Title: "Install", Path: "install.md", URL: "install.html", Level: 1}
 	nav := &Navigation{

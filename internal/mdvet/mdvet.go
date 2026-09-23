@@ -135,7 +135,7 @@ func RunSite(paths []string, checks []Check, site Site) ([]Diagnostic, error) {
 			ctx:    pc,
 		}
 		for _, c := range checks {
-			if assetMode && legacyAssetCheck(c.Name()) {
+			if assetMode && coveredByAssets(c.Name()) {
 				continue
 			}
 			ds, err := c.Check(doc)
@@ -166,7 +166,10 @@ func hasCheck(checks []Check, name string) bool {
 	return false
 }
 
-func legacyAssetCheck(name string) bool {
+// coveredByAssets reports whether the assets check already covers what
+// the named check looks for, so that running both would report each
+// problem twice.
+func coveredByAssets(name string) bool {
 	switch name {
 	case "links", "images", "anchors":
 		return true

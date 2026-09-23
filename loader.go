@@ -295,8 +295,8 @@ func (l *Loader) TemplateFuncs() template.FuncMap {
 
 // nodeText returns the plain text of a node and its descendants.
 //
-// goldmark's ast.Node.Text is deprecated, and it read the whole source
-// segment; walking the text nodes gives the same answer from the parsed
+// goldmark's ast.Node.Text is deprecated and reads the whole source
+// segment. Walking the text nodes gives the same answer from the parsed
 // document, which is what the headings, links, and list items recorded
 // here are built from.
 func nodeText(n ast.Node, source []byte) string {

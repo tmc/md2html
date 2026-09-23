@@ -78,8 +78,8 @@ func generateChromaCSS() string {
 	// Both are scoped, not just one. The two styles do not name the same
 	// token classes, so whichever was left unscoped would show through
 	// wherever the other is silent: github colors NameOther near-black
-	// and github-dark says nothing about it, which left every plain
-	// identifier in a dark block black on black.
+	// and github-dark says nothing about it, so an unscoped github
+	// would leave every plain identifier in a dark block black on black.
 	var buf bytes.Buffer
 	buf.WriteString("@media (prefers-color-scheme: dark) {\n")
 	buf.WriteString(scopeCSS(darkCSS, `:root:not([data-theme="light"])`))

@@ -157,7 +157,7 @@ type server struct {
 	// navTitle is the title the caller configured, kept so a reload can
 	// recompute the effective title. Without it the site name applied at
 	// startup would look like a caller's choice and outrank every later
-	// one, so a renamed site never took effect.
+	// one, and a renamed site would never take effect.
 	navTitle string
 	// title is the effective site title. It is derived from navTitle and
 	// the site name, so a reload can change it while requests are being

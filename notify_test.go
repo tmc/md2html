@@ -6,10 +6,9 @@ import (
 	"testing"
 )
 
-// TestNotifyClientsDelivers verifies that notifyClients actually delivers a
-// reload to registered SSE clients. A prior implementation guarded the send
-// with an inverted select on time.After, so the default branch was always
-// taken and no client was ever notified, so live reload silently never fired.
+// TestNotifyClientsDelivers checks that notifyClients delivers a reload
+// to every registered SSE client. A send that never happens fails
+// silently in the browser: the page just stops reloading.
 func TestNotifyClientsDelivers(t *testing.T) {
 	s := newServer(context.Background(), &preparedSite{}, slog.Default())
 
