@@ -1,4 +1,4 @@
-# Simple test without help or background
+# A single file argument renders to stdout.
 md2html simple.md
 stdout 'Hello'
 

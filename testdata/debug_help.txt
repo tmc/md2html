@@ -1,3 +1,0 @@
-# Debug help output
-md2html -h
-stderr 'Usage of md2html'
