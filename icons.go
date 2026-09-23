@@ -78,38 +78,72 @@ func prepareBuiltinIcons(cfg Config, name string) (*preparedSite, error) {
 }
 
 func (s *preparedSite) prepareBuiltinIcons(name string) error {
+	lib, err := builtinIcons(name)
+	if err != nil {
+		return err
+	}
+	s.iconAttribution = lib.attribution
+	s.iconSet = lib.set
+	s.iconStyles = lib.styles
+	return nil
+}
+
+// inlinedLibrary is a built-in icon library prepared for inlining. Its
+// maps are shared by every site that uses the library and must not be
+// modified.
+type inlinedLibrary struct {
+	attribution string
+	set         map[string]template.HTML
+	styles      map[string]map[string]template.HTML // Font Awesome only
+}
+
+var builtinIconCache sync.Map // library name -> func() (*inlinedLibrary, error)
+
+// builtinIcons returns the named built-in library, inlining it on first
+// use. Every rendered fragment prepares a site, so redoing this work per
+// site would dominate rendering time.
+func builtinIcons(name string) (*inlinedLibrary, error) {
+	f, _ := builtinIconCache.LoadOrStore(name, sync.OnceValues(func() (*inlinedLibrary, error) {
+		return inlineLibrary(name)
+	}))
+	return f.(func() (*inlinedLibrary, error))()
+}
+
+func inlineLibrary(name string) (*inlinedLibrary, error) {
 	lib, err := iconsets.Load(name)
 	if err != nil {
-		return fmt.Errorf("load built-in icons: %w", err)
+		return nil, fmt.Errorf("load built-in icons: %w", err)
 	}
-	s.iconAttribution = lib.Attribution
-	s.iconSet = make(map[string]template.HTML)
+	out := &inlinedLibrary{
+		attribution: lib.Attribution,
+		set:         make(map[string]template.HTML),
+	}
 	if name != "fontawesome" {
 		for name, svg := range lib.Icons {
-			s.iconSet[name] = inlineSVG(svg)
+			out.set[name] = inlineSVG(svg)
 		}
-		return nil
+		return out, nil
 	}
-	s.iconStyles = make(map[string]map[string]template.HTML)
-	for _, style := range []string{"solid", "regular", "brands"} {
-		s.iconStyles[style] = make(map[string]template.HTML)
+	styles := []string{"solid", "regular", "brands"}
+	out.styles = make(map[string]map[string]template.HTML)
+	for _, style := range styles {
+		out.styles[style] = make(map[string]template.HTML)
 	}
 	for key, svg := range lib.Icons {
 		style, name, ok := strings.Cut(key, "/")
 		if !ok {
 			continue
 		}
-		markup := inlineSVG(svg)
-		s.iconStyles[style][name] = markup
+		out.styles[style][name] = inlineSVG(svg)
 	}
-	for _, style := range []string{"solid", "regular", "brands"} {
-		for name, markup := range s.iconStyles[style] {
-			if _, exists := s.iconSet[name]; !exists {
-				s.iconSet[name] = markup
+	for _, style := range styles {
+		for name, markup := range out.styles[style] {
+			if _, exists := out.set[name]; !exists {
+				out.set[name] = markup
 			}
 		}
 	}
-	return nil
+	return out, nil
 }
 
 // iconDirName is the directory an icon set is kept in beside documentation.
