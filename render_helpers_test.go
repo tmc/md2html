@@ -4,7 +4,7 @@ import "testing"
 
 func mustRenderMarkdown(t *testing.T, cfg Config, markdown, filePath string) string {
 	t.Helper()
-	html, err := markdownToHTMLWithContext(cfg, markdown, filePath)
+	html, err := markdownToHTML(cfg, markdown, filePath)
 	if err != nil {
 		t.Fatal(err)
 	}

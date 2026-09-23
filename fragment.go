@@ -76,7 +76,7 @@ func RenderFragment(markdown, filePath string, opts FragmentOptions) (Fragment, 
 		Format:      opts.Format,
 	}
 	theme, darkTheme, autoTheme := resolveMermaidThemes(opts.Frontmatter)
-	html, err := markdownToHTMLWithContext(cfg, markdown, filePath)
+	html, err := markdownToHTML(cfg, markdown, filePath)
 	if err != nil {
 		return Fragment{}, err
 	}

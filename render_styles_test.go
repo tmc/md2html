@@ -28,7 +28,7 @@ func TestRenderTemplateStylesTaskListCheckboxes(t *testing.T) {
 // reflows rather than breaking at the author's wrap column. GFM treats a
 // single newline as a space.
 func TestRenderNoHardWraps(t *testing.T) {
-	got, err := markdownToHTMLWithContext(Config{}, "one\ntwo\n\nthree  \nfour\n", "")
+	got, err := markdownToHTML(Config{}, "one\ntwo\n\nthree  \nfour\n", "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -301,7 +301,9 @@ func (s *preparedSite) markdownToHTML(markdown, filePath string) (string, error)
 	return buf.String(), nil
 }
 
-func markdownToHTMLWithContext(cfg Config, markdown, filePath string) (string, error) {
+// markdownToHTML renders markdown, the source of the page at filePath,
+// with a site prepared from cfg.
+func markdownToHTML(cfg Config, markdown, filePath string) (string, error) {
 	site, err := prepareSite(cfg, slog.Default())
 	if err != nil {
 		return "", err

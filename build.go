@@ -320,7 +320,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 			logger.Debug("Skipping draft", "file", file.RelPath)
 			continue
 		}
-		if err := processMarkdownFileWithOpts(file, sourceDir, outputDir, cssContent, site, pageOptions(file.RelPath)); err != nil {
+		if err := processMarkdownFile(file, sourceDir, outputDir, cssContent, site, pageOptions(file.RelPath)); err != nil {
 			logger.Error("Error processing file", "error", err, "file", file.RelPath)
 			renderErrors = append(renderErrors, fmt.Errorf("process %s: %w", file.RelPath, err))
 			continue
@@ -332,7 +332,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	if cfg.Index != "" {
 		indexFile := filepath.Join(sourceDir, cfg.Index)
 		if _, err := os.Stat(indexFile); err == nil {
-			if err := processIndexFileWithOpts(indexFile, outputDir, cssContent, site, pageOptions(cfg.Index)); err != nil {
+			if err := processIndexFile(indexFile, outputDir, cssContent, site, pageOptions(cfg.Index)); err != nil {
 				logger.Error("Error processing index file", "error", err, "file", indexFile)
 			} else {
 				logger.Debug("Processed index file", "file", indexFile)
@@ -351,7 +351,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 			}
 		default:
 			indexFile := filepath.Join(sourceDir, name)
-			if err := processIndexFileWithOpts(indexFile, outputDir, cssContent, site, pageOptions(name)); err != nil {
+			if err := processIndexFile(indexFile, outputDir, cssContent, site, pageOptions(name)); err != nil {
 				logger.Error("Error processing index file", "error", err, "file", indexFile)
 			} else {
 				logger.Debug("Processed index file", "file", indexFile)
@@ -392,7 +392,7 @@ func isDraft(path string) bool {
 	return false
 }
 
-func processMarkdownFileWithOpts(file markdownFile, sourceDir, outputDir, cssContent string, site *preparedSite, opts RenderOptions) error {
+func processMarkdownFile(file markdownFile, sourceDir, outputDir, cssContent string, site *preparedSite, opts RenderOptions) error {
 	cfg := site.config
 	sourcePath := filepath.Join(sourceDir, file.RelPath)
 
@@ -505,7 +505,7 @@ func documentTitle(doc DocumentData, filePath, fallback string) string {
 	return fallback
 }
 
-func processIndexFileWithOpts(indexPath, outputDir, cssContent string, site *preparedSite, opts RenderOptions) error {
+func processIndexFile(indexPath, outputDir, cssContent string, site *preparedSite, opts RenderOptions) error {
 	cfg := site.config
 	content, err := os.ReadFile(indexPath)
 	if err != nil {

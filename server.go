@@ -851,7 +851,7 @@ func (s *server) handleRaw(w http.ResponseWriter, r *http.Request) {
 	content := s.content
 	s.mu.RUnlock()
 
-	html, err := markdownToHTMLWithContext(s.config, content, "")
+	html, err := markdownToHTML(s.config, content, "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

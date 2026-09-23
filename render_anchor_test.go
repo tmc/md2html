@@ -19,7 +19,7 @@ func TestRenderHeadingIDs(t *testing.T) {
 		{"extension_console/extension_evaluate", "extension_console/extension_evaluate"},
 	}
 	for _, tt := range tests {
-		html, err := markdownToHTMLWithContext(Config{}, "## "+tt.heading+"\n", "")
+		html, err := markdownToHTML(Config{}, "## "+tt.heading+"\n", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -33,7 +33,7 @@ func TestRenderHeadingIDs(t *testing.T) {
 // TestRenderHeadingIDsDedupe checks that a repeated heading still gets
 // a distinct anchor rather than two elements sharing an id.
 func TestRenderHeadingIDsDedupe(t *testing.T) {
-	html, err := markdownToHTMLWithContext(Config{}, "## Setup\n\n## Setup\n", "")
+	html, err := markdownToHTML(Config{}, "## Setup\n\n## Setup\n", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestRenderTypography(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			html, err := markdownToHTMLWithContext(Config{}, tt.in, "")
+			html, err := markdownToHTML(Config{}, tt.in, "")
 			if err != nil {
 				t.Fatal(err)
 			}

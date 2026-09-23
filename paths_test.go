@@ -181,7 +181,7 @@ func TestRewriteLocalMarkdownReference(t *testing.T) {
 	}
 }
 
-func TestMarkdownToHTMLWithContextRewritesRelativeLinks(t *testing.T) {
+func TestMarkdownToHTMLRewritesRelativeLinks(t *testing.T) {
 	cfg := Config{HTMLExt: "html", Index: "index.md"}
 
 	html := mustRenderMarkdown(t, cfg, "[Install](../install.md)\n", "guides/getting-started.md")
@@ -193,7 +193,7 @@ func TestMarkdownToHTMLWithContextRewritesRelativeLinks(t *testing.T) {
 	}
 }
 
-func TestMarkdownToHTMLWithContextRewritesOKFRootLinks(t *testing.T) {
+func TestMarkdownToHTMLRewritesOKFRootLinks(t *testing.T) {
 	cfg := Config{Format: "okf", HTMLExt: "html", Index: "index.md"}
 
 	html := mustRenderMarkdown(t, cfg, "[Orders](/tables/orders.md?view=all#columns)\n", "datasets/sales.md")
@@ -202,14 +202,14 @@ func TestMarkdownToHTMLWithContextRewritesOKFRootLinks(t *testing.T) {
 	}
 }
 
-func TestMarkdownToHTMLWithContextLeavesRootLinksInDefaultFormat(t *testing.T) {
+func TestMarkdownToHTMLLeavesRootLinksInDefaultFormat(t *testing.T) {
 	html := mustRenderMarkdown(t, Config{HTMLExt: "html"}, "[Orders](/tables/orders.md)\n", "datasets/sales.md")
 	if !strings.Contains(html, `href="/tables/orders.md"`) {
 		t.Fatalf("rendered HTML rewrote ordinary root-relative href:\n%s", html)
 	}
 }
 
-func TestMarkdownToHTMLWithContextRewritesUnsafeHTMLLinks(t *testing.T) {
+func TestMarkdownToHTMLRewritesUnsafeHTMLLinks(t *testing.T) {
 	cfg := Config{AllowUnsafe: true, HTMLExt: "html", Index: "index.md"}
 
 	html := mustRenderMarkdown(t, cfg, `<div><a href="../install.md#x">Install</a></div>`, "guides/getting-started.md")
@@ -221,7 +221,7 @@ func TestMarkdownToHTMLWithContextRewritesUnsafeHTMLLinks(t *testing.T) {
 	}
 }
 
-func TestMarkdownToHTMLWithContextLeavesFencedHTMLLinks(t *testing.T) {
+func TestMarkdownToHTMLLeavesFencedHTMLLinks(t *testing.T) {
 	md := "Prose: <a href=\"./other.md\">x</a>\n\n```html\n<a href=\"./other.md\">in fence</a>\n```\n"
 	html := mustRenderMarkdown(t, Config{HTMLExt: "html", AllowUnsafe: true}, md, "docs/page.md")
 
@@ -245,7 +245,7 @@ func TestMarkdownToHTMLWithContextLeavesFencedHTMLLinks(t *testing.T) {
 	}
 }
 
-func TestMarkdownToHTMLWithContextRewritesUnsafeOKFRootLinks(t *testing.T) {
+func TestMarkdownToHTMLRewritesUnsafeOKFRootLinks(t *testing.T) {
 	cfg := Config{AllowUnsafe: true, Format: "okf", HTMLExt: "html", Index: "index.md"}
 
 	html := mustRenderMarkdown(t, cfg, `<div><a href="/tables/orders.md#columns">Orders</a></div>`, "datasets/sales.md")

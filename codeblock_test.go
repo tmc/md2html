@@ -31,7 +31,7 @@ func TestCodeLanguageLabel(t *testing.T) {
 // language stays unlabelled rather than gaining an empty strip.
 func TestRenderCodeBlockLanguage(t *testing.T) {
 	cfg := Config{}
-	html, err := markdownToHTMLWithContext(cfg, "```go\nfmt.Println()\n```\n", "")
+	html, err := markdownToHTML(cfg, "```go\nfmt.Println()\n```\n", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestRenderCodeBlockLanguage(t *testing.T) {
 		t.Errorf("language strip missing from:\n%s", html)
 	}
 
-	plain, err := markdownToHTMLWithContext(cfg, "```\nno language\n```\n", "")
+	plain, err := markdownToHTML(cfg, "```\nno language\n```\n", "")
 	if err != nil {
 		t.Fatal(err)
 	}
