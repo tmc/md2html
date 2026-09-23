@@ -31,7 +31,6 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		return err
 	}
 
-	// Handle positional arguments
 	if len(args) > 0 {
 		cfg.Source = args[0]
 	}
@@ -39,9 +38,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		return fmt.Errorf("too many positional arguments")
 	}
 
-	// Configure logger level based on verbose flag
 	if cfg.Verbose {
-		// Create a new logger with debug level when verbose is enabled
 		opts := &slog.HandlerOptions{
 			Level: slog.LevelDebug,
 		}
@@ -60,9 +57,6 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		runVet(site, logger)
 	}
 
-	// TODO: clean up handling stdin and choosing between modes
-
-	// If -html flag is provided, generate static HTML
 	if cfg.HTML != "" {
 		if cfg.Base != "" {
 			return fmt.Errorf("-base applies to server mode; static output is served at whatever prefix the host uses")
@@ -76,7 +70,6 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		return site.generateStaticHTML(ctx, logger)
 	}
 
-	// If -http flag is provided, run server
 	if cfg.HTTP != "" {
 		logger.Info("Starting server", "address", cfg.HTTP)
 		err := runServer(ctx, site, logger)
@@ -96,7 +89,6 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 			return fmt.Errorf("error reading file: %w", err)
 		}
 
-		// Convert to HTML
 		doc, err := parseFrontmatter(string(content))
 		if err != nil {
 			logger.Error("Error parsing frontmatter", "error", err)

@@ -70,10 +70,8 @@ func ParseSummary(content, htmlExt string) (*Navigation, error) {
 		}
 	}
 
-	// Build tree from flat items
 	nav.Items = buildNavTree(items)
 
-	// Build lookup map and flat list
 	nav.buildIndexes()
 
 	return nav, nil
@@ -107,7 +105,6 @@ func parseSummaryLine(line, htmlExt string) *NavItem {
 
 	// List item with link: * [Title](path.md) or - [Title](path.md)
 	if strings.HasPrefix(trimmed, "* ") || strings.HasPrefix(trimmed, "- ") {
-		// Calculate indent level from original line
 		indent := countIndent(line)
 		level := indent / 2 // 2 spaces per level
 
@@ -164,21 +161,17 @@ func buildNavTree(items []*NavItem) []*NavItem {
 			continue
 		}
 
-		// Pop stack until we find the right parent level
 		for len(stack) > 0 && stack[len(stack)-1].Level >= item.Level {
 			stack = stack[:len(stack)-1]
 		}
 
 		if len(stack) == 0 {
-			// Top-level item
 			roots = append(roots, item)
 		} else {
-			// Child of current stack top
 			parent := stack[len(stack)-1]
 			parent.Children = append(parent.Children, item)
 		}
 
-		// Push current item if it's not a group/sep (could have children)
 		if !item.IsGroup && !item.IsSep {
 			stack = append(stack, item)
 		}
@@ -218,13 +211,10 @@ func (n *Navigation) ForPage(currentPath string) *NavContext {
 		HasNav: true,
 	}
 
-	// Normalize path for lookup
 	currentPath = normalizePath(currentPath)
 
-	// Find current page
 	ctx.Current = n.ByPath[currentPath]
 
-	// Find prev/next in flat list
 	if ctx.Current != nil {
 		for i, item := range n.Flat {
 			if item.Path == currentPath {
@@ -238,7 +228,6 @@ func (n *Navigation) ForPage(currentPath string) *NavContext {
 			}
 		}
 
-		// Build breadcrumb (find ancestors)
 		ctx.Breadcrumb = n.findAncestors(currentPath)
 	}
 
@@ -272,13 +261,9 @@ func (n *Navigation) findAncestors(path string) []*NavItem {
 
 // normalizePath normalizes a file path for lookup.
 func normalizePath(path string) string {
-	// Remove leading ./
 	path = strings.TrimPrefix(path, "./")
-	// Remove leading /
 	path = strings.TrimPrefix(path, "/")
-	// Ensure .md extension for lookup
 	if !strings.HasSuffix(path, ".md") && !strings.HasSuffix(path, ".markdown") {
-		// Try to find with .md
 		path = path + ".md"
 	}
 	return path

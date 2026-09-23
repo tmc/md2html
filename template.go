@@ -206,7 +206,6 @@ func (s *preparedSite) renderTemplate(htmlContent, title, customCSS string, live
 		return "", fmt.Errorf("load templates: %w", err)
 	}
 
-	// Choose template based on whether we have navigation
 	name := "layout"
 	if opts.Nav != nil && opts.Nav.HasNav {
 		if tmpl.Lookup("docs-layout") != nil {

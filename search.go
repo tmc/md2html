@@ -131,7 +131,6 @@ func buildSearchIndexJS(sourceDir string, cfg Config) ([]byte, int, error) {
 
 // extractPlainText extracts plain text from markdown content
 func extractPlainText(markdown string) string {
-	// Simple approach: remove markdown syntax and extract text
 	lines := strings.Split(markdown, "\n")
 	var textParts []string
 
@@ -143,7 +142,6 @@ func extractPlainText(markdown string) string {
 			continue
 		}
 
-		// Remove heading markers
 		line = strings.TrimPrefix(line, "######")
 		line = strings.TrimPrefix(line, "#####")
 		line = strings.TrimPrefix(line, "####")
@@ -152,12 +150,10 @@ func extractPlainText(markdown string) string {
 		line = strings.TrimPrefix(line, "#")
 		line = strings.TrimSpace(line)
 
-		// Remove list markers
 		line = strings.TrimPrefix(line, "- ")
 		line = strings.TrimPrefix(line, "* ")
 		line = strings.TrimPrefix(line, "+ ")
 
-		// Remove markdown formatting
 		line = strings.ReplaceAll(line, "**", "")
 		line = strings.ReplaceAll(line, "*", "")
 		line = strings.ReplaceAll(line, "`", "")
@@ -194,7 +190,6 @@ func extractPlainText(markdown string) string {
 
 // extractBlurb extracts the first paragraph or sentence as a blurb
 func extractBlurb(content string) string {
-	// Remove frontmatter if present
 	if strings.HasPrefix(content, "---") {
 		parts := strings.SplitN(content, "---", 3)
 		if len(parts) >= 3 {
@@ -202,7 +197,6 @@ func extractBlurb(content string) string {
 		}
 	}
 
-	// Remove markdown headings
 	lines := strings.Split(content, "\n")
 	var textLines []string
 	for _, line := range lines {
@@ -210,18 +204,15 @@ func extractBlurb(content string) string {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		// Remove markdown links, bold, italic
 		line = strings.ReplaceAll(line, "**", "")
 		line = strings.ReplaceAll(line, "*", "")
 		line = strings.ReplaceAll(line, "`", "")
 
-		// Simple link removal
 		for strings.Contains(line, "[") && strings.Contains(line, "]") {
 			start := strings.Index(line, "[")
 			end := strings.Index(line, "]")
 			if start < end {
 				linkText := line[start+1 : end]
-				// Remove URL part if present
 				if urlStart := strings.Index(line[end:], "("); urlStart != -1 {
 					urlEnd := strings.Index(line[end+urlStart:], ")")
 					if urlEnd != -1 {
@@ -254,15 +245,12 @@ func extractBlurb(content string) string {
 
 // convertPathToURL converts a file path to a URL
 func convertPathToURL(relPath string, htmlExt string) string {
-	// Remove .md extension
 	url := strings.TrimSuffix(relPath, ".md")
 
-	// Add HTML extension if configured
 	if htmlExt != "" {
 		url += "." + htmlExt
 	}
 
-	// Ensure it starts with /
 	if !strings.HasPrefix(url, "/") {
 		url = "/" + url
 	}
@@ -276,7 +264,6 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 
-	// Try to break at word boundary
 	truncated := s[:maxLen]
 	if lastSpace := strings.LastIndex(truncated, " "); lastSpace > maxLen/2 {
 		truncated = s[:lastSpace]

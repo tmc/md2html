@@ -32,7 +32,6 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 		shutdownCh: make(chan struct{}),
 	}
 
-	// Initialize version management if enabled
 	if cfg.Versions {
 		// Versions come from the repository the base directory is in,
 		// not from the source tree, which may be a subdirectory of it or
@@ -51,7 +50,6 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 		}
 	}
 
-	// Load JSON data if provided
 	if cfg.DataJSON != "" {
 		jsonData, err := loadJSONFile(cfg.DataJSON)
 		if err != nil {
@@ -62,7 +60,6 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 		}
 	}
 
-	// Load navigation from SUMMARY.md or build it from the markdown tree.
 	if cfg.Nav {
 		root, err := sourceRoot(s.base, cfg.Source)
 		if err == nil {
@@ -88,7 +85,6 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 		}
 	}
 
-	// Load initial content
 	if cfg.Source != "" && cfg.Source != "-" {
 		content, err := os.ReadFile(cfg.Source)
 		if err != nil {
@@ -101,7 +97,6 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 		}
 	}
 
-	// Load CSS if provided
 	if cfg.CSS != "" {
 		css, err := os.ReadFile(cfg.CSS)
 		if err != nil {
@@ -417,7 +412,6 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract version from URL if versioning is enabled
 	var requestedVersion string
 	var filePath string
 	if s.config.Versions && len(s.versions) > 0 {
@@ -428,7 +422,6 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			filePath = strings.Join(parts[2:], "/")
 		} else {
 			filePath = strings.Join(parts, "/")
-			// Use default version or current
 			if s.config.VersionDefault != "" {
 				requestedVersion = s.config.VersionDefault
 			} else if len(s.versions) > 0 {
@@ -439,7 +432,6 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		filePath = strings.TrimPrefix(r.URL.Path, "/")
 	}
 
-	// Check if root path and index file is specified
 	if (filePath == "" || filePath == "/") && s.config.Index != "" {
 		var fileContent []byte
 		var err error
@@ -473,7 +465,6 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Check if a specific file is requested via clean URL path
 	if filePath != "" && filePath != "/" {
 		cleanPath, err := secureURLPath(filePath)
 		if err != nil {
@@ -494,12 +485,10 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Try the path as-is if it ends with .md
 		var candidates []string
 		if strings.HasSuffix(cleanPath, ".md") || strings.HasSuffix(cleanPath, ".markdown") {
 			candidates = append(candidates, cleanPath)
 		} else {
-			// Try adding .md extension
 			candidates = append(candidates, cleanPath+".md")
 			candidates = append(candidates, cleanPath+".markdown")
 		}
@@ -917,7 +906,6 @@ func (s *server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	// Create client channel
 	clientChan := make(chan string, 10)
 
 	s.clientsMu.Lock()
@@ -930,19 +918,13 @@ func (s *server) handleSSE(w http.ResponseWriter, r *http.Request) {
 		s.clientsMu.Unlock()
 	}()
 
-	// Keep connection alive
 	fmt.Fprintf(w, "data: connected\n\n")
 	w.(http.Flusher).Flush()
 
-	// Create a local copy of shutdown channel to avoid panic
-	shutdownCh := s.shutdownCh
-
-	// Listen for updates
 	for {
 		select {
 		case msg, ok := <-clientChan:
 			if !ok {
-				// Channel closed, server shutting down
 				fmt.Fprintf(w, "data: shutdown\n\n")
 				w.(http.Flusher).Flush()
 				return
@@ -953,14 +935,13 @@ func (s *server) handleSSE(w http.ResponseWriter, r *http.Request) {
 			// The server cancels requests when it stops. Say so, rather
 			// than leaving the browser to notice the stream went quiet.
 			select {
-			case <-shutdownCh:
+			case <-s.shutdownCh:
 				fmt.Fprintf(w, "data: shutdown\n\n")
 				w.(http.Flusher).Flush()
 			default:
 			}
 			return
-		case <-shutdownCh:
-			// Server is shutting down
+		case <-s.shutdownCh:
 			fmt.Fprintf(w, "data: shutdown\n\n")
 			w.(http.Flusher).Flush()
 			return
@@ -984,7 +965,6 @@ func (s *server) notifyClients() {
 	}
 }
 
-// Run starts the server and handles graceful shutdown
 // registerEndpoints registers the routes the rendered pages call by
 // absolute URL: live reload, raw Markdown, the versions API, and the
 // embedded search and JSON schema assets. The search assets are
@@ -1026,7 +1006,6 @@ func (s *server) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Set up file watching
 	if watch, err := watchEnabled(s.config.Watch, s.config.Source); err != nil {
 		return err
 	} else if watch {
@@ -1041,7 +1020,6 @@ func (s *server) Run(ctx context.Context) error {
 		}()
 	}
 
-	// Setup HTTP handlers
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleIndex)
 	s.registerEndpoints(mux)
@@ -1060,10 +1038,8 @@ func (s *server) Run(ctx context.Context) error {
 		BaseContext: func(net.Listener) context.Context { return reqCtx },
 	}
 
-	// Format URL for display and browser opening
 	displayURL := formatServerURL(s.config.HTTP) + base + "/"
 
-	// Open browser if requested
 	if s.config.Open {
 		wg.Add(1)
 		go func() {

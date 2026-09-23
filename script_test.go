@@ -13,12 +13,14 @@ import (
 var borderline = flag.Bool("include-borderline-tests", false, "run borderline tests that may be slow or push limits")
 
 func TestScripts(t *testing.T) {
-	exe, _ := os.Executable()
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
 	engine := script.NewEngine()
 	engine.Cmds["md2html"] = scripttest.BackgroundCmd(exe, nil, 0)
 	engine.Cmds["curl"] = script.Program("curl", nil, 0)
 	engine.Cmds["wait-port"] = scripttest.WaitPortCmd()
-	// remove Exec:
 	delete(engine.Cmds, "exec")
 
 	env := []string{

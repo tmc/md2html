@@ -58,14 +58,12 @@ func (gvm *GitVersionManager) ListVersions(includeBranches bool, tagPattern stri
 func (gvm *GitVersionManager) listVersions(ctx context.Context, includeBranches bool, tagPattern string) ([]GitVersion, error) {
 	var versions []GitVersion
 
-	// Get tags
 	tags, err := gvm.listTags(ctx, tagPattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tags: %w", err)
 	}
 	versions = append(versions, tags...)
 
-	// Get branches if requested
 	if includeBranches {
 		branches, err := gvm.listBranches(ctx)
 		if err != nil {
@@ -74,7 +72,6 @@ func (gvm *GitVersionManager) listVersions(ctx context.Context, includeBranches 
 		versions = append(versions, branches...)
 	}
 
-	// Sort versions (tags first, then alphabetically)
 	sort.Slice(versions, func(i, j int) bool {
 		if versions[i].IsTag != versions[j].IsTag {
 			return versions[i].IsTag // tags before branches
@@ -137,7 +134,6 @@ func (gvm *GitVersionManager) listBranches(ctx context.Context) ([]GitVersion, e
 			continue
 		}
 
-		// Remove 'origin/' prefix
 		branchName := strings.TrimPrefix(line, "origin/")
 
 		commit, err := gvm.commitHash(ctx, line)
@@ -171,7 +167,6 @@ func (gvm *GitVersionManager) GetFileContent(version, filePath string) ([]byte, 
 }
 
 func (gvm *GitVersionManager) fileContent(ctx context.Context, version, filePath string) ([]byte, error) {
-	// Resolve version to a git ref
 	ref := version
 	if !strings.HasPrefix(ref, "refs/") {
 		// Try as tag first
@@ -180,7 +175,6 @@ func (gvm *GitVersionManager) fileContent(ctx context.Context, version, filePath
 		}
 	}
 
-	// Use git show to get file content
 	output, err := gvm.git(ctx, "show", ref+":"+filePath).Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file content for %s at %s: %w", filePath, version, err)
@@ -215,7 +209,6 @@ func (gvm *GitVersionManager) listFiles(ctx context.Context, version, pattern st
 			continue
 		}
 
-		// Filter by pattern if provided
 		if pattern != "" {
 			matched, err := filepath.Match(pattern, filepath.Base(line))
 			if err != nil || !matched {
@@ -235,12 +228,10 @@ func (gvm *GitVersionManager) GetCurrentVersion() (string, error) {
 }
 
 func (gvm *GitVersionManager) currentVersion(ctx context.Context) (string, error) {
-	// Try to get current tag
 	if output, err := gvm.git(ctx, "describe", "--tags", "--exact-match").Output(); err == nil {
 		return strings.TrimSpace(string(output)), nil
 	}
 
-	// Fall back to branch name
 	output, err := gvm.git(ctx, "rev-parse", "--abbrev-ref", "HEAD").Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current version: %w", err)

@@ -96,7 +96,6 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 				continue
 			}
 
-			// Follow symlinks
 			if info.Mode()&os.ModeSymlink != 0 {
 				resolved, err := filepath.EvalSymlinks(realPath)
 				if err != nil {
@@ -198,7 +197,6 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 
 	logger.Info("Generating static HTML", "source", sourceDir, "output", outputDir)
 
-	// Create output directory
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
@@ -213,7 +211,6 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		logger.Info("Copied assets", "count", assetCount)
 	}
 
-	// Load JSON data if provided
 	var jsonData any
 	if cfg.DataJSON != "" {
 		var err error
@@ -225,7 +222,6 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		}
 	}
 
-	// Load CSS if provided
 	var cssContent string
 	if cfg.CSS != "" {
 		css, err := os.ReadFile(cfg.CSS)
@@ -237,7 +233,6 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		}
 	}
 
-	// Find all markdown files
 	files, err := findMarkdownFiles(sourceDir, 100) // Use high depth for static generation
 	if err != nil {
 		return fmt.Errorf("failed to find markdown files: %w", err)
@@ -248,7 +243,6 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	var nav *Navigation
 	var sInfo siteInfo
 	if cfg.Nav {
-		// Load navigation from SUMMARY.md or build it from the markdown tree.
 		htmlExt := ""
 		if cfg.HTMLExt != "" {
 			htmlExt = "." + cfg.HTMLExt
@@ -292,10 +286,8 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		}
 	}
 
-	// Process each markdown file
 	var renderErrors []error
 	for _, file := range files {
-		// Check for draft frontmatter and skip unless drafts are requested
 		if !cfg.Drafts && isDraft(filepath.Join(sourceDir, file.RelPath)) {
 			logger.Debug("Skipping draft", "file", file.RelPath)
 			continue
@@ -329,7 +321,6 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		logger.Debug("Generated file", "file", file.RelPath)
 	}
 
-	// Handle index file if specified
 	if cfg.Index != "" {
 		indexFile := filepath.Join(sourceDir, cfg.Index)
 		if _, err := os.Stat(indexFile); err == nil {
@@ -361,7 +352,6 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 			}
 		}
 	} else {
-		// Generate table of contents as index.html
 		if err := generateTOCIndex(outputDir, files, cssContent, site, assets); err != nil {
 			logger.Error("Error generating TOC index", "error", err)
 		} else {
@@ -559,7 +549,6 @@ func processIndexFileWithOpts(indexPath, outputDir, cssContent string, site *pre
 
 func generateTOCIndex(outputDir string, files []markdownFile, cssContent string, site *preparedSite, assets map[string]string) error {
 	cfg := site.config
-	// Generate table of contents markdown
 	var buf strings.Builder
 	buf.WriteString(fmt.Sprintf("# %s\n\n", listingTitle("")))
 
@@ -573,20 +562,17 @@ func generateTOCIndex(outputDir string, files []markdownFile, cssContent string,
 		}
 	}
 
-	// Convert to HTML
 	htmlContent, err := site.markdownToHTML(buf.String(), "")
 	if err != nil {
 		return err
 	}
 
-	// Render with template
 	doc := DocumentData{Content: buf.String(), Frontmatter: make(map[string]any)}
 	finalHTML, err := site.renderTemplate(htmlContent, listingTitle(""), cssContent, false, doc.Frontmatter, RenderOptions{Assets: assets, SiteTitle: cfg.Title})
 	if err != nil {
 		return err
 	}
 
-	// Write index.html
 	indexOutputPath := filepath.Join(outputDir, "index.html")
 	return os.WriteFile(indexOutputPath, []byte(finalHTML), 0644)
 }

@@ -557,15 +557,12 @@ func loadJSONFile(filename string) (any, error) {
 }
 
 func parseFrontmatter(content string) (DocumentData, error) {
-	// Use goldmark to parse frontmatter
 	md := goldmark.New(goldmark.WithExtensions(meta.Meta))
 	context := parser.NewContext(parser.WithIDs(anchor.NewIDs()))
 
-	// Parse to extract metadata
 	source := []byte(content)
 	tree := md.Parser().Parse(text.NewReader(source), parser.WithContext(context))
 
-	// Get metadata
 	metaData := meta.Get(context)
 	if metaData == nil {
 		metaData = make(map[string]any)

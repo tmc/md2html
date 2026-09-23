@@ -132,7 +132,6 @@ func (l *Loader) ParseMD(content string) (*MarkdownDoc, error) {
 		Frontmatter: make(map[string]any),
 	}
 
-	// Create goldmark parser with extensions
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,
@@ -140,13 +139,11 @@ func (l *Loader) ParseMD(content string) (*MarkdownDoc, error) {
 		),
 	)
 
-	// Parse the document
 	ctx := parser.NewContext(parser.WithIDs(anchor.NewIDs()))
 	source := []byte(content)
 	reader := text.NewReader(source)
 	tree := md.Parser().Parse(reader, parser.WithContext(ctx))
 
-	// Extract frontmatter
 	if metadata := meta.Get(ctx); metadata != nil {
 		doc.Frontmatter = metadata
 		if title, ok := metadata["title"].(string); ok {
@@ -154,10 +151,8 @@ func (l *Loader) ParseMD(content string) (*MarkdownDoc, error) {
 		}
 	}
 
-	// Walk the AST to extract structure
 	l.extractStructure(doc, tree, source)
 
-	// Render to HTML
 	var buf bytes.Buffer
 	if err := md.Renderer().Render(&buf, source, tree); err != nil {
 		return nil, err
@@ -209,7 +204,6 @@ func (l *Loader) extractStructure(doc *MarkdownDoc, tree ast.Node, source []byte
 			if len(listStack) > 0 {
 				currentIndent = len(listStack) - 1
 			}
-			// Extract list item structure
 			item := l.extractListItem(node, source, currentIndent)
 			if item != nil {
 				doc.Lists = append(doc.Lists, *item)
@@ -219,7 +213,6 @@ func (l *Loader) extractStructure(doc *MarkdownDoc, tree ast.Node, source []byte
 		return ast.WalkContinue, nil
 	})
 
-	// Build nested list structure from flat items
 	doc.Lists = buildListTree(doc.Lists)
 }
 
@@ -229,7 +222,6 @@ func (l *Loader) extractListItem(node *ast.ListItem, source []byte, indent int) 
 		Indent: indent,
 	}
 
-	// Find link or text in the list item
 	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
 		if para, ok := child.(*ast.Paragraph); ok {
 			for pchild := para.FirstChild(); pchild != nil; pchild = pchild.NextSibling() {
@@ -262,17 +254,14 @@ func buildListTree(items []ListItem) []ListItem {
 	for i := range items {
 		item := items[i]
 
-		// Pop stack until we find parent level
 		for len(stack) > 0 && stack[len(stack)-1].Indent >= item.Indent {
 			stack = stack[:len(stack)-1]
 		}
 
 		if len(stack) == 0 {
-			// Top-level item
 			roots = append(roots, item)
 			stack = append(stack, &roots[len(roots)-1])
 		} else {
-			// Child of current stack top
 			parent := stack[len(stack)-1]
 			parent.Children = append(parent.Children, item)
 			stack = append(stack, &parent.Children[len(parent.Children)-1])

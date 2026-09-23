@@ -290,7 +290,6 @@ func Test(t *testing.T, ctx context.Context, engine *script.Engine, env []string
 				t.Fatal(err)
 			}
 
-			// Unpack archive.
 			a, err := txtar.ParseFile(file)
 			if err != nil {
 				t.Fatal(err)
@@ -309,7 +308,6 @@ func Test(t *testing.T, ctx context.Context, engine *script.Engine, env []string
 				t.Fatal(err)
 			}
 
-			// Use scripttest.Run to execute the test
 			scripttest.Run(t, engine, s, file, bytes.NewReader([]byte(scriptText)))
 		})
 	}
