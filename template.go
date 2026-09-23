@@ -30,7 +30,7 @@ func loadAllTemplates(site *preparedSite) (*template.Template, error) {
 			// directory, which Run leaves alone.
 			data, err := loadJSONFile(resolveAgainst(site.base, filename))
 			if err != nil {
-				slog.Default().Error("Error loading JSON", "file", filename, "error", err)
+				slog.Default().Error("error loading JSON", "file", filename, "error", err)
 				return nil
 			}
 			return data
@@ -69,7 +69,7 @@ func loadAllTemplates(site *preparedSite) (*template.Template, error) {
 	}).ParseFS(templates, "templates/*.html", "templates/*/*.html")
 
 	if err != nil {
-		slog.Default().Error("Error parsing embedded templates", "error", err)
+		slog.Default().Error("error parsing embedded templates", "error", err)
 		tmpl = template.New("root")
 	}
 

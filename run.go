@@ -71,7 +71,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	}
 
 	if cfg.HTTP != "" {
-		logger.Info("Starting server", "address", cfg.HTTP)
+		logger.Info("starting server", "address", cfg.HTTP)
 		err := runServer(ctx, site, logger)
 		// Don't treat context cancellation as an error (graceful shutdown)
 		if err == context.Canceled {
@@ -91,7 +91,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 
 		doc, err := parseFrontmatter(string(content))
 		if err != nil {
-			logger.Error("Error parsing frontmatter", "error", err)
+			logger.Error("error parsing frontmatter", "error", err)
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
 

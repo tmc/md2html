@@ -53,13 +53,13 @@ func copySourceAssets(sourceDir, outputDir string, logger *slog.Logger) (int, er
 	}
 	ignore, err := loadIgnoreSet(source)
 	if err != nil {
-		logger.Warn("Skipping the ignore file", "error", err)
+		logger.Warn("skipping the ignore file", "error", err)
 	}
 
 	var copied int
 	err = filepath.WalkDir(source, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
-			logger.Warn("Skipping path", "path", p, "error", err)
+			logger.Warn("skipping path", "path", p, "error", err)
 			return nil
 		}
 		name := d.Name()
@@ -86,7 +86,7 @@ func copySourceAssets(sourceDir, outputDir string, logger *slog.Logger) (int, er
 			return nil
 		}
 		if err := copyFile(p, filepath.Join(output, rel)); err != nil {
-			logger.Warn("Skipping asset", "path", rel, "error", err)
+			logger.Warn("skipping asset", "path", rel, "error", err)
 			return nil
 		}
 		copied++

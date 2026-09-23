@@ -40,23 +40,23 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 		if s.versionMgr.isRepo(ctx) {
 			versions, err := s.versionMgr.versions(ctx, cfg.VersionBranches, cfg.VersionPattern)
 			if err != nil {
-				logger.Error("Error listing versions", "error", err)
+				logger.Error("error listing versions", "error", err)
 			} else {
 				s.versions = versions
-				logger.Info("Loaded versions", "count", len(versions))
+				logger.Info("loaded versions", "count", len(versions))
 			}
 		} else {
-			logger.Warn("Versions enabled but not in a git repository")
+			logger.Warn("versions enabled but not in a git repository")
 		}
 	}
 
 	if cfg.DataJSON != "" {
 		jsonData, err := loadJSONFile(cfg.DataJSON)
 		if err != nil {
-			logger.Error("Error loading JSON data file", "error", err, "file", cfg.DataJSON)
+			logger.Error("error loading JSON data file", "error", err, "file", cfg.DataJSON)
 		} else {
 			s.jsonData = jsonData
-			logger.Debug("Loaded JSON data", "file", cfg.DataJSON)
+			logger.Debug("loaded JSON data", "file", cfg.DataJSON)
 		}
 	}
 
@@ -74,12 +74,12 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 			}
 			nav, site, err := navigationForDir(root, htmlExt)
 			if err != nil {
-				logger.Error("Error loading navigation", "error", err)
+				logger.Error("error loading navigation", "error", err)
 			} else if nav != nil && len(nav.Items) > 0 {
 				s.nav = nav
 				s.site = site
 				s.title = siteTitle(s.config.Title, site.Name)
-				logger.Info("Loaded navigation", "pages", len(nav.Flat))
+				logger.Info("loaded navigation", "pages", len(nav.Flat))
 				s.site.Stars = s.prepared.repoStars(ctx, site.Repo, logger)
 			}
 		}
@@ -88,22 +88,22 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 	if cfg.Source != "" && cfg.Source != "-" {
 		content, err := os.ReadFile(cfg.Source)
 		if err != nil {
-			logger.Error("Error reading initial file", "error", err, "file", cfg.Source)
+			logger.Error("error reading initial file", "error", err, "file", cfg.Source)
 		} else {
 			s.mu.Lock()
 			s.content = string(content)
 			s.mu.Unlock()
-			logger.Debug("Loaded initial content", "file", cfg.Source)
+			logger.Debug("loaded initial content", "file", cfg.Source)
 		}
 	}
 
 	if cfg.CSS != "" {
 		css, err := os.ReadFile(cfg.CSS)
 		if err != nil {
-			logger.Error("Error reading CSS file", "error", err, "file", cfg.CSS)
+			logger.Error("error reading CSS file", "error", err, "file", cfg.CSS)
 		} else {
 			s.cssContent = string(css)
-			logger.Debug("Loaded CSS content", "file", cfg.CSS)
+			logger.Debug("loaded CSS content", "file", cfg.CSS)
 		}
 	}
 
@@ -214,7 +214,7 @@ func (s *server) startWatching() (*fsnotify.Watcher, error) {
 		s.watchMu.Lock()
 		n := len(s.watched)
 		s.watchMu.Unlock()
-		s.logger.Debug("Watch setup complete", "paths", n)
+		s.logger.Debug("watch setup complete", "paths", n)
 	}
 
 	return watcher, nil
@@ -252,7 +252,7 @@ func (s *server) watchPath(path string) error {
 	}
 	s.watched[abs] = true
 	if s.config.Verbose {
-		s.logger.Debug("Watching path", "path", abs)
+		s.logger.Debug("watching path", "path", abs)
 	}
 	return nil
 }
@@ -272,7 +272,7 @@ func (s *server) watchEvents(ctx context.Context, watcher *fsnotify.Watcher) {
 			if !ok {
 				return
 			}
-			s.logger.Error("Watcher error", "error", err)
+			s.logger.Error("watcher error", "error", err)
 		case <-ctx.Done():
 			return
 		case <-s.shutdownCh:
@@ -286,7 +286,7 @@ func (s *server) handleWatchEvent(ctx context.Context, event fsnotify.Event) {
 		return
 	}
 	if s.config.Verbose {
-		s.logger.Debug("Watch event", "op", event.Op.String(), "path", event.Name)
+		s.logger.Debug("watch event", "op", event.Op.String(), "path", event.Name)
 	}
 
 	if samePath(event.Name, s.inputPath) {
@@ -342,11 +342,11 @@ func (s *server) reloadNavigation(ctx context.Context) {
 	}
 	nav, site, err := navigationForDir(s.navRoot, htmlExt)
 	if err != nil {
-		s.logger.Warn("Could not reload navigation", "error", err)
+		s.logger.Warn("could not reload navigation", "error", err)
 		return
 	}
 	if nav == nil || len(nav.Items) == 0 {
-		s.logger.Warn("Reloaded navigation is empty; keeping the previous one")
+		s.logger.Warn("reloaded navigation is empty; keeping the previous one")
 		return
 	}
 
@@ -369,7 +369,7 @@ func (s *server) reloadNavigation(ctx context.Context) {
 	s.title = siteTitle(s.navTitle, site.Name)
 	s.mu.Unlock()
 
-	s.logger.Info("Reloaded navigation", "pages", len(nav.Flat))
+	s.logger.Info("reloaded navigation", "pages", len(nav.Flat))
 }
 
 // siteTitle returns the effective site title. Navigation reload can
@@ -442,7 +442,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if s.config.Verbose {
-			s.logger.Warn("Index file not found, falling back to directory listing", "file", s.config.Index)
+			s.logger.Warn("index file not found, falling back to directory listing", "file", s.config.Index)
 		}
 	}
 
@@ -534,7 +534,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 func (s *server) serveMarkdown(ctx context.Context, w http.ResponseWriter, content, filePath, css, version string) {
 	doc, err := parseFrontmatter(content)
 	if err != nil {
-		s.logger.Error("Error parsing frontmatter", "file", filePath, "error", err)
+		s.logger.Error("error parsing frontmatter", "file", filePath, "error", err)
 		doc = DocumentData{Content: content, Frontmatter: make(map[string]any)}
 	}
 	title := s.siteTitle()
@@ -909,7 +909,7 @@ func (s *server) notifyClients() {
 	defer s.clientsMu.RUnlock()
 
 	if s.config.Verbose {
-		s.logger.Debug("Notifying clients", "count", len(s.clients))
+		s.logger.Debug("notifying clients", "count", len(s.clients))
 	}
 
 	for ch := range s.clients {
@@ -1000,9 +1000,9 @@ func (s *server) Run(ctx context.Context) error {
 		go func() {
 			defer wg.Done()
 			if !openBrowser(ctx, displayURL) {
-				s.logger.Warn("Failed to open browser", "url", displayURL)
+				s.logger.Warn("failed to open browser", "url", displayURL)
 			} else {
-				s.logger.Debug("Opened browser", "url", displayURL)
+				s.logger.Debug("opened browser", "url", displayURL)
 			}
 		}()
 	}
@@ -1021,12 +1021,12 @@ func (s *server) Run(ctx context.Context) error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			s.logger.Error("Server shutdown error", "error", err)
+			s.logger.Error("server shutdown error", "error", err)
 		}
 	}()
 
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-		s.logger.Error("Server error", "error", err)
+		s.logger.Error("server error", "error", err)
 		return fmt.Errorf("server error: %w", err)
 	}
 

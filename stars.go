@@ -97,7 +97,7 @@ func (s *preparedSite) repoStars(ctx context.Context, repo string, logger *slog.
 	n, err := fetchStars(ctx, s.starsAPI, repo)
 	if err != nil {
 		if logger != nil {
-			logger.Warn("Could not fetch repository stars", "repo", repo, "error", err)
+			logger.Warn("could not fetch repository stars", "repo", repo, "error", err)
 		}
 		return ""
 	}

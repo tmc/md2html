@@ -33,7 +33,7 @@ func (s *server) handleVersionsAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Error("Error encoding versions JSON", "error", err)
+		s.logger.Error("error encoding versions JSON", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }

@@ -76,7 +76,7 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 	// function.
 	ignore, err := loadIgnoreSet(rootDir)
 	if err != nil {
-		slog.Default().Warn("Skipping the ignore file", "error", err)
+		slog.Default().Warn("skipping the ignore file", "error", err)
 	}
 
 	// walkDir walks a directory rooted at realDir, mapping discovered paths
@@ -133,7 +133,7 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 					// Skip subdirectories we cannot read (e.g. permission
 					// denied on system directories like .Trashes) rather than
 					// aborting the entire listing.
-					slog.Default().Warn("Skipping path", "path", apparentPath, "error", err)
+					slog.Default().Warn("skipping path", "path", apparentPath, "error", err)
 				}
 				continue
 			}
@@ -187,7 +187,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 
 	outputDir := cfg.HTML
 
-	logger.Info("Generating static HTML", "source", sourceDir, "output", outputDir)
+	logger.Info("generating static HTML", "source", sourceDir, "output", outputDir)
 
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
@@ -197,10 +197,10 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	// name (llms.txt, the search assets) is what survives.
 	assetCount, err := copySourceAssets(sourceDir, outputDir, logger)
 	if err != nil {
-		logger.Error("Error copying assets", "error", err)
+		logger.Error("error copying assets", "error", err)
 	}
 	if assetCount > 0 {
-		logger.Info("Copied assets", "count", assetCount)
+		logger.Info("copied assets", "count", assetCount)
 	}
 
 	var jsonData any
@@ -208,9 +208,9 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		var err error
 		jsonData, err = loadJSONFile(cfg.DataJSON)
 		if err != nil {
-			logger.Error("Error loading JSON data file", "error", err, "file", cfg.DataJSON)
+			logger.Error("error loading JSON data file", "error", err, "file", cfg.DataJSON)
 		} else {
-			logger.Debug("Loaded JSON data", "file", cfg.DataJSON)
+			logger.Debug("loaded JSON data", "file", cfg.DataJSON)
 		}
 	}
 
@@ -218,10 +218,10 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	if cfg.CSS != "" {
 		css, err := os.ReadFile(cfg.CSS)
 		if err != nil {
-			logger.Error("Error reading CSS file", "error", err, "file", cfg.CSS)
+			logger.Error("error reading CSS file", "error", err, "file", cfg.CSS)
 		} else {
 			cssContent = string(css)
-			logger.Debug("Loaded CSS content", "file", cfg.CSS)
+			logger.Debug("loaded CSS content", "file", cfg.CSS)
 		}
 	}
 
@@ -230,7 +230,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		return fmt.Errorf("failed to find markdown files: %w", err)
 	}
 
-	logger.Info("Found markdown files to process", "count", len(files))
+	logger.Info("found markdown files to process", "count", len(files))
 	site.links = newSiteLinks(sourceDir, files)
 
 	var nav *Navigation
@@ -243,11 +243,11 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		var err error
 		nav, sInfo, err = navigationForDir(sourceDir, htmlExt)
 		if err != nil {
-			logger.Error("Error loading navigation", "error", err)
+			logger.Error("error loading navigation", "error", err)
 		} else if nav != nil && len(nav.Items) > 0 {
 			cfg.Title = siteTitle(cfg.Title, sInfo.Name)
 			site.config.Title = cfg.Title
-			logger.Info("Loaded navigation", "pages", len(nav.Flat))
+			logger.Info("loaded navigation", "pages", len(nav.Flat))
 			sInfo.Stars = site.repoStars(ctx, sInfo.Repo, logger)
 		}
 	}
@@ -266,15 +266,15 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	if cfg.Search {
 		body, n, err := buildSearchIndexJS(sourceDir, cfg)
 		if err != nil {
-			logger.Error("Error generating search index", "error", err)
+			logger.Error("error generating search index", "error", err)
 		} else {
 			var writeErr error
 			assets, writeErr = writeFingerprintedSearchAssets(outputDir, body)
 			if writeErr != nil {
-				logger.Error("Error writing search assets", "error", writeErr)
+				logger.Error("error writing search assets", "error", writeErr)
 				assets = map[string]string{}
 			} else {
-				logger.Info("Generated search index", "documents", n)
+				logger.Info("generated search index", "documents", n)
 			}
 		}
 	}
@@ -310,15 +310,15 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	rendered := make(map[string]bool)
 	for _, file := range files {
 		if !cfg.Drafts && isDraft(filepath.Join(sourceDir, file.RelPath)) {
-			logger.Debug("Skipping draft", "file", file.RelPath)
+			logger.Debug("skipping draft", "file", file.RelPath)
 			continue
 		}
 		if err := processMarkdownFile(file, sourceDir, outputDir, cssContent, site, pageOptions(file.RelPath)); err != nil {
-			logger.Error("Error processing file", "error", err, "file", file.RelPath)
+			logger.Error("error processing file", "error", err, "file", file.RelPath)
 			renderErrors = append(renderErrors, fmt.Errorf("process %s: %w", file.RelPath, err))
 			continue
 		}
-		logger.Debug("Generated file", "file", file.RelPath)
+		logger.Debug("generated file", "file", file.RelPath)
 		rendered[filepath.ToSlash(file.RelPath)] = true
 	}
 
@@ -326,9 +326,9 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		indexFile := filepath.Join(sourceDir, cfg.Index)
 		if _, err := os.Stat(indexFile); err == nil {
 			if err := processIndexFile(indexFile, outputDir, cssContent, site, pageOptions(cfg.Index)); err != nil {
-				logger.Error("Error processing index file", "error", err, "file", indexFile)
+				logger.Error("error processing index file", "error", err, "file", indexFile)
 			} else {
-				logger.Debug("Processed index file", "file", indexFile)
+				logger.Debug("processed index file", "file", indexFile)
 			}
 		}
 	} else {
@@ -338,16 +338,16 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		case "index.md", "index.markdown":
 		case "":
 			if err := generateTOCIndex(outputDir, files, cssContent, site, assets); err != nil {
-				logger.Error("Error generating TOC index", "error", err)
+				logger.Error("error generating TOC index", "error", err)
 			} else {
-				logger.Debug("Generated TOC index")
+				logger.Debug("generated TOC index")
 			}
 		default:
 			indexFile := filepath.Join(sourceDir, name)
 			if err := processIndexFile(indexFile, outputDir, cssContent, site, pageOptions(name)); err != nil {
-				logger.Error("Error processing index file", "error", err, "file", indexFile)
+				logger.Error("error processing index file", "error", err, "file", indexFile)
 			} else {
-				logger.Debug("Processed index file", "file", indexFile)
+				logger.Debug("processed index file", "file", indexFile)
 			}
 		}
 	}
@@ -355,16 +355,16 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	if cfg.LLMS {
 		n, err := generateLLMSFiles(sourceDir, outputDir, files, nav, cfg)
 		if err != nil {
-			logger.Error("Error generating llms files", "error", err)
+			logger.Error("error generating llms files", "error", err)
 		} else {
-			logger.Info("Generated llms files", "documents", n)
+			logger.Info("generated llms files", "documents", n)
 		}
 	}
 	if len(renderErrors) > 0 {
 		return errors.Join(renderErrors...)
 	}
 
-	logger.Info("Static HTML generation completed")
+	logger.Info("static HTML generation completed")
 
 	return nil
 }
@@ -396,7 +396,7 @@ func processMarkdownFile(file markdownFile, sourceDir, outputDir, cssContent str
 
 	doc, err := parseFrontmatter(string(content))
 	if err != nil {
-		slog.Default().Error("Error parsing frontmatter", "file", file.RelPath, "error", err)
+		slog.Default().Error("error parsing frontmatter", "file", file.RelPath, "error", err)
 		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 	}
 
@@ -507,7 +507,7 @@ func processIndexFile(indexPath, outputDir, cssContent string, site *preparedSit
 
 	doc, err := parseFrontmatter(string(content))
 	if err != nil {
-		slog.Default().Error("Error parsing frontmatter", "file", indexPath, "error", err)
+		slog.Default().Error("error parsing frontmatter", "file", indexPath, "error", err)
 		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 	}
 

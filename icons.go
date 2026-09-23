@@ -270,5 +270,5 @@ func (s *preparedSite) warnMissingIcon(name, style string) {
 	if _, loaded := s.iconMissing.LoadOrStore(key, struct{}{}); loaded {
 		return
 	}
-	s.iconLogger.Warn("Icon not found", "name", name, "style", style)
+	s.iconLogger.Warn("icon not found", "name", name, "style", style)
 }

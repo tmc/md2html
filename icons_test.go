@@ -216,7 +216,7 @@ func TestMissingIconWarnsOnce(t *testing.T) {
 	cfg.iconLogger = slog.New(slog.NewTextHandler(&log, nil))
 	cfg.navIcon("not-a-real-icon")
 	cfg.navIcon("not-a-real-icon")
-	if got := strings.Count(log.String(), "Icon not found"); got != 1 {
+	if got := strings.Count(log.String(), "icon not found"); got != 1 {
 		t.Errorf("missing-icon warnings = %d, want 1:\n%s", got, log.String())
 	}
 }
