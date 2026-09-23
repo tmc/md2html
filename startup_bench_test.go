@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func BenchmarkNewServerHomeTmp(b *testing.B) {
+func BenchmarkNewServer(b *testing.B) {
 	dir := b.TempDir()
 	docs := filepath.Join(dir, "docs")
 	if err := os.MkdirAll(docs, 0755); err != nil {
@@ -22,17 +22,8 @@ func BenchmarkNewServerHomeTmp(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	oldwd, err := os.Getwd()
-	if err != nil {
-		b.Fatal(err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		b.Fatal(err)
-	}
-	defer os.Chdir(oldwd)
-
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	cfg := Config{HTTP: ":0"}
+	cfg := Config{Chdir: dir, HTTP: ":0"}
 	site, err := prepareSite(cfg, logger)
 	if err != nil {
 		b.Fatal(err)
