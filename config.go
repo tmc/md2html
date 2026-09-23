@@ -66,7 +66,7 @@ type Config struct {
 	Vet bool
 	// VetChecks is a comma-separated list of mdvet check names to run
 	// when Vet is true. Empty means run every check. Unknown names are
-	// logged and skipped — vet must never block rendering.
+	// logged and skipped: vet must never block rendering.
 	VetChecks string
 
 	// JSONSpec is a directory containing jsonspec.json and any
@@ -96,9 +96,9 @@ type Config struct {
 type preparedSite struct {
 	config Config
 	// base is the absolute directory config's relative filesystem paths
-	// were resolved against. It is kept because paths discovered later —
-	// the source root, the icon search path, the repository git metadata
-	// is read from — are anchored to it rather than to the process
+	// were resolved against. It is kept because paths discovered later
+	// (the source root, the icon search path, the repository git metadata
+	// is read from) are anchored to it rather than to the process
 	// working directory, which Run does not change.
 	base string
 

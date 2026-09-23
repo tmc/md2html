@@ -204,7 +204,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	}
 
 	// Copy assets before rendering, so anything generated under the same
-	// name — llms.txt, the search assets — is what survives.
+	// name (llms.txt, the search assets) is what survives.
 	assetCount, err := copySourceAssets(sourceDir, outputDir, logger)
 	if err != nil {
 		logger.Error("Error copying assets", "error", err)

@@ -221,7 +221,7 @@ func startBackgroundCommand(s *script.State, name, path string, args []string, c
 
 		// When the script's context is cancelled, the process is signaled
 		// to shut down. Either a clean exit (code 0) or a signal-terminated
-		// exit counts as success — we asked it to stop.
+		// exit counts as success: we asked it to stop.
 		if s.Context().Err() != nil {
 			return stdout.String(), stderr.String(), nil
 		}

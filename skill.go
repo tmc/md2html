@@ -5,7 +5,7 @@ import "strings"
 // Agent skills are documented in a file named SKILL.md sitting alone in a
 // directory named for the skill: skills/it2/SKILL.md, or
 // plugins/it2/SKILL.md. The file describes the skill and its frontmatter
-// declares the contract — "name", "description", and often "when_to_use"
+// declares the contract: "name", "description", and often "when_to_use"
 // and "allowed-tools".
 //
 // Two of those conventions matter to a renderer that would otherwise treat

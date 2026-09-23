@@ -75,7 +75,7 @@ var (
 //
 // Those belong to ComponentCheck, which knows the registry and can say
 // what is missing; reporting them here as well would double every
-// diagnostic. Capitalisation alone is not enough to tell them apart —
+// diagnostic. Capitalisation alone is not enough to tell them apart:
 // "List<String>" is the case this check exists for, and <String> is
 // capitalised too. What distinguishes a component is that the author
 // closed it.

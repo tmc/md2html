@@ -143,8 +143,8 @@ func walkOnDiskRefs(doc *Document, name string, images bool) ([]Diagnostic, erro
 
 // isAbsolutePathLink reports whether dest is an absolute filesystem
 // path used as a link target (e.g. "/Users/me/notes.md", "C:\\foo").
-// Such links are almost always mistakes — leaked from another
-// machine's worktree, or pointing outside the repository — and should
+// Such links are almost always mistakes (leaked from another
+// machine's worktree, or pointing outside the repository) and should
 // be flagged rather than validated against the local filesystem.
 func isAbsolutePathLink(dest string) bool {
 	u, err := url.Parse(dest)
@@ -203,7 +203,7 @@ var errAbsolutePathLink = fmt.Errorf("absolute path link")
 // resolveLink turns a markdown link destination into an absolute path,
 // stripping the URL fragment and decoding percent-escapes. The returned
 // frag is the link's "#anchor" portion, if any. Absolute filesystem
-// paths return [errAbsolutePathLink] — they are not validated against
+// paths return [errAbsolutePathLink]; they are not validated against
 // the local filesystem because such links almost always reflect a
 // leaked path from another machine.
 func resolveLink(dir, dest string) (path, frag string, err error) {
@@ -217,7 +217,7 @@ func resolveLink(dir, dest string) (path, frag string, err error) {
 		return "", "", err
 	}
 	if p == "" {
-		// e.g. "?query#frag" without a path — treat as same-file.
+		// e.g. "?query#frag" without a path; treat as same-file.
 		p = "."
 	}
 	if isAbsolutePathLink(dest) {

@@ -72,7 +72,7 @@ func generateChromaCSS() string {
 	// The syntax colors have to follow the same conditions as the design
 	// tokens, or a reader who forces one theme gets the other theme's
 	// code: dark-background keywords on the light page surface, which is
-	// unreadable. Each stylesheet is scoped the way the tokens are —
+	// unreadable. Each stylesheet is scoped the way the tokens are:
 	// what the system prefers, unless the reader forced the other.
 	//
 	// Both are scoped, not just one. The two styles do not name the same
@@ -179,7 +179,7 @@ func preprocessHTMLBlocks(markdown string) string {
 // The two disagree about dashes. goldmark reads "--" as an en dash and
 // "---" as an em dash; the platforms read "--" as an em dash and leave
 // "---" alone. Taking goldmark's defaults would not close the gap, it
-// would move it — and would newly break "---", which the two renderers
+// would move it, and would newly break "---", which the two renderers
 // agree about today.
 //
 // Quotes keep goldmark's defaults, which do match: straight quotes and

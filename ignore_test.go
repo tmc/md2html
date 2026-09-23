@@ -172,6 +172,6 @@ func TestFindMarkdownFilesWithoutIgnoreFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(files) != 1 {
-		t.Errorf("got %v, want the one file — no ignore file means exclude nothing", files)
+		t.Errorf("got %v, want the one file: no ignore file means exclude nothing", files)
 	}
 }

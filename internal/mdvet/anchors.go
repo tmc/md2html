@@ -50,8 +50,8 @@ func (AnchorCheck) Check(doc *Document) ([]Diagnostic, error) {
 			}
 			return ast.WalkContinue, nil
 		}
-		// A link written as a rendered URL — "/docs/churl#exit-status"
-		// rather than "churl.md#exit-status" — names no file on disk, so
+		// A link written as a rendered URL ("/docs/churl#exit-status"
+		// rather than "churl.md#exit-status") names no file on disk, so
 		// without the site mapping neither half can be checked. Docs
 		// written for a hosted site are usually written that way.
 		if target, frag, ok := doc.env.site.resolve(dest); ok {
@@ -83,7 +83,7 @@ func (AnchorCheck) Check(doc *Document) ([]Diagnostic, error) {
 		}
 		ids := doc.env.anchorsFor(target)
 		if len(ids) == 0 {
-			// Couldn't read target or it has no headings — leave to LinkCheck.
+			// Couldn't read target or it has no headings; leave to LinkCheck.
 			return ast.WalkContinue, nil
 		}
 		if !ids[frag] {

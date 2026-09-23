@@ -453,7 +453,7 @@ func buildAutoNavItems(files []autoNavFile, htmlExt string) []*NavItem {
 	// and wrong for an agent skill, where the landing file is the skill
 	// and everything beside it is supporting material. Give a skill an
 	// entry: within its group when the directory holds other pages, and
-	// at the top level when SKILL.md is all there is — the usual case,
+	// at the top level when SKILL.md is all there is. That is the usual case,
 	// where a group of one would only add a label above its own page.
 	for dir, f := range landing {
 		if dir == "" || !isSkillFile(f.base) {

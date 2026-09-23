@@ -63,7 +63,7 @@ func pageHasMath(htmlContent string) bool {
 // An invalid Format is not an error: it is treated as ordinary Markdown,
 // since a presentation profile the caller misspelled should not stop the
 // page from rendering. A renderer that fails is an error, and the
-// returned Fragment then holds no HTML — reporting it is what tells the
+// returned Fragment then holds no HTML; reporting it is what tells the
 // caller the blank page is a failure rather than an empty document.
 func RenderFragment(markdown, filePath string, opts FragmentOptions) (Fragment, error) {
 	if validateFormat(opts.Format) != nil {

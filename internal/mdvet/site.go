@@ -10,7 +10,7 @@ import (
 
 // Site describes how the documents being checked are addressed once
 // published. Docs written for a hosted site link to each other by their
-// rendered URL — "/docs/quickstart", not "quickstart.md" — and without
+// rendered URL ("/docs/quickstart", not "quickstart.md"), and without
 // this those links name nothing on disk, so neither the target nor its
 // "#fragment" can be checked.
 //
@@ -63,8 +63,8 @@ func (s Site) owns(dest string) bool {
 
 // resolve maps a site-absolute URL to the source file that renders it,
 // along with any fragment. It reports false when s cannot resolve the
-// URL — no Root configured, a different prefix, or no source file for
-// that path — so callers keep whatever they did before rather than
+// URL (no Root configured, a different prefix, or no source file for
+// that path), so callers keep whatever they did before rather than
 // inventing a diagnostic about a file they cannot see.
 func (s Site) resolve(dest string) (file, frag string, ok bool) {
 	if s.Root == "" {

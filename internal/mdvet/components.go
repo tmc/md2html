@@ -80,7 +80,7 @@ func componentRegistry(checks []Check) components.Registry {
 // destAttrs are the component attributes whose value names a
 // destination, and whether that destination is an image rather than a
 // link. A component contract declares attribute names but not what they
-// mean, so the name is the only signal there is — and it is a reliable
+// mean, so the name is the only signal there is, and it is a reliable
 // one, since a component that points somewhere spells it the way HTML
 // does and its template renders it into href="" or src="".
 var destAttrs = map[string]bool{

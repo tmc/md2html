@@ -152,7 +152,7 @@ func TestGitIgnoredCheck(t *testing.T) {
 			"a.md":       "[x](/Users/me/notes.md)\n",
 		})
 		if diags := checkGitIgnored(t, dir, "a.md", Site{}); len(diags) != 0 {
-			t.Errorf("got %v, want none — LinkCheck reports absolute paths", diags)
+			t.Errorf("got %v, want none: LinkCheck reports absolute paths", diags)
 		}
 	})
 }

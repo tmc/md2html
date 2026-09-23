@@ -21,8 +21,8 @@ type GitVersion struct {
 // GitVersionManager handles git operations for versioned documentation.
 //
 // It holds the repository location and nothing else. Every git
-// subprocess it runs belongs to whatever asked for it — a request, a
-// build — so the context comes in with the call rather than being kept
+// subprocess it runs belongs to whatever asked for it (a request, a
+// build), so the context comes in with the call rather than being kept
 // here. The exported methods, which have no context parameter, use
 // [context.Background].
 type GitVersionManager struct {

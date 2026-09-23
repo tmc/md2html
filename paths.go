@@ -40,7 +40,7 @@ func resolveBase(chdir string) (string, error) {
 }
 
 // resolveAgainst resolves a filesystem path against base. An empty path
-// keeps its meaning — "not configured" — and an absolute one is already
+// keeps its meaning ("not configured"), and an absolute one is already
 // resolved. An empty base leaves the path relative to the process
 // working directory, which is what a zero-value site wants.
 func resolveAgainst(base, name string) string {
@@ -51,8 +51,8 @@ func resolveAgainst(base, name string) string {
 }
 
 // resolveConfigPaths returns cfg with every filesystem path resolved
-// against base. URL paths — Base, SiteURL, EditURL — and document names
-// relative to the rendered tree — Index — are not filesystem paths and
+// against base. URL paths (Base, SiteURL, EditURL) and document names
+// relative to the rendered tree (Index) are not filesystem paths and
 // are left alone.
 func resolveConfigPaths(cfg Config, base string) Config {
 	if cfg.Source != "-" {

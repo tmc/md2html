@@ -187,7 +187,7 @@ func cssColor(v string) string {
 // loadDocsJSON reads the docs.json covering sourceDir and returns the
 // navigation it describes along with the site name and colors. It reports
 // ok=false when there is no docs.json, when it does not parse, or when
-// none of the pages it names live under sourceDir — a docs.json found
+// none of the pages it names live under sourceDir, since a docs.json found
 // several levels up may describe an unrelated tree.
 func loadDocsJSON(sourceDir, htmlExt string) (nav *Navigation, site siteInfo, ok bool) {
 	// Page paths are resolved against the docs.json directory, which

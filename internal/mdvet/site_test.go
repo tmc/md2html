@@ -126,7 +126,7 @@ func TestAnchorCheckResolvesRenderedURLs(t *testing.T) {
 	t.Run("without a site the anchor is unchecked", func(t *testing.T) {
 		diags := runCheck(t, files, "quickstart.md", AnchorCheck{})
 		if len(diags) != 0 {
-			t.Errorf("got %v, want none — nothing can resolve /docs/churl", diags)
+			t.Errorf("got %v, want none: nothing can resolve /docs/churl", diags)
 		}
 	})
 

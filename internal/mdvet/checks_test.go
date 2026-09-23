@@ -93,7 +93,7 @@ func TestImageCheck(t *testing.T) {
 			"a.md": "[ref](missing.md)\n",
 		}, "a.md", ImageCheck{})
 		if len(diags) != 0 {
-			t.Errorf("got %v, want none — broken link should be LinkCheck's", diags)
+			t.Errorf("got %v, want none: broken link should be LinkCheck's", diags)
 		}
 	})
 	t.Run("absolute path flagged", func(t *testing.T) {
@@ -111,7 +111,7 @@ func TestAnchorCheck_AbsolutePathSilent(t *testing.T) {
 		"a.md": "See [there](/Users/me/notes.md#section).\n",
 	}, "a.md", AnchorCheck{})
 	if len(diags) != 0 {
-		t.Errorf("got %v, want none — absolute paths belong to links check", diags)
+		t.Errorf("got %v, want none: absolute paths belong to links check", diags)
 	}
 }
 
@@ -120,7 +120,7 @@ func TestCaseCheck_AbsolutePathSilent(t *testing.T) {
 		"a.md": "[x](/Users/me/notes.md)\n",
 	}, "a.md", CaseCheck{})
 	if len(diags) != 0 {
-		t.Errorf("got %v, want none — absolute paths belong to links check", diags)
+		t.Errorf("got %v, want none: absolute paths belong to links check", diags)
 	}
 }
 
@@ -369,7 +369,7 @@ func TestComponentDestinations(t *testing.T) {
 			"a.md": "<Card title=\"G\" href=\"missing.md\">\nbody\n</Card>\n",
 		}, "a.md", ImageCheck{})
 		if len(diags) != 0 {
-			t.Errorf("got %v, want none — href is LinkCheck's", diags)
+			t.Errorf("got %v, want none: href is LinkCheck's", diags)
 		}
 	})
 	t.Run("assets check reads attributes", func(t *testing.T) {

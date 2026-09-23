@@ -1043,7 +1043,7 @@ func (s *server) registerEndpoints(mux *http.ServeMux) {
 }
 
 // Run serves until ctx is canceled. It owns every background worker it
-// starts — the file watcher, the browser opener, the shutdown — and
+// starts (the file watcher, the browser opener, the shutdown) and
 // stops them on the way out whatever ends the call: a bad option, a
 // listener that will not bind, or ordinary cancellation. Cleanup is
 // established before any of them start, so a failure part of the way

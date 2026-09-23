@@ -23,7 +23,7 @@ import (
 //
 // Targets git already tracks are not reported even when a pattern
 // matches them, because a tracked file ships regardless. The check is
-// silent when git is not installed or the tree is not a repository —
+// silent when git is not installed or the tree is not a repository:
 // it has no opinion it can support.
 type GitIgnoredCheck struct{}
 
@@ -93,8 +93,8 @@ func (GitIgnoredCheck) Check(doc *Document) ([]Diagnostic, error) {
 // resolveExisting turns a link destination into the file it names, and
 // reports false for anything this check has no business judging: a
 // destination that names no path, an absolute one (LinkCheck's finding),
-// and one that resolves to nothing — a missing target is the link and
-// asset checks' finding, and reporting it twice helps nobody.
+// and one that resolves to nothing (a missing target is the link and
+// asset checks' finding, and reporting it twice helps nobody).
 func resolveExisting(doc *Document, dir, dest string) (string, bool) {
 	if !shouldCheckOnDisk(dest) {
 		return "", false
@@ -145,7 +145,7 @@ func newGitIgnorer() *gitIgnorer {
 }
 
 // gitIgnored reports which of paths git excludes. Paths it cannot
-// decide — no git, no repository, a git that failed — are absent from
+// decide (no git, no repository, a git that failed) are absent from
 // the result, which callers read as "not ignored".
 func (e *env) gitIgnored(paths []string) map[string]bool {
 	return e.git.ignoredSet(paths)

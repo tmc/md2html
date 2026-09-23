@@ -104,7 +104,7 @@ func TestLinkCheck(t *testing.T) {
 			name: "absolute path flagged regardless of existence",
 			files: map[string]string{
 				// Use a path that is overwhelmingly likely to exist on
-				// the host (/etc) — diagnostic must still fire.
+				// the host (/etc); the diagnostic must still fire.
 				"README.md": "See [etc](/etc).\n",
 			},
 			target:  "README.md",

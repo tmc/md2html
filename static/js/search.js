@@ -104,7 +104,7 @@ function displayResults(results, query) {
     resultsContainer.querySelectorAll('.search-result').forEach(el => {
         el.addEventListener('click', () => {
             const url = el.dataset.url;
-            // TODO: file:// support — doc.url is absolute
+            // TODO: support file:// (doc.url is absolute)
             window.location.href = url;
         });
     });
@@ -160,7 +160,7 @@ function selectResult() {
     const results = document.querySelectorAll('.search-result');
     if (selectedResultIndex >= 0 && selectedResultIndex < results.length) {
         const url = results[selectedResultIndex].dataset.url;
-        // TODO: file:// support — doc.url is absolute
+        // TODO: support file:// (doc.url is absolute)
         window.location.href = url;
     }
 }

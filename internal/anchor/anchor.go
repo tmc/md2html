@@ -17,9 +17,9 @@ import (
 // The rules are those hosted documentation platforms use, so a source
 // tree rendered by more than one renderer keeps the same deep links.
 // Concretely that means "/", "_", and "=" survive rather than
-// being deleted — dropping them welds words together, turning
+// being deleted (dropping them welds words together, turning
 // "extension_console/extension_evaluate" into
-// "extension-consoleextension-evaluate" — and non-ASCII characters,
+// "extension-consoleextension-evaluate"), and non-ASCII characters,
 // em dashes in particular, are kept as written.
 //
 // The rule is otherwise uniform: ASCII letters lowercase, digits and the
@@ -69,8 +69,8 @@ func ID(s string) string {
 // agree on.
 //
 // The substitution has to be repeated here because the id is derived
-// from the heading's source text, not from the substituted inline nodes
-// — without it a heading would display "a — b" and answer to "a-b".
+// from the heading's source text, not from the substituted inline nodes;
+// without it a heading would display "a — b" and answer to "a-b".
 func emDashes(s string) string {
 	if !strings.Contains(s, "--") {
 		return s

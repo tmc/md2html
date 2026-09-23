@@ -17,7 +17,7 @@ func TestID(t *testing.T) {
 
 		// Measured on a probe page served by a hosted documentation
 		// platform (`mint dev`): heading text to the id it put in the
-		// DOM. These are the contract — a source tree may be rendered by
+		// DOM. These are the contract: a source tree may be rendered by
 		// either, and a deep link that works on one has to work on the
 		// other.
 		{

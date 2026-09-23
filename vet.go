@@ -8,7 +8,7 @@ import (
 )
 
 // runVet executes mdvet over site.config.Source and reports any diagnostics it
-// finds via logger. It never returns an error — vet is advisory and
+// finds via logger. It never returns an error: vet is advisory and
 // must not block rendering.
 func runVet(site *preparedSite, logger *slog.Logger) {
 	if site == nil {

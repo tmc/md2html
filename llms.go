@@ -138,7 +138,7 @@ func navGroups(nav *Navigation) map[string]string {
 // buildLLMSSummary renders the llms.txt index described at llmstxt.org:
 // an H1 naming the site, an optional blockquote summary, then H2
 // sections of Markdown links with a one-line description each. The
-// format is Markdown on purpose — a model reading it should not have to
+// format is Markdown on purpose: a model reading it should not have to
 // guess where a URL ends.
 func buildLLMSSummary(cfg Config, pages []llmsPage) string {
 	var b strings.Builder

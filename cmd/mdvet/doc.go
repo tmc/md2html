@@ -26,7 +26,7 @@
 //	-list        print the available checks and exit
 //	-base path   URL path prefix the tree is served under (e.g. /docs)
 //
-// Docs written for a hosted site link to each other by rendered URL —
+// Docs written for a hosted site link to each other by rendered URL:
 // "/docs/churl#exit-status" rather than "churl.md#exit-status". Such a
 // path names no file on disk, so without -base neither the target nor
 // its anchor can be checked. With it, mdvet maps the URL back to the

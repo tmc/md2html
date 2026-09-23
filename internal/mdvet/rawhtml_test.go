@@ -73,6 +73,6 @@ func TestRawHTMLCheckLeavesComponentsToComponentCheck(t *testing.T) {
 		"a.md": "<Warning>\nCareful.\n</Warning>\n\nInline <Badge>x</Badge> too.\n",
 	}, "a.md", RawHTMLCheck{})
 	if len(diags) != 0 {
-		t.Errorf("got %v, want none — component tags belong to ComponentCheck", diags)
+		t.Errorf("got %v, want none: component tags belong to ComponentCheck", diags)
 	}
 }

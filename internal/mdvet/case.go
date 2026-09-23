@@ -28,7 +28,7 @@ func (CaseCheck) Check(doc *Document) ([]Diagnostic, error) {
 			File:    doc.File,
 			Line:    lineOf(doc.Source, n),
 			Check:   "case",
-			Message: fmt.Sprintf("link %q: case mismatch — on-disk path is %s", dest, mismatch),
+			Message: fmt.Sprintf("link %q: case mismatch, on-disk path is %s", dest, mismatch),
 		})
 	}
 

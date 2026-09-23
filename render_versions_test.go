@@ -39,7 +39,7 @@ func TestRenderTemplateThreadsVersionData(t *testing.T) {
 }
 
 // TestRenderTemplateEmptyVersionsByDefault verifies that when no versioning
-// is configured, Version is empty and Versions has zero length — confirming
+// is configured, Version is empty and Versions has zero length, confirming
 // we are not silently injecting noise.
 func TestRenderTemplateEmptyVersionsByDefault(t *testing.T) {
 	dir := t.TempDir()

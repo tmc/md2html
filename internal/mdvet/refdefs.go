@@ -22,7 +22,7 @@ type ReferenceDefCheck struct{}
 func (ReferenceDefCheck) Name() string { return "reference-defs" }
 
 // refUseRE matches [text][label] and ![alt][label] reference links.
-// It is intentionally simple — it doesn't try to track code spans, so
+// It is intentionally simple: it doesn't try to track code spans, so
 // callers should treat its results as best-effort.
 var refUseRE = regexp.MustCompile(`(?m)!?\[(?:[^\]]*)\]\[([^\]]*)\]`)
 
@@ -49,7 +49,7 @@ func (ReferenceDefCheck) Check(doc *Document) ([]Diagnostic, error) {
 	var diags []Diagnostic
 	codes := codeRanges(doc.Tree)
 
-	// Full reference form [text][label] — the label is what we check.
+	// Full reference form [text][label]: the label is what we check.
 	for _, m := range refUseRE.FindAllStringSubmatchIndex(src, -1) {
 		// Skip if this match lies inside a code block or code span.
 		if inCodeRange(codes, m[0]) {
@@ -57,7 +57,7 @@ func (ReferenceDefCheck) Check(doc *Document) ([]Diagnostic, error) {
 		}
 		label := normalizeRefLabel(src[m[2]:m[3]])
 		if label == "" {
-			// Collapsed form [text][] — label comes from text.
+			// Collapsed form [text][]: label comes from text.
 			label = normalizeRefLabel(extractLinkText(src, m[0]))
 			if label == "" {
 				continue
@@ -74,7 +74,7 @@ func (ReferenceDefCheck) Check(doc *Document) ([]Diagnostic, error) {
 		}
 	}
 
-	// Orphan definitions — defined but never used.
+	// Orphan definitions: defined but never used.
 	for label, line := range defs {
 		if !used[label] {
 			diags = append(diags, Diagnostic{

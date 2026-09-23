@@ -314,7 +314,7 @@ func (p *tabParser) Continue(node ast.Node, reader text.Reader, pc parser.Contex
 			reader.Advance(seg.Stop - seg.Start - 1)
 			return parser.Close
 		}
-		// "::: tab ..." starts a new sibling tab — close this one
+		// "::: tab ..." starts a new sibling tab. Close this one
 		// without consuming the line so tabParser.Open can claim it.
 		if fenceLen, ok := countFence(line, pos); ok {
 			if keyword, _, hasKW := parseOpeningKeyword(line, pos+fenceLen); hasKW {

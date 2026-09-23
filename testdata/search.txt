@@ -21,7 +21,7 @@ exists out/js
 # search-index.js assigns the global, not a JSON file.
 exists out/search-index.7a9ed859.js
 exists out/js/minisearch.min.e66b5b61.js
-exists out/js/search.7f3603e3.js
+exists out/js/search.b099a4d5.js
 grep '^window\.MD2HTML_SEARCH_INDEX = \[' out/search-index.7a9ed859.js
 grep '"title":"README"' out/search-index.7a9ed859.js
 grep '"title":"Nested Page"' out/search-index.7a9ed859.js
@@ -29,17 +29,17 @@ grep '"title":"Nested Page"' out/search-index.7a9ed859.js
 # Top-level page references assets with ./ prefix.
 grep 'src="./js/minisearch.min.e66b5b61.js"' out/README.html
 grep 'src="./search-index.7a9ed859.js"' out/README.html
-grep 'src="./js/search.7f3603e3.js"' out/README.html
+grep 'src="./js/search.b099a4d5.js"' out/README.html
 
 # Nested page references assets with ../ prefix.
 grep 'src="../js/minisearch.min.e66b5b61.js"' out/sub/nested.html
 grep 'src="../search-index.7a9ed859.js"' out/sub/nested.html
-grep 'src="../js/search.7f3603e3.js"' out/sub/nested.html
+grep 'src="../js/search.b099a4d5.js"' out/sub/nested.html
 
 # No absolute /js/ paths, no fetch of search-index.json.
 ! grep 'src="/js/' out/README.html
 ! grep 'src="/js/' out/sub/nested.html
-! grep 'search-index\.json' out/js/search.7f3603e3.js
+! grep 'search-index\.json' out/js/search.b099a4d5.js
 
 # Without -search, none of these assets are produced.
 rm -rf out

@@ -29,8 +29,8 @@ const githubAPI = "https://api.github.com"
 
 // fetchStars reports the star count of an "owner/name" repository.
 //
-// Anything that goes wrong — no network, a rate limit, a repository that
-// is private or gone — reports an error, and the caller renders the link
+// Anything that goes wrong (no network, a rate limit, a repository that
+// is private or gone) reports an error, and the caller renders the link
 // without a count rather than failing the build over decoration.
 func fetchStars(ctx context.Context, api, repo string) (int, error) {
 	if repo == "" {
