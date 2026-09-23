@@ -63,9 +63,8 @@
 // The stable public API is [Config], [ConfigFromFlags], [NewFlagSet],
 // [Run], [RenderFragment], [FragmentOptions], [Fragment], [FragmentStyles],
 // [NewLoader], [Loader], [MarkdownDoc], [Navigation], [NavContext],
-// [ParseSummary], [GitVersion], and [GitVersionManager]. Changes to
-// exported names, method signatures, or exported struct fields follow
-// semantic versioning.
+// [ParseSummary], and [GitVersion]. Changes to exported names, method
+// signatures, or exported struct fields follow semantic versioning.
 //
 // The template data passed to bundled and user templates is also part of
 // the compatibility contract. Fields documented on [RenderOptions] and

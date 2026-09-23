@@ -6,11 +6,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// GitVersion represents a git tag or branch that can be used for versioned docs
+// GitVersion is a git tag or branch that versioned docs can be served from.
 type GitVersion struct {
 	Name   string // Tag or branch name
 	Ref    string // Full git reference (e.g., refs/tags/v1.0.0)
@@ -18,228 +19,167 @@ type GitVersion struct {
 	Commit string // Short commit hash
 }
 
-// GitVersionManager handles git operations for versioned documentation.
+// gitVersions runs the git operations behind versioned documentation.
 //
 // It holds the repository location and nothing else. Every git
 // subprocess it runs belongs to whatever asked for it (a request, a
 // build), so the context comes in with the call rather than being kept
-// here. The exported methods, which have no context parameter, use
-// [context.Background].
-type GitVersionManager struct {
+// here.
+type gitVersions struct {
 	repoPath string
 }
 
-// NewGitVersionManager creates a new git version manager for the given repository
-func NewGitVersionManager(repoPath string) *GitVersionManager {
-	return &GitVersionManager{repoPath: repoPath}
+// newGitVersions returns a gitVersions for the repository at repoPath.
+func newGitVersions(repoPath string) *gitVersions {
+	return &gitVersions{repoPath: repoPath}
 }
 
 // git returns a git command rooted at the repository.
-func (gvm *GitVersionManager) git(ctx context.Context, args ...string) *exec.Cmd {
+func (g *gitVersions) git(ctx context.Context, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = gvm.repoPath
+	cmd.Dir = g.repoPath
 	return cmd
 }
 
-// IsGitRepo checks if the given path is inside a git repository
-func (gvm *GitVersionManager) IsGitRepo() bool {
-	return gvm.isGitRepo(context.Background())
+// isRepo reports whether the repository path is inside a git repository.
+func (g *gitVersions) isRepo(ctx context.Context) bool {
+	return g.git(ctx, "rev-parse", "--git-dir").Run() == nil
 }
 
-func (gvm *GitVersionManager) isGitRepo(ctx context.Context) bool {
-	return gvm.git(ctx, "rev-parse", "--git-dir").Run() == nil
-}
-
-// ListVersions returns all available versions (tags and optionally branches)
-func (gvm *GitVersionManager) ListVersions(includeBranches bool, tagPattern string) ([]GitVersion, error) {
-	return gvm.listVersions(context.Background(), includeBranches, tagPattern)
-}
-
-func (gvm *GitVersionManager) listVersions(ctx context.Context, includeBranches bool, tagPattern string) ([]GitVersion, error) {
-	var versions []GitVersion
-
-	tags, err := gvm.listTags(ctx, tagPattern)
+// versions returns the tags matching tagPattern, followed by the remote
+// branches if includeBranches is set. Tags come first, and each group is
+// in reverse alphabetical order.
+func (g *gitVersions) versions(ctx context.Context, includeBranches bool, tagPattern string) ([]GitVersion, error) {
+	vs, err := g.tags(ctx, tagPattern)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list tags: %w", err)
+		return nil, fmt.Errorf("listing tags: %w", err)
 	}
-	versions = append(versions, tags...)
 
 	if includeBranches {
-		branches, err := gvm.listBranches(ctx)
+		branches, err := g.branches(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list branches: %w", err)
+			return nil, fmt.Errorf("listing branches: %w", err)
 		}
-		versions = append(versions, branches...)
+		vs = append(vs, branches...)
 	}
 
-	sort.Slice(versions, func(i, j int) bool {
-		if versions[i].IsTag != versions[j].IsTag {
-			return versions[i].IsTag // tags before branches
+	sort.Slice(vs, func(i, j int) bool {
+		if vs[i].IsTag != vs[j].IsTag {
+			return vs[i].IsTag
 		}
-		return versions[i].Name > versions[j].Name // reverse alphabetical
+		return vs[i].Name > vs[j].Name
 	})
-
-	return versions, nil
+	return vs, nil
 }
 
-// listTags returns all git tags matching the optional pattern
-func (gvm *GitVersionManager) listTags(ctx context.Context, pattern string) ([]GitVersion, error) {
+// tags returns the git tags matching the optional pattern.
+func (g *gitVersions) tags(ctx context.Context, pattern string) ([]GitVersion, error) {
 	args := []string{"tag", "-l"}
 	if pattern != "" {
 		args = append(args, pattern)
 	}
 	args = append(args, "--sort=-version:refname")
 
-	output, err := gvm.git(ctx, args...).Output()
+	output, err := g.git(ctx, args...).Output()
 	if err != nil {
 		return nil, err
 	}
 
-	var versions []GitVersion
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
+	var vs []GitVersion
+	for _, line := range strings.Split(string(output), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-
-		commit, err := gvm.commitHash(ctx, "refs/tags/"+line)
+		ref := "refs/tags/" + line
+		commit, err := g.commitHash(ctx, ref)
 		if err != nil {
 			commit = "unknown"
 		}
-
-		versions = append(versions, GitVersion{
+		vs = append(vs, GitVersion{
 			Name:   line,
-			Ref:    "refs/tags/" + line,
+			Ref:    ref,
 			IsTag:  true,
 			Commit: commit,
 		})
 	}
-
-	return versions, nil
+	return vs, nil
 }
 
-// listBranches returns all git branches
-func (gvm *GitVersionManager) listBranches(ctx context.Context) ([]GitVersion, error) {
-	output, err := gvm.git(ctx, "branch", "-r", "--format=%(refname:short)").Output()
+// branches returns the remote git branches.
+func (g *gitVersions) branches(ctx context.Context) ([]GitVersion, error) {
+	output, err := g.git(ctx, "branch", "-r", "--format=%(refname:short)").Output()
 	if err != nil {
 		return nil, err
 	}
 
-	var versions []GitVersion
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
+	var vs []GitVersion
+	for _, line := range strings.Split(string(output), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.Contains(line, "HEAD") {
 			continue
 		}
-
-		branchName := strings.TrimPrefix(line, "origin/")
-
-		commit, err := gvm.commitHash(ctx, line)
+		commit, err := g.commitHash(ctx, line)
 		if err != nil {
 			commit = "unknown"
 		}
-
-		versions = append(versions, GitVersion{
-			Name:   branchName,
+		vs = append(vs, GitVersion{
+			Name:   strings.TrimPrefix(line, "origin/"),
 			Ref:    line,
 			IsTag:  false,
 			Commit: commit,
 		})
 	}
-
-	return versions, nil
+	return vs, nil
 }
 
-// commitHash returns the short commit hash for a given ref
-func (gvm *GitVersionManager) commitHash(ctx context.Context, ref string) (string, error) {
-	output, err := gvm.git(ctx, "rev-parse", "--short", ref).Output()
+// commitHash returns the short commit hash for ref.
+func (g *gitVersions) commitHash(ctx context.Context, ref string) (string, error) {
+	output, err := g.git(ctx, "rev-parse", "--short", ref).Output()
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(string(output)), nil
 }
 
-// GetFileContent returns the content of a file at a specific version
-func (gvm *GitVersionManager) GetFileContent(version, filePath string) ([]byte, error) {
-	return gvm.fileContent(context.Background(), version, filePath)
+// resolve returns the git reference for version. A full reference
+// (one starting with "refs/") is returned unchanged; otherwise version
+// is taken as a tag if such a tag exists, and as a plain revision if not.
+func (g *gitVersions) resolve(ctx context.Context, version string) string {
+	if strings.HasPrefix(version, "refs/") {
+		return version
+	}
+	if _, err := g.commitHash(ctx, "refs/tags/"+version); err == nil {
+		return "refs/tags/" + version
+	}
+	return version
 }
 
-func (gvm *GitVersionManager) fileContent(ctx context.Context, version, filePath string) ([]byte, error) {
-	ref := version
-	if !strings.HasPrefix(ref, "refs/") {
-		// Try as tag first
-		if _, err := gvm.commitHash(ctx, "refs/tags/"+version); err == nil {
-			ref = "refs/tags/" + version
-		}
-	}
-
-	output, err := gvm.git(ctx, "show", ref+":"+filePath).Output()
+// fileContent returns the content of the file at path as of version.
+func (g *gitVersions) fileContent(ctx context.Context, version, path string) ([]byte, error) {
+	output, err := g.git(ctx, "show", g.resolve(ctx, version)+":"+path).Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get file content for %s at %s: %w", filePath, version, err)
+		return nil, fmt.Errorf("reading %s at %s: %w", path, version, err)
 	}
-
 	return output, nil
 }
 
-// ListFiles returns all files at a specific version matching a pattern
-func (gvm *GitVersionManager) ListFiles(version, pattern string) ([]string, error) {
-	return gvm.listFiles(context.Background(), version, pattern)
-}
-
-func (gvm *GitVersionManager) listFiles(ctx context.Context, version, pattern string) ([]string, error) {
-	ref := version
-	if !strings.HasPrefix(ref, "refs/") {
-		if _, err := gvm.commitHash(ctx, "refs/tags/"+version); err == nil {
-			ref = "refs/tags/" + version
-		}
-	}
-
-	output, err := gvm.git(ctx, "ls-tree", "-r", "--name-only", ref).Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list files at %s: %w", version, err)
-	}
-
-	var files []string
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		if pattern != "" {
-			matched, err := filepath.Match(pattern, filepath.Base(line))
-			if err != nil || !matched {
-				continue
-			}
-		}
-
-		files = append(files, line)
-	}
-
-	return files, nil
-}
-
-// GetCurrentVersion returns the current version (tag or branch)
-func (gvm *GitVersionManager) GetCurrentVersion() (string, error) {
-	return gvm.currentVersion(context.Background())
-}
-
-func (gvm *GitVersionManager) currentVersion(ctx context.Context) (string, error) {
-	if output, err := gvm.git(ctx, "describe", "--tags", "--exact-match").Output(); err == nil {
+// currentVersion returns the tag at HEAD if there is one, and the
+// current branch name otherwise.
+func (g *gitVersions) currentVersion(ctx context.Context) (string, error) {
+	if output, err := g.git(ctx, "describe", "--tags", "--exact-match").Output(); err == nil {
 		return strings.TrimSpace(string(output)), nil
 	}
 
-	output, err := gvm.git(ctx, "rev-parse", "--abbrev-ref", "HEAD").Output()
+	output, err := g.git(ctx, "rev-parse", "--abbrev-ref", "HEAD").Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to get current version: %w", err)
+		return "", fmt.Errorf("finding current version: %w", err)
 	}
-
 	return strings.TrimSpace(string(output)), nil
 }
 
+// gitLastUpdated returns the date, as YYYY-MM-DD, of the last commit
+// touching each of files, keyed by slash-separated relative path.
 func gitLastUpdated(ctx context.Context, repoPath string, files []markdownFile) (map[string]string, error) {
 	paths := make([]string, 0, len(files))
 	for _, f := range files {
@@ -248,6 +188,8 @@ func gitLastUpdated(ctx context.Context, repoPath string, files []markdownFile) 
 	return gitLastUpdatedPaths(ctx, repoPath, paths)
 }
 
+// gitLastUpdatedPaths is like gitLastUpdated but takes paths directly.
+// A repository with no commits yields an empty map.
 func gitLastUpdatedPaths(ctx context.Context, repoPath string, paths []string) (map[string]string, error) {
 	if len(paths) == 0 {
 		return map[string]string{}, nil
@@ -270,12 +212,16 @@ func gitLastUpdatedPaths(ctx context.Context, repoPath string, paths []string) (
 	return parseGitLastUpdated(out, want), nil
 }
 
+// gitHasHead reports whether the repository at repoPath has a HEAD commit.
 func gitHasHead(ctx context.Context, repoPath string) bool {
 	head := exec.CommandContext(ctx, "git", "rev-parse", "--verify", "HEAD")
 	head.Dir = repoPath
 	return head.Run() == nil
 }
 
+// parseGitLastUpdated parses the output of git log --format=%ct --name-only,
+// newest commit first, and returns the date of the first commit listing
+// each wanted path.
 func parseGitLastUpdated(out []byte, want map[string]bool) map[string]string {
 	result := make(map[string]string)
 	var stamp string
@@ -284,39 +230,15 @@ func parseGitLastUpdated(out []byte, want map[string]bool) map[string]string {
 		if line == "" {
 			continue
 		}
-		if isDigits(line) {
-			stamp = line
+		if sec, err := strconv.ParseUint(line, 10, 64); err == nil {
+			stamp = time.Unix(int64(sec), 0).UTC().Format("2006-01-02")
 			continue
 		}
 		name := filepath.ToSlash(line)
 		if stamp == "" || !want[name] || result[name] != "" {
 			continue
 		}
-		sec, err := parseUnix(stamp)
-		if err != nil {
-			continue
-		}
-		result[name] = time.Unix(sec, 0).UTC().Format("2006-01-02")
+		result[name] = stamp
 	}
 	return result
-}
-
-func isDigits(s string) bool {
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return s != ""
-}
-
-func parseUnix(s string) (int64, error) {
-	var n int64
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return 0, fmt.Errorf("invalid unix time")
-		}
-		n = n*10 + int64(r-'0')
-	}
-	return n, nil
 }

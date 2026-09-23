@@ -370,10 +370,9 @@ func TestRequestsAreIndependent(t *testing.T) {
 	<-done
 }
 
-// TestGitVersionManagerExportedMethods checks that the exported,
-// context-free API still works against a real repository after the
-// internal operations grew explicit contexts.
-func TestGitVersionManagerExportedMethods(t *testing.T) {
+// TestGitVersions checks the git version operations against a real
+// repository.
+func TestGitVersions(t *testing.T) {
 	dir := t.TempDir()
 	runGit(t, dir, "init")
 	runGit(t, dir, "config", "user.email", "test@example.com")
@@ -385,32 +384,26 @@ func TestGitVersionManagerExportedMethods(t *testing.T) {
 	runGit(t, dir, "commit", "-m", "add readme")
 	runGit(t, dir, "tag", "v1.0.0")
 
-	gvm := NewGitVersionManager(dir)
-	if !gvm.IsGitRepo() {
-		t.Fatal("IsGitRepo() = false for a repository")
+	ctx := context.Background()
+	g := newGitVersions(dir)
+	if !g.isRepo(ctx) {
+		t.Fatal("isRepo() = false for a repository")
 	}
-	versions, err := gvm.ListVersions(false, "v*")
+	versions, err := g.versions(ctx, false, "v*")
 	if err != nil {
-		t.Fatalf("ListVersions() error = %v", err)
+		t.Fatalf("versions() error = %v", err)
 	}
 	if len(versions) != 1 || versions[0].Name != "v1.0.0" {
-		t.Fatalf("ListVersions() = %#v, want v1.0.0", versions)
+		t.Fatalf("versions() = %#v, want v1.0.0", versions)
 	}
-	content, err := gvm.GetFileContent("v1.0.0", "README.md")
+	content, err := g.fileContent(ctx, "v1.0.0", "README.md")
 	if err != nil {
-		t.Fatalf("GetFileContent() error = %v", err)
+		t.Fatalf("fileContent() error = %v", err)
 	}
 	if string(content) != "# README\n" {
-		t.Fatalf("GetFileContent() = %q", content)
+		t.Fatalf("fileContent() = %q", content)
 	}
-	files, err := gvm.ListFiles("v1.0.0", "*.md")
-	if err != nil {
-		t.Fatalf("ListFiles() error = %v", err)
-	}
-	if len(files) != 1 || files[0] != "README.md" {
-		t.Fatalf("ListFiles() = %#v", files)
-	}
-	if current, err := gvm.GetCurrentVersion(); err != nil || current != "v1.0.0" {
-		t.Fatalf("GetCurrentVersion() = %q, %v, want v1.0.0", current, err)
+	if current, err := g.currentVersion(ctx); err != nil || current != "v1.0.0" {
+		t.Fatalf("currentVersion() = %q, %v, want v1.0.0", current, err)
 	}
 }

@@ -36,9 +36,9 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 		// Versions come from the repository the base directory is in,
 		// not from the source tree, which may be a subdirectory of it or
 		// not versioned at all.
-		s.versionMgr = NewGitVersionManager(s.base)
-		if s.versionMgr.isGitRepo(ctx) {
-			versions, err := s.versionMgr.listVersions(ctx, cfg.VersionBranches, cfg.VersionPattern)
+		s.versionMgr = newGitVersions(s.base)
+		if s.versionMgr.isRepo(ctx) {
+			versions, err := s.versionMgr.versions(ctx, cfg.VersionBranches, cfg.VersionPattern)
 			if err != nil {
 				logger.Error("Error listing versions", "error", err)
 			} else {
@@ -145,7 +145,7 @@ type server struct {
 	watched      map[string]bool
 
 	// Version management
-	versionMgr *GitVersionManager
+	versionMgr *gitVersions
 	versions   []GitVersion
 
 	// Navigation and the site presentation its source carries. Both are
