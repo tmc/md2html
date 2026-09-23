@@ -1,30 +1,21 @@
-# Test utility functions and server URL formatting
-
-# Test server with different address formats
+# -http accepts a bare port or a host and port.
 md2html -http :9034 test.md &
 wait-port :9034
 curl -s http://localhost:9034/
 stdout '<!DOCTYPE html>'
 
-# Test with IP address
-md2html -http :9035 test.md &
+md2html -http 127.0.0.1:9035 test.md &
 wait-port :9035
 curl -s http://127.0.0.1:9035/
 stdout '<!DOCTYPE html>'
 
-# Test with just port (should bind to all interfaces)
-md2html -http :9036 test.md &
-wait-port :9036
-curl -s http://localhost:9036/
-stdout '<!DOCTYPE html>'
-
-# Test verbose mode outputs
+# -v still serves pages.
 md2html -v -http :9037 test.md &
 wait-port :9037
 curl -s http://localhost:9037/
 stdout '<!DOCTYPE html>'
 
-# Test with open flag (suppressed by env var)
+# -open does not launch a browser when MD2HTML_NO_BROWSER is set.
 env MD2HTML_NO_BROWSER=1
 md2html -open -http :9038 test.md &
 wait-port :9038
@@ -33,5 +24,3 @@ stdout '<!DOCTYPE html>'
 
 -- test.md --
 # Test Document
-
-This tests various server configurations.
