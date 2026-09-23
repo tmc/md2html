@@ -10,7 +10,7 @@ import (
 // handleVersionsAPI returns the list of available versions as JSON
 func (s *server) handleVersionsAPI(w http.ResponseWriter, r *http.Request) {
 	if !s.config.Versions {
-		http.Error(w, "Versioning not enabled", http.StatusNotFound)
+		http.Error(w, "versioning not enabled", http.StatusNotFound)
 		return
 	}
 
@@ -35,7 +35,7 @@ func (s *server) handleVersionsAPI(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		s.logger.Error("Error encoding versions JSON", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }
 

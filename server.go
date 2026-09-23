@@ -413,7 +413,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	root, err := s.sourceRoot()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error resolving source root: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("resolving source root: %v", err), http.StatusInternalServerError)
 		return
 	}
 
