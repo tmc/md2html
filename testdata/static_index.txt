@@ -6,12 +6,15 @@ exists output/index.html
 grep -q 'Welcome to Documentation' output/index.html
 
 # Without -index, README.md is the site index, as the server serves it.
-# It is still written as README.html, so links to it keep working.
+# It is still written as README.html, so links to it keep working, and
+# both copies name the site root as canonical.
 rm -rf output
-md2html -html output
+md2html -html output -site-url https://example.com/docs
 grep -q 'Main Project README' output/index.html
 ! grep -q 'Index of /' output/index.html
 grep -q 'Main Project README' output/README.html
+grep -q 'rel="canonical" href="https://example.com/docs/"' output/index.html
+grep -q 'rel="canonical" href="https://example.com/docs/"' output/README.html
 
 # A lowercase readme.md is used the same way
 rm -rf output

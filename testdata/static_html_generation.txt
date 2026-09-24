@@ -17,7 +17,8 @@ grep 'This is documentation' output/docs/guide.html
 
 # Verify links are properly converted
 grep 'href="about.html"' output/README.html
-grep 'href="README.html"' output/about.html
+# README.md is the site root, so links to it name index.html
+grep 'href="index.html"' output/about.html
 
 # Cleanup
 rm -rf testsite output

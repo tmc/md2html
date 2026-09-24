@@ -233,6 +233,18 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	logger.Info("found markdown files to process", "count", len(files))
 	site.links = newSiteLinks(sourceDir, files)
 
+	// With no -index, the root page is chosen as the server chooses it.
+	// A README.md or SKILL.md root is then treated as if named by -index,
+	// so links and canonical URLs for it name the site root.
+	if cfg.Index == "" {
+		switch name := rootIndexName(sourceDir, files, cfg.Drafts); name {
+		case "", "index.md", "index.markdown":
+		default:
+			cfg.Index = name
+			site.config.Index = name
+		}
+	}
+
 	var nav *Navigation
 	var sInfo siteInfo
 	if cfg.Nav {
@@ -331,24 +343,11 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 				logger.Debug("processed index file", "file", indexFile)
 			}
 		}
-	} else {
-		// With no -index, the root page is chosen as the server chooses
-		// it. An index.md or index.markdown is already index.html.
-		switch name := rootIndexName(rendered); name {
-		case "index.md", "index.markdown":
-		case "":
-			if err := generateTOCIndex(outputDir, files, cssContent, site, assets); err != nil {
-				logger.Error("error generating TOC index", "error", err)
-			} else {
-				logger.Debug("generated TOC index")
-			}
-		default:
-			indexFile := filepath.Join(sourceDir, name)
-			if err := processIndexFile(indexFile, outputDir, cssContent, site, pageOptions(name)); err != nil {
-				logger.Error("error processing index file", "error", err, "file", indexFile)
-			} else {
-				logger.Debug("processed index file", "file", indexFile)
-			}
+	} else if !rendered["index.md"] && !rendered["index.markdown"] {
+		if err := generateTOCIndex(outputDir, files, cssContent, site, assets); err != nil {
+			logger.Error("error generating TOC index", "error", err)
+		} else {
+			logger.Debug("generated TOC index")
 		}
 	}
 
@@ -574,11 +573,15 @@ func generateTOCIndex(outputDir string, files []markdownFile, cssContent string,
 // them, in order of preference.
 var indexNames = []string{"index.md", "index.markdown", "README.md", "readme.md", "SKILL.md"}
 
-// rootIndexName returns the first of indexNames at the top of the source
-// tree that is among the rendered pages, or "" if there is none.
-func rootIndexName(rendered map[string]bool) string {
+// rootIndexName returns the file among files that is the site's root
+// page, as the server would choose it, or "" if there is none.
+func rootIndexName(sourceDir string, files []markdownFile, drafts bool) string {
+	have := make(map[string]bool)
+	for _, f := range files {
+		have[filepath.ToSlash(f.RelPath)] = true
+	}
 	for _, name := range indexNames {
-		if rendered[name] {
+		if have[name] && (drafts || !isDraft(filepath.Join(sourceDir, name))) {
 			return name
 		}
 	}

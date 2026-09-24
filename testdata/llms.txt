@@ -12,7 +12,7 @@ exists out/z-extra.html
 exists out/z-extra.md
 
 cmp out/llms.txt want-llms.txt
-grep '^--- README.html$' out/llms-full.txt
+grep '^--- index.html$' out/llms-full.txt
 grep '^--- guide.html$' out/llms-full.txt
 grep '^--- z-extra.html$' out/llms-full.txt
 grep '<link rel="alternate" type="text/markdown" href="./README.md">' out/README.html
@@ -42,7 +42,7 @@ stdout '^--- z-extra$'
 
 ## Pages
 
-- [Home](README.html): Frontmatter description wins.
+- [Home](index.html): Frontmatter description wins.
 - [Guide](guide.html): Guide summary comes from the first paragraph.
 - [Extra](z-extra.html): Extra summary outside navigation.
 -- src/SUMMARY.md --
