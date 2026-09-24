@@ -91,3 +91,20 @@ func TestMarkdownToHTMLRewritesRootLinks(t *testing.T) {
 		}
 	}
 }
+
+func TestMarkdownToHTMLRewritesComponentLinks(t *testing.T) {
+	site := &preparedSite{
+		config: Config{HTMLExt: "html", Index: "index.md"},
+		links:  newSiteLinks(t.TempDir(), []markdownFile{{RelPath: "docs/foo.md"}}),
+	}
+	md := "<Card title=\"Foo\" href=\"/docs/foo#h\">\nBody\n</Card>\n\nSee <Tooltip tip=\"t\" href=\"/docs/foo\">foo</Tooltip>.\n\n<Card title=\"Gone\" href=\"/docs/gone\" />\n"
+	html, err := site.markdownToHTML(md, "docs/sub/x.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`href="../foo.html#h"`, `class="md-tooltip" href="../foo.html"`, `href="/docs/gone"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %s in:\n%s", want, html)
+		}
+	}
+}

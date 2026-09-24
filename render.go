@@ -274,13 +274,24 @@ func (s *preparedSite) markdownToHTML(markdown, filePath string) (string, error)
 			if !entering {
 				return ast.WalkContinue, nil
 			}
-			link, ok := n.(*ast.Link)
-			if !ok {
-				return ast.WalkContinue, nil
+			var attrs map[string]string
+			switch n := n.(type) {
+			case *ast.Link:
+				if rewritten, ok := s.rewriteLink(filePath, string(n.Destination)); ok {
+					n.Destination = []byte(rewritten)
+				}
+			case *components.Node:
+				attrs = n.Attrs
+			case *components.Inline:
+				// A closing tag shares its opening tag's attributes.
+				if !n.Closing {
+					attrs = n.Attrs
+				}
 			}
-			href := string(link.Destination)
-			if rewritten, ok := s.rewriteLink(filePath, href); ok {
-				link.Destination = []byte(rewritten)
+			if href, ok := attrs["href"]; ok {
+				if rewritten, ok := s.rewriteLink(filePath, href); ok {
+					attrs["href"] = rewritten
+				}
 			}
 			return ast.WalkContinue, nil
 		})
