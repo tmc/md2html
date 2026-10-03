@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 func TestWatchEnabled(t *testing.T) {
@@ -213,5 +215,76 @@ func TestReloadNavigationDuringRequests(t *testing.T) {
 
 	if s.siteTitle() == "" {
 		t.Error("title was emptied by concurrent reloads")
+	}
+}
+
+// TestWatchEventReloadsNavigationItems checks that the sidebar follows
+// the pages it lists: an edited title, a new page, and a page in a
+// directory created after startup all appear without a restart.
+func TestWatchEventReloadsNavigationItems(t *testing.T) {
+	root := t.TempDir()
+	write := func(rel, body string) string {
+		t.Helper()
+		name := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(name, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return name
+	}
+	a := write("a.md", "---\ntitle: Before\n---\n\n# A\n")
+	write(".hidden/x.md", "# X\n")
+
+	s := &server{
+		config:  Config{Nav: true},
+		logger:  discardLogger(),
+		clients: make(map[chan string]bool),
+		navRoot: root,
+	}
+	nav, site, err := navigationForDir(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.nav, s.site = nav, site
+	watcher, err := s.startWatching()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer watcher.Close()
+	if s.watched[filepath.Join(root, ".hidden")] {
+		t.Error("watching a directory the navigation skips")
+	}
+
+	titles := func() string {
+		var out []string
+		for _, item := range s.nav.Flat {
+			out = append(out, item.Title)
+		}
+		return strings.Join(out, ",")
+	}
+	ctx := context.Background()
+
+	write("a.md", "---\ntitle: After\n---\n\n# A\n")
+	s.handleWatchEvent(ctx, fsnotify.Event{Name: a, Op: fsnotify.Write})
+	if got := titles(); got != "After" {
+		t.Errorf("titles = %q after editing a page, want %q", got, "After")
+	}
+
+	b := write("b.md", "---\ntitle: New\n---\n\n# B\n")
+	s.handleWatchEvent(ctx, fsnotify.Event{Name: b, Op: fsnotify.Create})
+	if got := titles(); got != "After,New" {
+		t.Errorf("titles = %q after adding a page, want %q", got, "After,New")
+	}
+
+	write("guide/c.md", "---\ntitle: Nested\n---\n\n# C\n")
+	guide := filepath.Join(root, "guide")
+	s.handleWatchEvent(ctx, fsnotify.Event{Name: guide, Op: fsnotify.Create})
+	if !s.watched[guide] {
+		t.Error("new directory is not watched")
+	}
+	if got := titles(); !strings.Contains(got, "Nested") {
+		t.Errorf("titles = %q after adding a directory, want Nested among them", got)
 	}
 }

@@ -210,6 +210,7 @@ func (s *server) startWatching() (*fsnotify.Watcher, error) {
 			s.logger.Debug("watch navigation config", "path", s.navConfig, "error", err)
 		}
 	}
+	s.watchNavTree()
 	if s.config.Verbose {
 		s.watchMu.Lock()
 		n := len(s.watched)
@@ -218,6 +219,37 @@ func (s *server) startWatching() (*fsnotify.Watcher, error) {
 	}
 
 	return watcher, nil
+}
+
+// watchNavTree watches every directory the navigation is built from.
+// The sidebar names pages nobody has opened yet, so a page's title or
+// icon can change, or a page can appear, in a directory no request has
+// reached. It skips what the navigation skips, and is safe to call again
+// when a directory is added.
+func (s *server) watchNavTree() {
+	if s.navRoot == "" {
+		return
+	}
+	ignore, err := loadIgnoreSet(s.navRoot)
+	if err != nil {
+		s.logger.Debug("watch navigation tree", "path", s.navRoot, "error", err)
+		return
+	}
+	filepath.WalkDir(s.navRoot, func(name string, entry os.DirEntry, err error) error {
+		if err != nil || !entry.IsDir() {
+			return nil
+		}
+		if name != s.navRoot {
+			base := entry.Name()
+			if strings.HasPrefix(base, ".") || base == "output" || ignore.excludes(name, true) {
+				return filepath.SkipDir
+			}
+		}
+		if err := s.watchPath(name); err != nil && s.config.Verbose {
+			s.logger.Debug("watch navigation tree", "path", name, "error", err)
+		}
+		return nil
+	})
 }
 
 func (s *server) watchOpenedPath(path string) error {
@@ -296,6 +328,7 @@ func (s *server) handleWatchEvent(ctx context.Context, event fsnotify.Event) {
 			s.content = string(content)
 			s.mu.Unlock()
 		}
+		s.reloadNavigation(ctx)
 		s.notifyClients()
 		return
 	}
@@ -310,22 +343,30 @@ func (s *server) handleWatchEvent(ctx context.Context, event fsnotify.Event) {
 		return
 	}
 
-	name := strings.ToLower(event.Name)
 	// A navigation source describes the whole site, so a change to it
-	// changes every page, not only the one being viewed.
-	if samePath(event.Name, s.navConfig) || strings.HasSuffix(name, "summary.md") {
+	// changes every page, not only the one being viewed. A page is a
+	// navigation source too: its frontmatter supplies the title and icon
+	// of its sidebar entry, and creating or removing it changes the tree.
+	name := strings.ToLower(event.Name)
+	if samePath(event.Name, s.navConfig) || strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".markdown") {
 		s.reloadNavigation(ctx)
 		s.notifyClients()
 		return
 	}
-	if strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".markdown") {
-		s.notifyClients()
+	// A new directory is not watched yet. Pages written into it before
+	// the watch lands produce no events, so reload for them here.
+	if event.Op&fsnotify.Create != 0 && s.navRoot != "" {
+		if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
+			s.watchNavTree()
+			s.reloadNavigation(ctx)
+			s.notifyClients()
+		}
 	}
 }
 
 // reloadNavigation rebuilds the navigation and the presentation its
-// source carries, so an edit to docs.json is picked up without a
-// restart.
+// source carries, so an edit to docs.json, SUMMARY.md, or a page's
+// frontmatter is picked up without a restart.
 //
 // A rebuild that finds nothing leaves the previous navigation in place:
 // a config saved halfway through an edit should not empty the sidebar.
