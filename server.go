@@ -241,7 +241,7 @@ func (s *server) watchNavTree() {
 		}
 		if name != s.navRoot {
 			base := entry.Name()
-			if strings.HasPrefix(base, ".") || base == "output" || ignore.excludes(name, true) {
+			if strings.HasPrefix(base, ".") || base == "output" || isDependencyDir(base) || ignore.excludes(name, true) {
 				return filepath.SkipDir
 			}
 		}

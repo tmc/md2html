@@ -38,6 +38,9 @@ func buildSearchIndex(sourceDir string, cfg Config) ([]SearchDocument, error) {
 			}
 			return nil
 		}
+		if info.IsDir() && path != sourceDir && isDependencyDir(info.Name()) {
+			return filepath.SkipDir
+		}
 		if info.IsDir() || !strings.HasSuffix(path, ".md") {
 			return nil
 		}

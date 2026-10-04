@@ -120,7 +120,7 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 			depth := strings.Count(relPath, string(filepath.Separator))
 
 			if info.IsDir() {
-				if depth >= maxDepth {
+				if depth >= maxDepth || isDependencyDir(entry.Name()) {
 					continue
 				}
 				if ignore.excludes(apparentPath, true) {

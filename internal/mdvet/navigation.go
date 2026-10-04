@@ -94,7 +94,7 @@ func summaryMarkdownFiles(root string) ([]string, error) {
 		}
 		name := d.Name()
 		if d.IsDir() {
-			if path != root && (strings.HasPrefix(name, ".") || name == "output" || name == "_site") {
+			if path != root && (strings.HasPrefix(name, ".") || name == "output" || name == "_site" || name == "node_modules") {
 				return filepath.SkipDir
 			}
 			return nil

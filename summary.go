@@ -355,7 +355,7 @@ func autoNavigationFromDir(sourceDir, htmlExt string) (*Navigation, error) {
 			return nil
 		}
 		if entry.IsDir() {
-			if base == "output" {
+			if base == "output" || isDependencyDir(base) {
 				return filepath.SkipDir
 			}
 			return nil
