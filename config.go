@@ -25,7 +25,7 @@ type Config struct {
 	Verbose           bool
 	Title             string
 	CSS               string
-	Depth             int // directory traversal depth; values below 2 mean 2
+	Depth             int // directory traversal depth; values below 1 mean 2
 	TOC               bool
 	AllowUnsafe       bool
 	TemplateDir       string
@@ -171,7 +171,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.Bool("v", false, "verbose logging")
 	fs.String("title", defaultTitle, "HTML title")
 	fs.String("css", "", "path to custom CSS file")
-	fs.Int("depth", 2, "directory traversal depth for listings (minimum 2)")
+	fs.Int("depth", 2, "directory traversal depth for listings; 1 lists only the directory itself")
 	fs.Bool("toc", false, "generate table of contents")
 	fs.Bool("allow-unsafe", false, "allow unsafe HTML in markdown (use with caution)")
 	fs.String("templates", "", "path to custom template directory (overrides embedded templates)")

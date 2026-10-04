@@ -20,7 +20,7 @@ sleep 200ms
 md2html -templates nonexistent-templates -v -http :9026 &
 sleep 200ms
 
-# Test with invalid depth parameter
+# Test with the smallest depth
 md2html -depth 1 -v -http :9027 &
 sleep 200ms
 

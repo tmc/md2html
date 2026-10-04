@@ -48,21 +48,36 @@ func TestFindMarkdownFilesSkipsUnreadableDir(t *testing.T) {
 	}
 }
 
-func TestFindMarkdownFilesZeroDepth(t *testing.T) {
+func TestFindMarkdownFilesDepth(t *testing.T) {
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "guide"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "guide", "advanced"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"index.md", "guide/start.md"} {
+	for _, name := range []string{"index.md", "guide/start.md", "guide/advanced/deep.md"} {
 		if err := os.WriteFile(filepath.Join(root, name), []byte("# x"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	files, err := findMarkdownFiles(root, 0)
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name  string
+		depth int
+		want  int
+	}{
+		{"negative means default", -1, 2},
+		{"zero means default", 0, 2},
+		{"root only", 1, 1},
+		{"one level down", 2, 2},
+		{"two levels down", 3, 3},
 	}
-	if len(files) != 2 {
-		t.Fatalf("findMarkdownFiles(root, 0) found %d files, want 2", len(files))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files, err := findMarkdownFiles(root, tt.depth)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(files) != tt.want {
+				t.Errorf("findMarkdownFiles(root, %d) found %d files, want %d", tt.depth, len(files), tt.want)
+			}
+		})
 	}
 }
