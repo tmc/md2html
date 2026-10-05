@@ -26,6 +26,11 @@ grep -q 'fmt.Println' out/guide.md
 grep -q '<Code src="shown-as-text.go" />' out/guide.md
 grep -q 'fmt.Println' out/llms-full.txt
 
+# A site whose navigation is SUMMARY.md can still name its repository
+# in docs.json.
+md2html -html summaryout -nav -include-root . summarydocs
+grep -q '<a href="https://github.com/example/project/blob/HEAD/examples/hello/main.go#L7">examples/hello/main.go</a>' summaryout/page.html
+
 # By default the include root is the source directory, so the same page
 # cannot reach the examples above it. The build fails, and the page says
 # why where the code would be.
@@ -115,6 +120,20 @@ private/
 secret
 -- baddocs/private/key.go --
 package private
+-- summarydocs/docs.json --
+{
+  "navbar": {
+    "primary": {"type": "github", "href": "https://github.com/example/project"}
+  }
+}
+-- summarydocs/SUMMARY.md --
+# Summary
+
+- [Page](page.md)
+-- summarydocs/page.md --
+# Page
+
+<Code src="/examples/hello/main.go" region="greet" link />
 -- baddocs/front.md --
 ---
 title: Front

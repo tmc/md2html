@@ -81,14 +81,18 @@ func (s *preparedSite) prepareIncludes(sourceDir, pagesDir string) error {
 // repository that the docs.json governing sourceDir names, of a file
 // under root. It returns nil when no repository is named.
 func repositoryLinks(sourceDir, root string) func(path string, first, last int) string {
-	_, site, ok := loadDocsJSON(sourceDir, "")
-	if !ok || site.RepoURL == "" {
+	// The repository is read from docs.json whether or not the
+	// navigation is: a site whose pages are listed in SUMMARY.md can
+	// still name its repository there.
+	doc, _, ok := readDocsJSON(sourceDir)
+	if !ok {
 		return nil
 	}
-	ref := site.Ref
-	if ref == "" {
-		ref = "HEAD"
+	_, repoURL := repoLink(doc.Navbar.Primary)
+	if repoURL == "" {
+		return nil
 	}
+	ref := cmp.Or(doc.Ref, "HEAD")
 	// The address is of a path in the repository, which the include
 	// root may be a subdirectory of.
 	prefix := ""
@@ -106,7 +110,7 @@ func repositoryLinks(sourceDir, root string) func(path string, first, last int) 
 		dir = parent
 	}
 	return func(path string, first, last int) string {
-		u := site.RepoURL + "/blob/" + url.PathEscape(ref) + "/" + (&url.URL{Path: prefix + path}).EscapedPath()
+		u := repoURL + "/blob/" + url.PathEscape(ref) + "/" + (&url.URL{Path: prefix + path}).EscapedPath()
 		switch {
 		case first == 0:
 		case first == last:

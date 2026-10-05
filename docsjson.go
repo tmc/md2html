@@ -205,9 +205,6 @@ type siteInfo struct {
 	// navigation source names a repository.
 	Repo    string
 	RepoURL string
-	// Ref is the branch, tag, or commit to link to in the repository.
-	// Empty means its default branch.
-	Ref string
 	// Stars is the repository's formatted star count, when one was
 	// fetched. It is not read from the navigation source.
 	Stars string
@@ -269,7 +266,6 @@ func loadDocsJSON(sourceDir, htmlExt string) (nav *Navigation, site siteInfo, ok
 
 	site = siteInfo{Name: doc.Name, Accent: cssColor(doc.Colors.Primary)}
 	site.Repo, site.RepoURL = repoLink(doc.Navbar.Primary)
-	site.Ref = doc.Ref
 	for _, l := range doc.Navbar.Links {
 		if l.Label != "" && l.Href != "" {
 			site.Links = append(site.Links, SiteLink{Label: l.Label, Href: l.Href})
