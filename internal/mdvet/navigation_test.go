@@ -96,7 +96,25 @@ func TestFrontmatterCheck(t *testing.T) {
 		},
 		{
 			name: "missing title",
+			src:  "---\ndescription: Intro page\n---\nIntro.\n",
+			want: []string{"title is missing"},
+		},
+		{
+			name: "title from heading",
 			src:  "---\ndescription: Intro page\n---\n# Intro\n",
+		},
+		{
+			name: "title from setext heading",
+			src:  "---\ndescription: Intro page\n---\nIntro\n=====\n",
+		},
+		{
+			name: "yaml comment is not a heading",
+			src:  "---\ndescription: Intro page\n# TODO pick a title\n---\nIntro.\n",
+			want: []string{"title is missing"},
+		},
+		{
+			name: "heading in code is not a title",
+			src:  "---\ndescription: Intro page\n---\n```sh\n# install\n```\n",
 			want: []string{"title is missing"},
 		},
 		{

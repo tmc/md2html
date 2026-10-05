@@ -73,7 +73,7 @@ func TestRunVet_UnknownCheck(t *testing.T) {
 func TestRunVet_OKFSkipsFrontmatterCheck(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sales.md")
-	if err := os.WriteFile(path, []byte("---\ntype: Dataset\n---\n# Sales\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("---\ntype: Dataset\n---\nSales.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
