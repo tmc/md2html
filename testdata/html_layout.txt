@@ -1,0 +1,104 @@
+# With -html-layout dir every page gets a directory of its own, so a
+# plain file server answers for it at a URL with no extension.
+
+md2html -html out -html-layout dir -allow-unsafe -nav -search -llms -site-url https://example.com/docs src
+exists out/index.html
+exists out/guide/index.html
+exists out/api/index.html
+exists out/api/client/index.html
+! exists out/guide.html
+! exists out/api/client.html
+
+# The README is the site index and is not written a second time.
+grep -q 'Home body' out/index.html
+! exists out/README/index.html
+! exists out/README.html
+
+# Pages link to one another by directory.
+grep -q 'href="guide/"' out/index.html
+grep -q 'href="api/client/#usage"' out/index.html
+grep -q 'href="../"' out/guide/index.html
+grep -q 'href="../api/"' out/guide/index.html
+grep -q 'href="../../guide/"' out/api/client/index.html
+grep -q 'href="client/"' out/api/index.html
+! grep -q 'href="[^"]*index\.html' out/api/client/index.html
+
+# A page that moved down a directory still finds the files beside its
+# source, and the site's own assets.
+grep -q 'src="../logo.png"' out/guide/index.html
+grep -q 'href="../notes.txt"' out/guide/index.html
+grep -q 'href="../logo.png">logo' out/guide/index.html
+
+# A component's link is rewritten once, as a raw HTML tag's is.
+grep -q 'href="../api/client/"' out/guide/index.html
+! grep -q 'href="../../api/client/"' out/guide/index.html
+grep -q 'src="../diagram.png"' out/api/client/index.html
+grep -q 'src="diagram.png"' out/api/index.html
+grep -q 'src="../js/search\.' out/guide/index.html
+grep -q 'src="../../js/search\.' out/api/client/index.html
+grep -q 'src="./js/search\.' out/index.html
+grep -q 'href="../guide.md"' out/guide/index.html
+
+# Canonical URLs and llms.txt name the directories.
+grep -q 'rel="canonical" href="https://example.com/docs/guide/"' out/guide/index.html
+grep -q 'rel="canonical" href="https://example.com/docs/api/client/"' out/api/client/index.html
+grep -q 'rel="canonical" href="https://example.com/docs/"' out/index.html
+grep -q '\[Client\]\(api/client/\)' out/llms.txt
+grep -q '\[Home\]\(\./\)' out/llms.txt
+
+# Two sources that would be written to the same file are an error.
+cp src/guide.md clash/guide.md
+! md2html -html out2 -html-layout dir clash
+stderr 'guide/index.html is already written for guide'
+
+# The layout is a property of static output.
+! md2html -http :9144 -html-layout dir src
+stderr 'html-layout applies to static builds'
+! md2html -html out3 -html-layout tree src
+stderr 'invalid html-layout "tree"'
+
+# The default layout is unchanged.
+md2html -html flat -html-layout file src
+exists flat/guide.html
+exists flat/api/client.html
+
+-- src/README.md --
+# Home
+
+Home body. See the [guide](guide.md) and the
+[client](api/client.md#usage).
+-- src/guide.md --
+# Guide
+
+![logo](logo.png)
+
+Back [home](README.md). See the [API](api/index.md) and the
+[notes](notes.txt).
+
+<a href="logo.png">logo</a>
+
+<Card title="Client" href="api/client.md">
+The client.
+</Card>
+-- src/logo.png --
+png
+-- src/notes.txt --
+notes
+-- src/api/index.md --
+# API
+
+![diagram](diagram.png)
+
+The [client](client.md).
+-- src/api/client.md --
+# Client
+
+## Usage
+
+<img src="diagram.png" alt="diagram">
+
+Read the [guide](../guide.md).
+-- src/api/diagram.png --
+png
+-- clash/guide/index.md --
+# Guide index

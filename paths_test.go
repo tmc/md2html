@@ -172,7 +172,7 @@ func TestRewriteLocalMarkdownReference(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := rewriteLocalMarkdownReference(tt.current, tt.href, tt.htmlExt, tt.indexFile)
+			got, ok := rewriteLocalMarkdownReference(pageLayout{ext: normalizeHTMLExt(tt.htmlExt), index: tt.indexFile}, tt.current, tt.href)
 			if got != tt.want || ok != tt.ok {
 				t.Fatalf("rewriteLocalMarkdownReference(%q, %q, %q, %q) = (%q, %v), want (%q, %v)",
 					tt.current, tt.href, tt.htmlExt, tt.indexFile, got, ok, tt.want, tt.ok)
@@ -353,5 +353,35 @@ func TestGenerateStaticHTMLSummaryLinksAreRelative(t *testing.T) {
 	}
 	if !strings.Contains(html, `href="../index.html"`) {
 		t.Fatalf("sidebar did not render relative home href:\n%s", html)
+	}
+}
+
+func TestRewriteLocalHTMLAttributes(t *testing.T) {
+	rewrite := func(_, href string) (string, bool) { return "../" + href, true }
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"html tag", `<a href="x.pdf">x</a>`, `<a href="../x.pdf">x</a>`},
+		{"image", `<img src="x.png" alt="x">`, `<img src="../x.png" alt="x">`},
+		{"two tags", `<a href="a">a</a> <img src='b'>`, `<a href="../a">a</a> <img src='../b'>`},
+		{"component", `<Card href="a.md">`, `<Card href="a.md">`},
+		{"component across lines", "<Card\n  href=\"a.md\"\n>\n<a href=\"b\">", "<Card\n  href=\"a.md\"\n>\n<a href=\"../b\">"},
+		{"html tag across lines", "<a\n  href=\"a\">x</a>", "<a\n  href=\"../a\">x</a>"},
+		{"quoted >", `<a title="a>b" href="a">`, `<a title="a>b" href="../a">`},
+		{"code span", "see `<img src=\"x.png\">` and <img src=\"y.png\">", "see `<img src=\"x.png\">` and <img src=\"../y.png\">"},
+		{"double code span", "``<a href=\"x\">` ``", "``<a href=\"x\">` ``"},
+		{"unclosed backtick", "a ` <a href=\"x\">", "a ` <a href=\"../x\">"},
+		{"text", `href="x" outside a tag`, `href="x" outside a tag`},
+		{"fence", "```\n<a href=\"x\">\n```", "```\n<a href=\"x\">\n```"},
+		{"blank line ends tag", "<a title=\"x\n\n<a href=\"y\">", "<a title=\"x\n\n<a href=\"../y\">"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := rewriteLocalHTMLAttributes(tt.in, "page.md", rewrite); got != tt.want {
+				t.Errorf("rewriteLocalHTMLAttributes(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
 	}
 }

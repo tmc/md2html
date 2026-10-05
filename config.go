@@ -33,13 +33,17 @@ type Config struct {
 	RenderFrontmatter bool
 	Index             string
 	HTMLExt           string
-	Versions          bool
-	VersionPattern    string
-	VersionBranches   bool
-	VersionDefault    string
-	Search            bool
-	LLMS              bool
-	SiteURL           string
+	// HTMLLayout is how a static build lays out its pages: "file", the
+	// default, writes guide.md as guide.html, and "dir" writes it as
+	// guide/index.html so that it is served as guide/.
+	HTMLLayout      string
+	Versions        bool
+	VersionPattern  string
+	VersionBranches bool
+	VersionDefault  string
+	Search          bool
+	LLMS            bool
+	SiteURL         string
 	// OGImage is the social card image used by pages whose frontmatter
 	// names none. A relative value resolves against SiteURL, so a site
 	// served from a subdirectory still advertises an absolute URL.
@@ -179,6 +183,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.Bool("render-frontmatter", false, "render YAML frontmatter as part of the document content")
 	fs.String("index", "", "default file to serve for root path (e.g., README.md, index.md)")
 	fs.String("html-ext", "", "file extension for generated HTML files (e.g., 'html' for .html, empty for no extension except index.html)")
+	fs.String("html-layout", "", "layout of static output: 'file' writes guide.md as guide.html (default), 'dir' writes guide/index.html, linked as guide/")
 	fs.Bool("versions", false, "enable versioned documentation using git tags/refs")
 	fs.String("version-pattern", "*", "git tag pattern to match for versions (e.g., 'v*', 'release-*')")
 	fs.Bool("version-branches", false, "include branches as versions alongside tags")
@@ -221,6 +226,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		RenderFrontmatter: flagBool(fs, "render-frontmatter"),
 		Index:             flagString(fs, "index"),
 		HTMLExt:           flagString(fs, "html-ext"),
+		HTMLLayout:        flagString(fs, "html-layout"),
 		Versions:          flagBool(fs, "versions"),
 		VersionPattern:    flagString(fs, "version-pattern"),
 		VersionBranches:   flagBool(fs, "version-branches"),

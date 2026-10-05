@@ -86,6 +86,9 @@ func buildSearchIndex(sourceDir string, cfg Config) ([]SearchDocument, error) {
 		}
 
 		url := convertPathToURL(relPath, cfg.HTMLExt)
+		if l := cfg.layout(); l.dirs {
+			url = l.url(relPath)
+		}
 		plainText := extractPlainText(doc.Content)
 
 		docType := "documentation"

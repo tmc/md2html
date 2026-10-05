@@ -33,6 +33,7 @@ func TestBuildSearchIndex(t *testing.T) {
 	}{
 		{"server", Config{}, []string{"guide/start", "index"}},
 		{"static", Config{HTMLExt: "html"}, []string{"guide/start.html", "index.html"}},
+		{"dirs", Config{HTMLExt: "html", HTMLLayout: "dir"}, []string{"./", "guide/start/"}},
 		{"drafts", Config{Drafts: true}, []string{"guide/draft", "guide/start", "index"}},
 	}
 	for _, tt := range tests {

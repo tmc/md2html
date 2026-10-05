@@ -52,7 +52,9 @@ func loadAllTemplates(site *preparedSite) (*template.Template, error) {
 			return dict
 		},
 		"navHref": func(currentFile, targetFile, htmlExt, indexFile string) string {
-			return relativeRenderedLink(currentFile, targetFile, htmlExt, indexFile)
+			l := site.config.layout()
+			l.ext, l.index = normalizeHTMLExt(htmlExt), indexFile
+			return l.link(currentFile, targetFile)
 		},
 		"navIcon": site.navIconType,
 		"asset": func(assets map[string]string, name string) string {
@@ -243,7 +245,7 @@ func (s *preparedSite) renderTemplate(htmlContent, title, customCSS string, live
 		MermaidDarkTheme:  mermaidDarkTheme,
 		MermaidAutoTheme:  mermaidAutoTheme,
 		FilePath:          opts.FilePath,
-		AssetBase:         assetBase(opts.FilePath),
+		AssetBase:         s.config.layout().root(opts.FilePath),
 		RawMDURL:          opts.RawMDURL,
 		HasMath:           pageHasMath(htmlContent),
 		Description:       meta.Description,
@@ -349,8 +351,7 @@ func pageMetadata(cfg Config, title string, frontmatter map[string]any, opts Ren
 		LastUpdated:       opts.LastUpdated,
 	}
 	if opts.FilePath != "" {
-		rendered := renderedPathForSource(opts.FilePath, cfg.HTMLExt, cfg.Index)
-		page := canonicalPagePath(rendered, cfg.HTMLExt)
+		page := canonicalPagePath(cfg.layout().file(opts.FilePath), cfg.HTMLExt)
 		if page == "" {
 			meta.OpenGraphType = "website"
 		}

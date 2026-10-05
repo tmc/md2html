@@ -87,7 +87,7 @@ func collectLLMSPages(sourceDir string, files []markdownFile, nav *Navigation, c
 		rel := normalizeSourcePath(f.RelPath)
 		pages = append(pages, llmsPage{
 			Path:    rel,
-			URL:     renderedPathForSource(f.RelPath, cfg.HTMLExt, cfg.Index),
+			URL:     cfg.layout().url(f.RelPath),
 			Title:   title,
 			Summary: llmsSummary(doc),
 			Content: string(content),

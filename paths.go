@@ -197,30 +197,8 @@ func canonicalPagePath(rendered, htmlExt string) string {
 }
 
 func relativeRenderedLink(currentSourcePath, targetSourcePath, htmlExt, indexFile string) string {
-	target := renderedPathForSource(targetSourcePath, htmlExt, indexFile)
-	if target == "" {
-		return ""
-	}
-
-	current := renderedPathForSource(currentSourcePath, htmlExt, indexFile)
-	if current == "" {
-		return target
-	}
-
-	currentDir := path.Dir(current)
-	if current == "." || currentDir == "" {
-		currentDir = "."
-	}
-
-	rel, err := filepath.Rel(filepath.FromSlash(currentDir), filepath.FromSlash(target))
-	if err != nil {
-		return target
-	}
-	rel = filepath.ToSlash(rel)
-	if rel == "" {
-		return "."
-	}
-	return rel
+	l := pageLayout{ext: normalizeHTMLExt(htmlExt), index: indexFile}
+	return l.link(currentSourcePath, targetSourcePath)
 }
 
 // assetBase returns a relative URL prefix from the page rendered for
@@ -250,11 +228,8 @@ func splitLinkSuffix(raw string) (base, suffix string) {
 	return raw, ""
 }
 
-func rewriteLocalMarkdownReference(currentSourcePath, href, htmlExt, indexFile string) (string, bool) {
-	if href == "" || strings.HasPrefix(href, "#") || strings.HasPrefix(href, "/") ||
-		strings.Contains(href, "://") || strings.HasPrefix(href, "mailto:") ||
-		strings.HasPrefix(href, "tel:") || strings.HasPrefix(href, "javascript:") ||
-		strings.HasPrefix(href, "data:") {
+func rewriteLocalMarkdownReference(l pageLayout, currentSourcePath, href string) (string, bool) {
+	if !isRelativeReference(href) {
 		return href, false
 	}
 
@@ -269,16 +244,16 @@ func rewriteLocalMarkdownReference(currentSourcePath, href, htmlExt, indexFile s
 	}
 
 	targetSourcePath := path.Clean(path.Join(currentDir, base))
-	return relativeRenderedLink(currentSourcePath, targetSourcePath, htmlExt, indexFile) + suffix, true
+	return l.link(currentSourcePath, targetSourcePath) + suffix, true
 }
 
 // rewriteMarkdownReference rewrites local Markdown links for format. Ordinary
 // Markdown keeps root-relative links unchanged. OKF uses root-relative links
 // to identify concepts within the bundle, so its profile rewrites those links
 // relative to the rendered page.
-func rewriteMarkdownReference(format, currentSourcePath, href, htmlExt, indexFile string) (string, bool) {
+func rewriteMarkdownReference(format string, l pageLayout, currentSourcePath, href string) (string, bool) {
 	if normalizedFormat(format) != "okf" || !strings.HasPrefix(href, "/") {
-		return rewriteLocalMarkdownReference(currentSourcePath, href, htmlExt, indexFile)
+		return rewriteLocalMarkdownReference(l, currentSourcePath, href)
 	}
 
 	base, suffix := splitLinkSuffix(href)
@@ -286,7 +261,7 @@ func rewriteMarkdownReference(format, currentSourcePath, href, htmlExt, indexFil
 		return href, false
 	}
 	targetSourcePath := strings.TrimPrefix(path.Clean(base), "/")
-	return relativeRenderedLink(currentSourcePath, targetSourcePath, htmlExt, indexFile) + suffix, true
+	return l.link(currentSourcePath, targetSourcePath) + suffix, true
 }
 
 func validateFormat(format string) error {

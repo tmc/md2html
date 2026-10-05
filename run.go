@@ -30,6 +30,12 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	if err := validateFormat(cfg.Format); err != nil {
 		return err
 	}
+	if err := validateHTMLLayout(cfg.HTMLLayout); err != nil {
+		return err
+	}
+	if cfg.HTMLLayout == "dir" && cfg.HTML == "" {
+		return fmt.Errorf("-html-layout applies to static builds; the server already serves guide.md as guide")
+	}
 
 	if len(args) > 0 {
 		cfg.Source = args[0]

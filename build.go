@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -50,7 +51,7 @@ func generateDirectoryListing(cfg Config, dir, relDir string) (string, error) {
 	}
 
 	for _, f := range files {
-		url := renderedPathForSource(f.RelPath, cfg.HTMLExt, cfg.Index)
+		url := cfg.layout().url(f.RelPath)
 		buf.WriteString(fmt.Sprintf("- [%s](%s) (%d bytes, %s)\n",
 			f.RelPath, url, f.Size, f.ModTime.Format("2006-01-02 15:04")))
 	}
@@ -316,6 +317,9 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		}
 		if cfg.LLMS {
 			opts.RawMDURL = rawMarkdownURL(relPath)
+			if cfg.layout().moved(relPath) {
+				opts.RawMDURL = "../" + path.Base(normalizeSourcePath(relPath))
+			}
 		}
 		if nav != nil {
 			opts.Nav = nav.ForPage(relPath)
@@ -325,10 +329,28 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 
 	var renderErrors []error
 	rendered := make(map[string]bool)
+	layout := cfg.layout()
+	outputs := make(map[string]string)
 	for _, file := range files {
 		if !cfg.Drafts && isDraft(filepath.Join(sourceDir, file.RelPath)) {
 			logger.Debug("skipping draft", "file", file.RelPath)
 			continue
+		}
+		if layout.dirs {
+			// The site index is written once, as index.html. A copy
+			// under its own name would sit a directory lower, where
+			// its links would no longer resolve.
+			rel := normalizeSourcePath(file.RelPath)
+			if cfg.Index != "" && rel == normalizeSourcePath(cfg.Index) {
+				rendered[rel] = true
+				continue
+			}
+			out := layout.file(rel)
+			if other, ok := outputs[out]; ok {
+				renderErrors = append(renderErrors, fmt.Errorf("process %s: %s is already written for %s", rel, out, other))
+				continue
+			}
+			outputs[out] = rel
 		}
 		if err := processMarkdownFile(file, sourceDir, outputDir, cssContent, site, pageOptions(file.RelPath)); err != nil {
 			logger.Error("error processing file", "error", err, "file", file.RelPath)
@@ -410,12 +432,12 @@ func processMarkdownFile(file markdownFile, sourceDir, outputDir, cssContent str
 	}
 	opts.Description = llmsSummary(doc)
 
-	baseName := strings.TrimSuffix(file.RelPath, filepath.Ext(file.RelPath))
-	outputPath := baseName
-	if cfg.HTMLExt != "" {
-		outputPath = baseName + "." + cfg.HTMLExt
-	}
-	outputPath = filepath.Join(outputDir, outputPath)
+	// In the file layout the page chosen as the site index is also
+	// written under its own name, so the layout must not send it to
+	// index.html here. The dir layout skips that page before this.
+	l := cfg.layout()
+	l.index = ""
+	outputPath := filepath.Join(outputDir, filepath.FromSlash(l.file(file.RelPath)))
 
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return err
@@ -553,7 +575,7 @@ func generateTOCIndex(outputDir string, files []markdownFile, cssContent string,
 		buf.WriteString("*No markdown files found.*\n")
 	} else {
 		for _, f := range files {
-			url := renderedPathForSource(f.RelPath, cfg.HTMLExt, cfg.Index)
+			url := cfg.layout().url(f.RelPath)
 			buf.WriteString(fmt.Sprintf("- [%s](%s) (%d bytes, %s)\n",
 				f.RelPath, url, f.Size, f.ModTime.Format("2006-01-02 15:04")))
 		}

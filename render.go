@@ -280,6 +280,10 @@ func (s *preparedSite) markdownToHTML(markdown, filePath string) (string, error)
 				if rewritten, ok := s.rewriteLink(filePath, string(n.Destination)); ok {
 					n.Destination = []byte(rewritten)
 				}
+			case *ast.Image:
+				if rewritten, ok := s.config.layout().relocate(filePath, string(n.Destination)); ok {
+					n.Destination = []byte(rewritten)
+				}
 			case *components.Node:
 				attrs = n.Attrs
 			case *components.Inline:
@@ -485,14 +489,14 @@ func logExtensionErrors(pc parser.Context, filePath string) {
 // rewriteLink returns href rewritten for the page at filePath, and reports
 // whether it changed.
 func (s *preparedSite) rewriteLink(filePath, href string) (string, bool) {
-	cfg := s.config
-	if rewritten, ok := rewriteMarkdownReference(cfg.Format, filePath, href, cfg.HTMLExt, cfg.Index); ok {
+	l := s.config.layout()
+	if rewritten, ok := rewriteMarkdownReference(s.config.Format, l, filePath, href); ok {
 		return rewritten, true
 	}
 	if target, suffix, ok := s.links.resolve(href); ok {
-		return relativeRenderedLink(filePath, target, cfg.HTMLExt, cfg.Index) + suffix, true
+		return l.link(filePath, target) + suffix, true
 	}
-	return "", false
+	return l.relocate(filePath, href)
 }
 
 func rewriteLocalHTMLAttributes(content, filePath string, rewrite func(filePath, href string) (string, bool)) string {
@@ -501,10 +505,15 @@ func rewriteLocalHTMLAttributes(content, filePath string, rewrite func(filePath,
 	}
 
 	var out strings.Builder
+	var tags htmlTagScanner
 	inFence := false
 	fence := byte(0)
 	fenceLen := 0
 	for line := range strings.SplitAfterSeq(content, "\n") {
+		if strings.TrimSpace(line) == "" {
+			// No HTML tag runs past a blank line.
+			tags = htmlTagScanner{}
+		}
 		trimmed := strings.TrimLeft(line, " ")
 		if marker, n := markdownFence(trimmed); n >= 3 {
 			if !inFence {
@@ -519,9 +528,100 @@ func rewriteLocalHTMLAttributes(content, filePath string, rewrite func(filePath,
 			out.WriteString(line)
 			continue
 		}
-		out.WriteString(rewriteHTMLAttributes(line, filePath, rewrite))
+		out.WriteString(tags.rewrite(line, filePath, rewrite))
 	}
 	return out.String()
+}
+
+// An htmlTagScanner finds the parts of Markdown source lines that are
+// inside raw HTML tags, carrying its state from one line to the next so
+// that a tag may span lines.
+//
+// Component tags, whose names are capitalized, are not raw HTML: their
+// attributes are rewritten after parsing, and rewriting them here too
+// would rewrite them twice. Inline code spans are text, not tags.
+type htmlTagScanner struct {
+	inTag     bool
+	component bool
+	quote     byte
+}
+
+// rewrite returns line with the href and src attributes of its raw HTML
+// tags rewritten.
+func (t *htmlTagScanner) rewrite(line, filePath string, rewrite func(filePath, href string) (string, bool)) string {
+	var out strings.Builder
+	copied := 0
+	start := -1 // start of the raw HTML tag being scanned, if any
+	if t.inTag && !t.component {
+		start = 0
+	}
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		switch {
+		case t.inTag && t.quote != 0:
+			if c == t.quote {
+				t.quote = 0
+			}
+		case t.inTag:
+			switch c {
+			case '"', '\'':
+				t.quote = c
+			case '>':
+				t.inTag = false
+				if start >= 0 {
+					out.WriteString(line[copied:start])
+					out.WriteString(rewriteHTMLAttributes(line[start:i], filePath, rewrite))
+					copied, start = i, -1
+				}
+			}
+		case c == '`':
+			n := 1
+			for i+n < len(line) && line[i+n] == '`' {
+				n++
+			}
+			i += n - 1
+			if end := closingBackticks(line[i+1:], n); end >= 0 {
+				i += end + n
+			}
+		case c == '<' && i+1 < len(line) && (isASCIILetter(line[i+1]) || line[i+1] == '/'):
+			t.inTag = true
+			t.component = 'A' <= line[i+1] && line[i+1] <= 'Z'
+			if !t.component && line[i+1] != '/' {
+				start = i
+			}
+		}
+	}
+	if start >= 0 {
+		out.WriteString(line[copied:start])
+		out.WriteString(rewriteHTMLAttributes(line[start:], filePath, rewrite))
+		copied = len(line)
+	}
+	out.WriteString(line[copied:])
+	return out.String()
+}
+
+// closingBackticks returns the index in s of the first run of exactly n
+// backticks, or -1 if there is none.
+func closingBackticks(s string, n int) int {
+	for i := 0; i < len(s); {
+		if s[i] != '`' {
+			i++
+			continue
+		}
+		j := i
+		for j < len(s) && s[j] == '`' {
+			j++
+		}
+		if j-i == n {
+			return i
+		}
+		i = j
+	}
+	return -1
+}
+
+func isASCIILetter(c byte) bool {
+	return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
 }
 
 func markdownFence(line string) (byte, int) {
