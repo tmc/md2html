@@ -68,6 +68,7 @@ func resolveConfigPaths(cfg Config, base string) Config {
 	cfg.Components = resolveAgainst(base, cfg.Components)
 	cfg.Icons = resolveAgainst(base, cfg.Icons)
 	cfg.IncludeRoot = resolveAgainst(base, cfg.IncludeRoot)
+	cfg.Favicon = resolveAgainst(base, cfg.Favicon)
 	return cfg
 }
 

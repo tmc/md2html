@@ -277,6 +277,9 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		logger.Debug("git metadata unavailable", "error", err)
 	}
 	assets := map[string]string{}
+	if err := site.copyFavicon(outputDir); err != nil {
+		return err
+	}
 	if site.jsonSpecBundle != "" {
 		if err := writeJSONSpecAsset(outputDir); err != nil {
 			return err

@@ -1,0 +1,52 @@
+# The site icon is copied to the root of the output under a fixed name
+# and linked from every page, relative to the page.
+
+md2html -html out -favicon art/logo.svg docs
+cmp out/favicon.svg art/logo.svg
+grep -q '<link rel="icon" href="./favicon.svg">' out/index.html
+grep -q '<link rel="icon" href="../favicon.svg">' out/guide/start.html
+
+md2html -html dirs -html-layout dir -favicon art/logo.svg docs
+grep -q '<link rel="icon" href="../../favicon.svg">' dirs/guide/start/index.html
+
+# Without the flag the icon is the one docs.json names, even when the
+# navigation comes from SUMMARY.md.
+md2html -nav -html fromjson docs
+cmp fromjson/favicon.png docs/img/icon.png
+grep -q '<link rel="icon" href="../favicon.png">' fromjson/guide/start.html
+
+# A site without one links none.
+md2html -html plain plain-src
+! grep 'rel="icon"' plain/index.html
+
+# A file named on the command line must be there, and be an image.
+! md2html -html bad -favicon art/gone.svg docs
+stderr 'favicon: .*gone.svg'
+! md2html -html bad -favicon docs/index.md docs
+stderr 'favicon: .*not an image'
+
+# The server serves it.
+md2html -http :9146 -favicon art/logo.svg docs &
+wait-port :9146
+curl -s http://localhost:9146/favicon.svg
+stdout '<svg'
+curl -s http://localhost:9146/guide/start
+stdout '<link rel="icon" href="[./]*favicon.svg">'
+
+-- art/logo.svg --
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1"/></svg>
+-- docs/docs.json --
+{"name": "Site", "favicon": "/img/icon.png"}
+-- docs/img/icon.png --
+not really a png
+-- docs/SUMMARY.md --
+# Summary
+
+- [Home](index.md)
+- [Start](guide/start.md)
+-- docs/index.md --
+# Home
+-- docs/guide/start.md --
+# Start
+-- plain-src/index.md --
+# Home

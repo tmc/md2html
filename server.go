@@ -1034,6 +1034,9 @@ func (s *server) registerEndpoints(mux *http.ServeMux) {
 	if s.prepared != nil && s.prepared.jsonSpecBundle != "" {
 		mux.HandleFunc("/js/jsonspec.js", handleSearchAsset("static/js/jsonspec.js"))
 	}
+	if s.prepared != nil && s.prepared.favicon != "" {
+		mux.HandleFunc("/"+s.prepared.faviconName, s.prepared.serveFavicon)
+	}
 }
 
 // Run serves until ctx is canceled. It owns every background worker it

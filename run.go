@@ -71,6 +71,9 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 		if err := site.prepareIncludes(root, pagesDir); err != nil {
 			return err
 		}
+		if err := site.prepareFavicon(root, logger); err != nil {
+			return err
+		}
 	}
 
 	// Run mdvet checks before any rendering. Diagnostics are reported

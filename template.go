@@ -246,6 +246,7 @@ func (s *preparedSite) renderTemplate(htmlContent, title, customCSS string, live
 		MermaidAutoTheme:  mermaidAutoTheme,
 		FilePath:          opts.FilePath,
 		AssetBase:         s.config.layout().root(opts.FilePath),
+		Favicon:           s.faviconName,
 		RawMDURL:          opts.RawMDURL,
 		HasMath:           pageHasMath(htmlContent),
 		Description:       meta.Description,
@@ -293,7 +294,9 @@ type templateData struct {
 	MermaidAutoTheme bool
 	FilePath         string
 	AssetBase        string
-	RawMDURL         string
+	// Favicon is the site icon's file name at the site root, if any.
+	Favicon  string
+	RawMDURL string
 	// HasMath reports whether the page content contains TeX math
 	// delimiters outside code regions, so templates can load MathJax
 	// only where it is needed.

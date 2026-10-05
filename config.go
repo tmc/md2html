@@ -39,7 +39,10 @@ type Config struct {
 	HTMLLayout string
 	// IncludeRoot is the directory the files that pages include with
 	// Code tags must be inside. Empty means the source directory.
-	IncludeRoot     string
+	IncludeRoot string
+	// Favicon is the image file browsers show for the site. Empty
+	// means the one docs.json names, if any.
+	Favicon         string
 	Versions        bool
 	VersionPattern  string
 	VersionBranches bool
@@ -130,6 +133,11 @@ type preparedSite struct {
 	// includes expands Code tags. It is nil until prepareIncludes says
 	// which files pages may read.
 	includes *siteIncludes
+
+	// favicon is the site icon file, and faviconName the name it is
+	// published under at the site root. Both are empty without one.
+	favicon     string
+	faviconName string
 }
 
 // newPreparedSite returns a site whose configuration paths are resolved
@@ -200,6 +208,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.Bool("llms", false, "emit llms.txt, llms-full.txt, and raw markdown links in static output")
 	fs.String("site-url", "", "canonical base URL for generated pages")
 	fs.String("og-image", "", "social card image for pages that name none in frontmatter; relative values resolve against -site-url")
+	fs.String("favicon", "", "site icon file, copied into the output and linked from every page (default: the favicon docs.json names)")
 	fs.String("edit-url", "", "URL template for edit links; {path} is replaced with the source path")
 	fs.Bool("nav", false, "render docs navigation from SUMMARY.md or the markdown tree")
 	fs.String("watch", "auto", "live reload file watching: auto, true, or false")
@@ -236,6 +245,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		HTMLExt:           flagString(fs, "html-ext"),
 		HTMLLayout:        flagString(fs, "html-layout"),
 		IncludeRoot:       flagString(fs, "include-root"),
+		Favicon:           flagString(fs, "favicon"),
 		Versions:          flagBool(fs, "versions"),
 		VersionPattern:    flagString(fs, "version-pattern"),
 		VersionBranches:   flagBool(fs, "version-branches"),

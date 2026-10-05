@@ -1,6 +1,7 @@
 package md2html
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -43,6 +44,51 @@ type docsJSON struct {
 	// Ref is the branch, tag, or commit that links into the repository
 	// name. It is not part of Mintlify's schema.
 	Ref string `json:"ref"`
+	// Favicon is the site icon, a path from the docs.json directory.
+	Favicon docsJSONFavicon `json:"favicon"`
+}
+
+// docsJSONFavicon is a favicon setting: one path, or an object giving
+// a path for each of the light and dark themes, of which md2html uses
+// the light one.
+type docsJSONFavicon string
+
+func (f *docsJSONFavicon) UnmarshalJSON(data []byte) error {
+	var s string
+	if json.Unmarshal(data, &s) == nil {
+		*f = docsJSONFavicon(s)
+		return nil
+	}
+	var themes struct {
+		Light string `json:"light"`
+		Dark  string `json:"dark"`
+	}
+	if err := json.Unmarshal(data, &themes); err != nil {
+		return nil // as with the rest of docs.json, a setting md2html cannot read is ignored
+	}
+	*f = docsJSONFavicon(cmp.Or(themes.Light, themes.Dark))
+	return nil
+}
+
+// readDocsJSON reads the docs.json at or above sourceDir and reports
+// the directory holding it.
+func readDocsJSON(sourceDir string) (doc docsJSON, siteDir string, ok bool) {
+	sourceDir, err := filepath.Abs(sourceDir)
+	if err != nil {
+		return docsJSON{}, "", false
+	}
+	siteDir, found := findDocsJSON(sourceDir)
+	if !found {
+		return docsJSON{}, "", false
+	}
+	data, err := os.ReadFile(filepath.Join(siteDir, docsJSONName))
+	if err != nil {
+		return docsJSON{}, "", false
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return docsJSON{}, "", false
+	}
+	return doc, siteDir, true
 }
 
 type docsJSONIcons struct {
@@ -205,16 +251,8 @@ func loadDocsJSON(sourceDir, htmlExt string) (nav *Navigation, site siteInfo, ok
 	if err != nil {
 		return nil, siteInfo{}, false
 	}
-	siteDir, found := findDocsJSON(sourceDir)
-	if !found {
-		return nil, siteInfo{}, false
-	}
-	data, err := os.ReadFile(filepath.Join(siteDir, docsJSONName))
-	if err != nil {
-		return nil, siteInfo{}, false
-	}
-	var doc docsJSON
-	if err := json.Unmarshal(data, &doc); err != nil {
+	doc, siteDir, ok := readDocsJSON(sourceDir)
+	if !ok {
 		return nil, siteInfo{}, false
 	}
 
