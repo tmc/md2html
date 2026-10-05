@@ -96,6 +96,17 @@ Define your own with `-components dir`, where `dir` holds a `components.json` na
 
 Each template must reference `{{.Content}}` exactly once, where the Markdown body goes, and reaches attribute values through `{{.Attrs.title}}`. Templates are configuration and may emit any markup; attribute values come from Markdown and are always escaped. A definition may reuse a built-in name to replace it. Pass the same directory to `mdvet -components` so it agrees about which components exist.
 
+`Code` shows a file as a code block, so a page cannot drift from the program it documents:
+
+	<Code src="../examples/hello/main.go" />
+	<Code src="/examples/hello/main.go" region="greet" title="Greeting" link />
+
+`src` is relative to the page, or to the include root when it begins with a slash. `lang` sets the fence language, which otherwise comes from the file name. `region` shows only the lines between comments reading `region NAME` and `endregion NAME`, without the indentation they share; those comments are never shown. `title` captions the block, and `link` makes the caption a link to the file, at the lines shown, in the GitHub repository that `docs.json` names in `navbar.primary`, at the branch, tag, or commit in its `ref` (by default the repository's default branch).
+
+A file must be inside the include root, which is the source directory unless `-include-root dir` names another, such as the repository root. Hidden files, files the ignore file excludes, and files a symbolic link would reach outside the root are refused. A tag that cannot be expanded fails a static build, and the server shows the reason in the page; `mdvet` reports the same errors, given the same `-include-root`. The server reloads a page when a file it includes changes. `llms-full.txt`, the search index, and the Markdown copies written by `-llms` contain the code, not the tag.
+
+Any fenced block that names a language can carry a caption the same way: `` ```go {title="main.go"} ``.
+
 Use `-format=okf` when rendering an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) bundle. It rewrites OKF root-relative Markdown links such as `/tables/orders.md` for the rendered site. It is presentation support only; validate bundles with an OKF-aware tool such as `specmd validate`.
 
 The command is a thin wrapper around package github.com/tmc/md2html.

@@ -67,6 +67,7 @@ func resolveConfigPaths(cfg Config, base string) Config {
 	cfg.JSONSpec = resolveAgainst(base, cfg.JSONSpec)
 	cfg.Components = resolveAgainst(base, cfg.Components)
 	cfg.Icons = resolveAgainst(base, cfg.Icons)
+	cfg.IncludeRoot = resolveAgainst(base, cfg.IncludeRoot)
 	return cfg
 }
 

@@ -22,8 +22,8 @@ type llmsPage struct {
 	Group   string // navigation group, "" when the page is in none
 }
 
-func generateLLMSFiles(sourceDir, outputDir string, files []markdownFile, nav *Navigation, cfg Config) (int, error) {
-	pages, err := collectLLMSPages(sourceDir, files, nav, cfg)
+func generateLLMSFiles(sourceDir, outputDir string, files []markdownFile, nav *Navigation, cfg Config, inc *siteIncludes) (int, error) {
+	pages, err := collectLLMSPages(sourceDir, files, nav, cfg, inc)
 	if err != nil {
 		return 0, err
 	}
@@ -36,7 +36,10 @@ func generateLLMSFiles(sourceDir, outputDir string, files []markdownFile, nav *N
 	return len(pages), nil
 }
 
-func collectLLMSPages(sourceDir string, files []markdownFile, nav *Navigation, cfg Config) ([]llmsPage, error) {
+// collectLLMSPages returns the pages of the site in navigation order.
+// Their content is the Markdown a reader would want: inc has replaced
+// each Code tag with the code it names.
+func collectLLMSPages(sourceDir string, files []markdownFile, nav *Navigation, cfg Config, inc *siteIncludes) ([]llmsPage, error) {
 	byPath := make(map[string]markdownFile)
 	for _, f := range files {
 		rel := normalizeSourcePath(f.RelPath)
@@ -90,7 +93,7 @@ func collectLLMSPages(sourceDir string, files []markdownFile, nav *Navigation, c
 			URL:     cfg.layout().url(f.RelPath),
 			Title:   title,
 			Summary: llmsSummary(doc),
-			Content: string(content),
+			Content: inc.expand(string(content), f.RelPath, 0),
 			Group:   groups[rel],
 		})
 	}
@@ -330,7 +333,7 @@ func rawMarkdownURL(relPath string) string {
 	return "./" + path.Base(normalizeSourcePath(relPath))
 }
 
-func copyRawMarkdown(sourcePath, outputDir, relPath string) error {
+func copyRawMarkdown(sourcePath, outputDir, relPath string, inc *siteIncludes) error {
 	dest := filepath.Join(outputDir, filepath.FromSlash(normalizeSourcePath(relPath)))
 	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
 		return err
@@ -339,5 +342,5 @@ func copyRawMarkdown(sourcePath, outputDir, relPath string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dest, data, 0644)
+	return os.WriteFile(dest, []byte(inc.expand(string(data), relPath, 0)), 0644)
 }

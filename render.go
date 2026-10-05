@@ -202,6 +202,7 @@ func (s *preparedSite) markdownToHTML(markdown, filePath string) (string, error)
 		s = &preparedSite{}
 	}
 	cfg := s.config
+	markdown = s.includes.expand(markdown, filePath, 0)
 	if cfg.AllowUnsafe {
 		markdown = rewriteLocalHTMLAttributes(markdown, filePath, s.rewriteLink)
 		markdown = preprocessHTMLBlocks(markdown)

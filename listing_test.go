@@ -84,7 +84,7 @@ func TestTreeWalkersSkipDependencies(t *testing.T) {
 		}
 	}
 
-	docs, err := buildSearchIndex(root, Config{})
+	docs, err := buildSearchIndex(root, Config{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

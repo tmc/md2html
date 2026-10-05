@@ -282,7 +282,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		}
 	}
 	if cfg.Search {
-		body, n, err := buildSearchIndexJS(sourceDir, cfg)
+		body, n, err := buildSearchIndexJS(sourceDir, cfg, site.includes)
 		if err != nil {
 			logger.Error("error generating search index", "error", err)
 		} else {
@@ -379,12 +379,17 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	}
 
 	if cfg.LLMS {
-		n, err := generateLLMSFiles(sourceDir, outputDir, files, nav, cfg)
+		n, err := generateLLMSFiles(sourceDir, outputDir, files, nav, cfg, site.includes)
 		if err != nil {
 			logger.Error("error generating llms files", "error", err)
 		} else {
 			logger.Info("generated llms files", "documents", n)
 		}
+	}
+	// A page that could not include a file was still written, with the
+	// reason where the code should be, but the site is not fit to publish.
+	for _, e := range site.includes.takeErrors() {
+		renderErrors = append(renderErrors, fmt.Errorf("include %s", e))
 	}
 	if len(renderErrors) > 0 {
 		return errors.Join(renderErrors...)
@@ -425,6 +430,7 @@ func processMarkdownFile(file markdownFile, sourceDir, outputDir, cssContent str
 		slog.Default().Error("error parsing frontmatter", "file", file.RelPath, "error", err)
 		doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 	}
+	doc = site.includes.expandPage(string(content), doc, file.RelPath)
 
 	htmlContent, err := site.markdownToHTML(promoteTitleHeading(doc), file.RelPath)
 	if err != nil {
@@ -443,7 +449,7 @@ func processMarkdownFile(file markdownFile, sourceDir, outputDir, cssContent str
 		return err
 	}
 	if cfg.LLMS {
-		if err := copyRawMarkdown(sourcePath, outputDir, file.RelPath); err != nil {
+		if err := copyRawMarkdown(sourcePath, outputDir, file.RelPath, site.includes); err != nil {
 			return err
 		}
 	}
@@ -541,6 +547,7 @@ func processIndexFile(indexPath, outputDir, cssContent string, site *preparedSit
 	if htmlPath == "" {
 		htmlPath = filepath.Base(indexPath)
 	}
+	doc = site.includes.expandPage(string(content), doc, htmlPath)
 	htmlContent, err := site.markdownToHTML(promoteTitleHeading(doc), htmlPath)
 	if err != nil {
 		return err
@@ -559,7 +566,7 @@ func processIndexFile(indexPath, outputDir, cssContent string, site *preparedSit
 
 	indexOutputPath := filepath.Join(outputDir, "index.html")
 	if cfg.LLMS && opts.FilePath != "" {
-		if err := copyRawMarkdown(indexPath, outputDir, opts.FilePath); err != nil {
+		if err := copyRawMarkdown(indexPath, outputDir, opts.FilePath, site.includes); err != nil {
 			return err
 		}
 	}

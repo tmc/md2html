@@ -175,6 +175,15 @@ type server struct {
 	gitMetadata   map[string]gitProbe
 }
 
+// includes returns the site's Code tag expander, which is nil for a
+// server that has no prepared site.
+func (s *server) includes() *siteIncludes {
+	if s.prepared == nil {
+		return nil
+	}
+	return s.prepared.includes
+}
+
 // sourceRoot returns the directory requests are served from.
 func (s *server) sourceRoot() (string, error) {
 	return sourceRoot(s.base, s.inputPath)
@@ -218,6 +227,14 @@ func (s *server) startWatching() (*fsnotify.Watcher, error) {
 		}
 	}
 	s.watchNavTree()
+	// A page shows the files it includes, which may be anywhere under
+	// the include root. Editors often replace a file instead of writing
+	// to it, so the watch is on the directory.
+	s.includes().watch(func(path string) {
+		if err := s.watchPath(filepath.Dir(path)); err != nil && s.config.Verbose {
+			s.logger.Debug("watch included file", "path", path, "error", err)
+		}
+	})
 	if s.config.Verbose {
 		s.watchMu.Lock()
 		n := len(s.watched)
@@ -346,6 +363,11 @@ func (s *server) handleWatchEvent(ctx context.Context, event fsnotify.Event) {
 			s.cssContent = string(css)
 			s.mu.Unlock()
 		}
+		s.notifyClients()
+		return
+	}
+
+	if s.includes().included(event.Name) {
 		s.notifyClients()
 		return
 	}
@@ -500,7 +522,13 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			s.serveDirectory(ctx, w, root, "", css, "")
 			return
 		}
-		s.serveMarkdown(ctx, w, content, "", css, "")
+		// The source file is rendered as the page it is, so that its
+		// links and Code tags resolve from where it lives.
+		name := ""
+		if s.inputPath != "" {
+			name = filepath.Base(s.inputPath)
+		}
+		s.serveMarkdown(ctx, w, content, name, css, "")
 		return
 	}
 
@@ -587,6 +615,7 @@ func (s *server) serveMarkdown(ctx context.Context, w http.ResponseWriter, conte
 		s.logger.Error("error parsing frontmatter", "file", filePath, "error", err)
 		doc = DocumentData{Content: content, Frontmatter: make(map[string]any)}
 	}
+	doc = s.includes().expandPage(content, doc, filePath)
 	title := s.siteTitle()
 	if filePath != "" {
 		title = documentTitle(doc, filePath, title)
@@ -677,6 +706,7 @@ func (s *server) renderDocumentWithVersion(ctx context.Context, doc DocumentData
 	if err != nil {
 		return "", err
 	}
+	s.logIncludeErrors()
 	if s.config.RenderFrontmatter {
 		html = renderFrontmatterHTML(doc.Frontmatter) + html
 	}
@@ -828,7 +858,8 @@ func (s *server) handleSearchIndex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("resolve source root: %v", err), http.StatusInternalServerError)
 		return
 	}
-	docs, err := buildSearchIndex(root, s.config)
+	docs, err := buildSearchIndex(root, s.config, s.includes())
+	s.logIncludeErrors()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("build search index: %v", err), http.StatusInternalServerError)
 		return
@@ -864,7 +895,18 @@ func (s *server) llmsPages() ([]llmsPage, error) {
 		// Without navigation the pages are still listed, just ungrouped.
 		nav = nil
 	}
-	return collectLLMSPages(root, files, nav, s.config)
+	pages, err := collectLLMSPages(root, files, nav, s.config, s.includes())
+	s.logIncludeErrors()
+	return pages, err
+}
+
+// logIncludeErrors logs the Code tags that failed to expand since it
+// was last called. Every request that expands pages calls it, so that
+// a failure is logged by the request that met it.
+func (s *server) logIncludeErrors() {
+	for _, e := range s.includes().takeErrors() {
+		s.logger.Warn("include failed", "error", e)
+	}
 }
 
 func (s *server) handleLLMS(w http.ResponseWriter, r *http.Request) {

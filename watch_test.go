@@ -288,3 +288,67 @@ func TestWatchEventReloadsNavigationItems(t *testing.T) {
 		t.Errorf("titles = %q after adding a directory, want Nested among them", got)
 	}
 }
+
+func TestWatchEventReloadsIncludedFile(t *testing.T) {
+	root := t.TempDir()
+	docs := filepath.Join(root, "docs")
+	examples := filepath.Join(root, "examples")
+	for _, dir := range []string{docs, examples} {
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	program := filepath.Join(examples, "main.go")
+	if err := os.WriteFile(program, []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	site, err := prepareSite(Config{Source: docs, IncludeRoot: root}, discardLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := site.prepareIncludes(docs, docs); err != nil {
+		t.Fatal(err)
+	}
+	client := make(chan string, 1)
+	s := &server{
+		config:    site.config,
+		prepared:  site,
+		logger:    discardLogger(),
+		clients:   map[chan string]bool{client: true},
+		inputPath: docs,
+	}
+	watcher, err := s.startWatching()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer watcher.Close()
+	if s.watched[examples] {
+		t.Fatal("watching a directory before a page includes a file from it")
+	}
+
+	html, err := site.markdownToHTML("<Code src=\"/examples/main.go\" />\n", "page.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(html, "package") {
+		t.Fatalf("page does not show the included file:\n%s", html)
+	}
+	if !s.watched[examples] {
+		t.Error("directory of an included file is not watched")
+	}
+
+	ctx := context.Background()
+	s.handleWatchEvent(ctx, fsnotify.Event{Name: filepath.Join(examples, "other.go"), Op: fsnotify.Write})
+	select {
+	case <-client:
+		t.Error("reloaded for a file no page includes")
+	default:
+	}
+	s.handleWatchEvent(ctx, fsnotify.Event{Name: program, Op: fsnotify.Write})
+	select {
+	case <-client:
+	default:
+		t.Error("no reload after an included file changed")
+	}
+}

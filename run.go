@@ -56,6 +56,22 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 	if err != nil {
 		return err
 	}
+	if cfg.Source != "-" {
+		root, err := sourceRoot(site.base, cfg.Source)
+		if err != nil {
+			return err
+		}
+		// The server and a static build name pages relative to the
+		// source root. Rendering one file to standard output names it
+		// as the command line did.
+		pagesDir := root
+		if cfg.HTML == "" && cfg.HTTP == "" {
+			pagesDir = site.base
+		}
+		if err := site.prepareIncludes(root, pagesDir); err != nil {
+			return err
+		}
+	}
 
 	// Run mdvet checks before any rendering. Diagnostics are reported
 	// to the logger but never cause Run to fail.
@@ -100,6 +116,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 			logger.Error("error parsing frontmatter", "error", err)
 			doc = DocumentData{Content: string(content), Frontmatter: make(map[string]any)}
 		}
+		doc = site.includes.expandPage(string(content), doc, cfg.Source)
 
 		html, err := site.markdownToHTML(promoteTitleHeading(doc), cfg.Source)
 		if err != nil {

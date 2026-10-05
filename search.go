@@ -23,7 +23,7 @@ type SearchDocument struct {
 // buildSearchIndex walks sourceDir and returns a search document for every
 // markdown file found, ready to be marshaled and consumed by the client-side
 // search.
-func buildSearchIndex(sourceDir string, cfg Config) ([]SearchDocument, error) {
+func buildSearchIndex(sourceDir string, cfg Config, inc *siteIncludes) ([]SearchDocument, error) {
 	var documents []SearchDocument
 
 	ignore, err := loadIgnoreSet(sourceDir)
@@ -62,6 +62,8 @@ func buildSearchIndex(sourceDir string, cfg Config) ([]SearchDocument, error) {
 		if draft, _ := doc.Frontmatter["draft"].(bool); draft && !cfg.Drafts {
 			return nil
 		}
+		relPath, _ := filepath.Rel(sourceDir, path)
+		doc = inc.expandPage(string(content), doc, relPath)
 
 		title := ""
 		if t, ok := doc.Frontmatter["title"].(string); ok {
@@ -79,7 +81,6 @@ func buildSearchIndex(sourceDir string, cfg Config) ([]SearchDocument, error) {
 			blurb = extractBlurb(doc.Content)
 		}
 
-		relPath, _ := filepath.Rel(sourceDir, path)
 		category := filepath.Dir(relPath)
 		if category == "." {
 			category = ""
@@ -128,8 +129,8 @@ func renderSearchIndexJS(documents []SearchDocument) ([]byte, error) {
 	return out, nil
 }
 
-func buildSearchIndexJS(sourceDir string, cfg Config) ([]byte, int, error) {
-	documents, err := buildSearchIndex(sourceDir, cfg)
+func buildSearchIndexJS(sourceDir string, cfg Config, inc *siteIncludes) ([]byte, int, error) {
+	documents, err := buildSearchIndex(sourceDir, cfg, inc)
 	if err != nil {
 		return nil, 0, err
 	}

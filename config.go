@@ -36,7 +36,10 @@ type Config struct {
 	// HTMLLayout is how a static build lays out its pages: "file", the
 	// default, writes guide.md as guide.html, and "dir" writes it as
 	// guide/index.html so that it is served as guide/.
-	HTMLLayout      string
+	HTMLLayout string
+	// IncludeRoot is the directory the files that pages include with
+	// Code tags must be inside. Empty means the source directory.
+	IncludeRoot     string
 	Versions        bool
 	VersionPattern  string
 	VersionBranches bool
@@ -123,6 +126,10 @@ type preparedSite struct {
 	// links resolves root-absolute page links. It is set only for
 	// static builds; the server serves those paths directly.
 	links *siteLinks
+
+	// includes expands Code tags. It is nil until prepareIncludes says
+	// which files pages may read.
+	includes *siteIncludes
 }
 
 // newPreparedSite returns a site whose configuration paths are resolved
@@ -184,6 +191,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.String("index", "", "default file to serve for root path (e.g., README.md, index.md)")
 	fs.String("html-ext", "", "file extension for generated HTML files (e.g., 'html' for .html, empty for no extension except index.html)")
 	fs.String("html-layout", "", "layout of static output: 'file' writes guide.md as guide.html (default), 'dir' writes guide/index.html, linked as guide/")
+	fs.String("include-root", "", "directory that files included with <Code src> must be inside (default: the source directory)")
 	fs.Bool("versions", false, "enable versioned documentation using git tags/refs")
 	fs.String("version-pattern", "*", "git tag pattern to match for versions (e.g., 'v*', 'release-*')")
 	fs.Bool("version-branches", false, "include branches as versions alongside tags")
@@ -227,6 +235,7 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		Index:             flagString(fs, "index"),
 		HTMLExt:           flagString(fs, "html-ext"),
 		HTMLLayout:        flagString(fs, "html-layout"),
+		IncludeRoot:       flagString(fs, "include-root"),
 		Versions:          flagBool(fs, "versions"),
 		VersionPattern:    flagString(fs, "version-pattern"),
 		VersionBranches:   flagBool(fs, "version-branches"),

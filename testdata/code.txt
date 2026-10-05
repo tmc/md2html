@@ -1,0 +1,137 @@
+# A Code tag shows a file as a fenced code block, so a page cannot drift
+# from the program it documents.
+
+md2html -html out -llms -search -include-root . docs
+grep -q 'fmt' out/guide.html
+grep -q 'Println' out/guide.html
+grep -q 'data-language="Go"' out/guide.html
+! grep -q 'region greet' out/guide.html
+
+# A tag inside a fence is an example, and is left alone.
+grep -q 'shown-as-text.go' out/guide.html
+! grep -q 'class="admonition adm-danger"' out/guide.html
+
+# A region is shown without its markers or its indentation, and a
+# relative src is resolved against the page.
+grep -q '<div class="md-code-title">Greeting</div>' out/guide.html
+grep -q 'beside' out/guide.html
+
+# With link, the caption links to the file in the repository docs.json
+# names, at the lines shown.
+grep -q '<a href="https://github.com/example/project/blob/v1.2.0/examples/hello/main.go#L7">examples/hello/main.go</a>' out/guide.html
+
+# The Markdown that readers and tools get has the code in it.
+grep -q 'fmt.Println' out/guide.md
+! grep -q '<Code src="/examples' out/guide.md
+grep -q '<Code src="shown-as-text.go" />' out/guide.md
+grep -q 'fmt.Println' out/llms-full.txt
+
+# By default the include root is the source directory, so the same page
+# cannot reach the examples above it. The build fails, and the page says
+# why where the code would be.
+! md2html -html narrow docs
+stderr 'include guide.md:5: examples/hello/main.go: no such file'
+grep -q 'Code: examples/hello/main.go: no such file' narrow/guide.html
+
+# A file that is missing, outside the root, hidden, or kept out of the
+# site by the ignore file is an error too.
+! md2html -html bad -include-root . baddocs
+stderr 'include page.md:3: baddocs/gone.go: no such file'
+stderr 'include page.md:5: ../../outside.go: outside the include root'
+stderr 'include page.md:7: .secret: hidden files cannot be included'
+stderr 'include page.md:9: baddocs/private/key.go: excluded by the ignore file'
+stderr 'include page.md:11: /examples/hello/main.go: no region nope'
+stderr 'include page.md:13: unknown attribute symbol'
+grep -q 'class="admonition adm-danger"' bad/page.html
+
+# The line of a failing tag counts the page's frontmatter.
+stderr 'include front.md:5: baddocs/gone.go: no such file'
+
+# The server shows the same error in the page instead of failing.
+cd baddocs
+md2html -http :9145 -include-root .. &
+wait-port :9145
+curl -s http://localhost:9145/page
+stdout 'Code: baddocs/gone.go: no such file'
+stdout 'class="admonition adm-danger"'
+cd ..
+
+# A single page served on its own includes files beside it at the root
+# URL, as at its own.
+md2html -http :9146 docs/guide.md &
+wait-port :9146
+curl -s http://localhost:9146/
+stdout '<span class="nb">echo</span> beside'
+! stdout 'files cannot be included here'
+
+-- docs/docs.json --
+{
+  "name": "Project",
+  "ref": "v1.2.0",
+  "navbar": {
+    "primary": {"type": "github", "href": "https://github.com/example/project"}
+  },
+  "navigation": {"pages": ["guide"]}
+}
+-- docs/guide.md --
+# Guide
+
+The whole program:
+
+<Code src="/examples/hello/main.go" />
+
+Only the greeting:
+
+<Code src="/examples/hello/main.go" region="greet" title="Greeting" />
+
+<Code src="/examples/hello/main.go" region="greet" link />
+
+A script beside this page:
+
+<Code src="run.sh" />
+
+Write it like this:
+
+```mdx
+<Code src="shown-as-text.go" />
+```
+-- docs/run.sh --
+echo beside
+-- examples/hello/main.go --
+package main
+
+import "fmt"
+
+func main() {
+	// region greet
+	fmt.Println("hello")
+	// endregion greet
+}
+-- outside.go --
+package outside
+-- baddocs/.md2htmlignore --
+private/
+-- baddocs/.secret --
+secret
+-- baddocs/private/key.go --
+package private
+-- baddocs/front.md --
+---
+title: Front
+---
+
+<Code src="gone.go" />
+-- baddocs/page.md --
+# Page
+
+<Code src="gone.go" />
+
+<Code src="../../outside.go" />
+
+<Code src=".secret" />
+
+<Code src="private/key.go" />
+
+<Code src="/examples/hello/main.go" region="nope" />
+
+<Code src="/examples/hello/main.go" symbol="main" />
