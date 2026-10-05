@@ -43,7 +43,7 @@ func buildSearchIndex(sourceDir string, cfg Config) ([]SearchDocument, error) {
 		if info.IsDir() && path != sourceDir && isDependencyDir(info.Name()) {
 			return filepath.SkipDir
 		}
-		if info.IsDir() || !markdownfile.Is(path) {
+		if info.IsDir() || !markdownfile.Is(path) || strings.EqualFold(info.Name(), "SUMMARY.md") {
 			return nil
 		}
 
@@ -58,6 +58,9 @@ func buildSearchIndex(sourceDir string, cfg Config) ([]SearchDocument, error) {
 				Content:     string(content),
 				Frontmatter: make(map[string]any),
 			}
+		}
+		if draft, _ := doc.Frontmatter["draft"].(bool); draft && !cfg.Drafts {
+			return nil
 		}
 
 		title := ""
@@ -248,19 +251,16 @@ func extractBlurb(content string) string {
 	return strings.Join(textLines, " ")
 }
 
-// convertPathToURL converts a file path to a URL
+// convertPathToURL returns the URL of the page rendered from relPath,
+// relative to the site root. It has no leading slash, so that the site
+// works wherever it is published: under a URL prefix, or opened from
+// disk. The search script resolves it against its own location.
 func convertPathToURL(relPath string, htmlExt string) string {
-	url := markdownfile.TrimExt(relPath)
-
+	url := markdownfile.TrimExt(filepath.ToSlash(relPath))
 	if htmlExt != "" {
 		url += "." + htmlExt
 	}
-
-	if !strings.HasPrefix(url, "/") {
-		url = "/" + url
-	}
-
-	return url
+	return strings.TrimPrefix(url, "/")
 }
 
 // truncate truncates text to maxLen characters

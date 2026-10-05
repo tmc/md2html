@@ -37,7 +37,7 @@ stdout 'Home body'
 # The search index covers them, under their rendered URLs.
 curl -s http://localhost:9141/search-index.js
 stdout '"title":"The Guide"'
-stdout '"url":"/api/client"'
+stdout '"url":"api/client"'
 ! stdout 'client\.mdx'
 
 -- src/index.mdx --

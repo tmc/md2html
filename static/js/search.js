@@ -3,6 +3,15 @@ let searchIndex = null;
 let searchData = null;
 let selectedResultIndex = -1;
 
+// Index URLs are relative to the site root, which is the parent of the
+// js/ directory this script is served from. Resolving them here keeps
+// search working under a URL prefix and from file://.
+const siteRoot = new URL('../', document.currentScript.src);
+
+function resultURL(url) {
+    return new URL(url, siteRoot).href;
+}
+
 // Initialize search when modal is opened
 function initSearch() {
     if (searchIndex) return; // Already initialized
@@ -103,9 +112,7 @@ function displayResults(results, query) {
     // Add click handlers
     resultsContainer.querySelectorAll('.search-result').forEach(el => {
         el.addEventListener('click', () => {
-            const url = el.dataset.url;
-            // TODO: support file:// (doc.url is absolute)
-            window.location.href = url;
+            window.location.href = resultURL(el.dataset.url);
         });
     });
 }
@@ -159,9 +166,7 @@ function navigateResults(direction) {
 function selectResult() {
     const results = document.querySelectorAll('.search-result');
     if (selectedResultIndex >= 0 && selectedResultIndex < results.length) {
-        const url = results[selectedResultIndex].dataset.url;
-        // TODO: support file:// (doc.url is absolute)
-        window.location.href = url;
+        window.location.href = resultURL(results[selectedResultIndex].dataset.url);
     }
 }
 

@@ -19,27 +19,39 @@ exists out/sub/nested.html
 exists out/js
 
 # search-index.js assigns the global, not a JSON file.
-exists out/search-index.7a9ed859.js
+exists out/search-index.27a14f92.js
 exists out/js/minisearch.min.e66b5b61.js
-exists out/js/search.b099a4d5.js
-grep '^window\.MD2HTML_SEARCH_INDEX = \[' out/search-index.7a9ed859.js
-grep '"title":"README"' out/search-index.7a9ed859.js
-grep '"title":"Nested Page"' out/search-index.7a9ed859.js
+exists out/js/search.74b4db00.js
+grep '^window\.MD2HTML_SEARCH_INDEX = \[' out/search-index.27a14f92.js
+grep '"title":"README"' out/search-index.27a14f92.js
+grep '"title":"Nested Page"' out/search-index.27a14f92.js
 
 # Top-level page references assets with ./ prefix.
 grep 'src="./js/minisearch.min.e66b5b61.js"' out/README.html
-grep 'src="./search-index.7a9ed859.js"' out/README.html
-grep 'src="./js/search.b099a4d5.js"' out/README.html
+grep 'src="./search-index.27a14f92.js"' out/README.html
+grep 'src="./js/search.74b4db00.js"' out/README.html
 
 # Nested page references assets with ../ prefix.
 grep 'src="../js/minisearch.min.e66b5b61.js"' out/sub/nested.html
-grep 'src="../search-index.7a9ed859.js"' out/sub/nested.html
-grep 'src="../js/search.b099a4d5.js"' out/sub/nested.html
+grep 'src="../search-index.27a14f92.js"' out/sub/nested.html
+grep 'src="../js/search.74b4db00.js"' out/sub/nested.html
 
 # No absolute /js/ paths, no fetch of search-index.json.
 ! grep 'src="/js/' out/README.html
 ! grep 'src="/js/' out/sub/nested.html
-! grep 'search-index\.json' out/js/search.b099a4d5.js
+! grep 'search-index\.json' out/js/search.74b4db00.js
+
+# Index URLs are relative to the site root, and the script resolves
+# them against its own location, so results work wherever the site is
+# published: under a URL prefix such as -base names, or from disk.
+grep '"url":"README.html"' out/search-index.27a14f92.js
+grep '"url":"sub/nested.html"' out/search-index.27a14f92.js
+! grep '"url":"/' out/search-index.27a14f92.js
+grep 'document.currentScript.src' out/js/search.74b4db00.js
+
+# Drafts and SUMMARY.md are not pages, so they are not indexed.
+! grep 'Unfinished' out/search-index.27a14f92.js
+! grep 'SUMMARY' out/search-index.27a14f92.js
 
 # Without -search, none of these assets are produced.
 rm -rf out
@@ -52,6 +64,19 @@ exists out2/README.html
 # README
 
 Welcome to the smoke test site.
+
+-- src/SUMMARY.md --
+# Summary
+
+- [README](README.md)
+- [Nested](sub/nested.md)
+
+-- src/sub/draft.md --
+---
+title: Unfinished
+draft: true
+---
+Not ready.
 
 -- src/sub/nested.md --
 ---
