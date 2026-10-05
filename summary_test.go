@@ -473,3 +473,24 @@ func TestAutoNavigationIconType(t *testing.T) {
 		t.Errorf("iconType = %q, want regular", got)
 	}
 }
+
+func TestParseSummaryExternalLink(t *testing.T) {
+	nav, err := ParseSummary("# Summary\n\n- [Intro](intro.md)\n- [API](https://pkg.go.dev/example.com/x)\n- [Guide](guide.md)\n", "html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nav.Items) != 3 {
+		t.Fatalf("got %d items, want 3", len(nav.Items))
+	}
+	api := nav.Items[1]
+	if !api.External || api.URL != "https://pkg.go.dev/example.com/x" || api.Path != "" {
+		t.Errorf("external item = %+v, want an external link with no path", api)
+	}
+	if len(nav.Flat) != 2 {
+		t.Errorf("reading order has %d pages, want 2", len(nav.Flat))
+	}
+	ctx := nav.ForPage("intro.md")
+	if ctx.Next == nil || ctx.Next.Path != "guide.md" {
+		t.Errorf("next after intro.md = %+v, want guide.md", ctx.Next)
+	}
+}

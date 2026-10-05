@@ -1,0 +1,21 @@
+# A SUMMARY.md link to another site stays a link to that site. It is
+# shown in the sidebar and is not a page to step to.
+
+md2html -nav -html out src
+
+grep -q 'href="https://pkg.go.dev/example.com/x" class="nav-external"' out/intro.html
+! grep 'pkg.go.dev[^"]*\.html' out/intro.html
+grep -q 'href="guide.html" class="nav-next"' out/intro.html
+
+-- src/SUMMARY.md --
+# Summary
+
+- [Intro](intro.md)
+- [API Reference](https://pkg.go.dev/example.com/x)
+- [Guide](guide.md)
+
+-- src/intro.md --
+# Intro
+
+-- src/guide.md --
+# Guide

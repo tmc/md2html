@@ -2,6 +2,7 @@ package md2html
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -26,6 +27,7 @@ type NavItem struct {
 	Children []*NavItem `json:"children,omitempty"` // Nested items
 	IsGroup  bool       `json:"isGroup"`            // True for ## section headers
 	IsSep    bool       `json:"isSep"`              // True for --- separators
+	External bool       `json:"external,omitempty"` // True for a link to another site: URL is set, Path is not
 }
 
 // Navigation represents the full navigation tree parsed from SUMMARY.md.
@@ -114,11 +116,21 @@ func parseSummaryLine(line, htmlExt string) *NavItem {
 		match := linkPattern.FindStringSubmatch(trimmed)
 		if match != nil {
 			path := match[2]
-			url := pathToURL(path, htmlExt)
+			// A link with a scheme leaves the site. It is shown in
+			// the sidebar but is no page: it has no Path, so it is
+			// in neither the reading order nor the page index.
+			if u, err := url.Parse(path); strings.HasPrefix(path, "//") || err == nil && u.Scheme != "" {
+				return &NavItem{
+					Title:    match[1],
+					URL:      path,
+					Level:    level,
+					External: true,
+				}
+			}
 			return &NavItem{
 				Title: match[1],
 				Path:  path,
-				URL:   url,
+				URL:   pathToURL(path, htmlExt),
 				Level: level,
 			}
 		}

@@ -28,7 +28,7 @@ Generate static output with docs navigation:
 
 	md2html -nav -html _site .
 
-`-nav` takes navigation from `SUMMARY.md`, then from a Mintlify `docs.json` covering the tree, then from the shape of the tree itself. A `docs.json` is looked for in the source directory and its parents, since it sits at the root of the published site while the Markdown often lives in a subdirectory; its page paths are resolved against that root, and pages outside the directory being served are skipped. Its `name` becomes the site title unless `-title` says otherwise.
+`-nav` takes navigation from `SUMMARY.md`, then from a Mintlify `docs.json` covering the tree, then from the shape of the tree itself. A `docs.json` is looked for in the source directory and its parents, since it sits at the root of the published site while the Markdown often lives in a subdirectory; its page paths are resolved against that root, and pages outside the directory being served are skipped. Its `name` becomes the site title unless `-title` says otherwise. A `SUMMARY.md` link to another site, such as `[API](https://pkg.go.dev/example.com/x)`, is shown in the sidebar and left out of the previous and next links.
 
 A static build writes `guide.md` as `guide.html`. With `-html-layout dir` it writes `guide/index.html` instead and links to it as `guide/`, for hosts that serve files as they are; references to images and other files beside a page are adjusted to match.
 

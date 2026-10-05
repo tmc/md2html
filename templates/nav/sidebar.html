@@ -18,7 +18,7 @@
     <li class="nav-sep"><hr></li>
   {{else}}
     <li class="nav-item level-{{.Level}}">
-      <a href="{{navHref $.FilePath .Path $.HTMLExt $.IndexFile}}"{{if and $.Current (eq .Path $.Current.Path)}} class="active" aria-current="page"{{end}}>
+      <a {{if .External}}href="{{.URL}}" class="nav-external" rel="noopener"{{else}}href="{{navHref $.FilePath .Path $.HTMLExt $.IndexFile}}"{{if and $.Current (eq .Path $.Current.Path)}} class="active" aria-current="page"{{end}}{{end}}>
         {{if .Icon}}<span class="nav-icon" data-icon="{{.Icon}}" aria-hidden="true">{{navIcon .Icon .IconType}}</span>{{end}}
         {{.Title}}
       </a>
