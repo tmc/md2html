@@ -22,6 +22,14 @@ func TestNavigationCheck(t *testing.T) {
 			},
 		},
 		{
+			name: "draft and external link",
+			files: map[string]string{
+				"SUMMARY.md": "- [Intro](intro.md)\n- [API](https://pkg.go.dev/example.com/x)\n",
+				"intro.md":   "# Intro\n",
+				"later.mdx":  "---\ndraft: true\n---\n# Later\n",
+			},
+		},
+		{
 			name: "missing target",
 			files: map[string]string{
 				"SUMMARY.md": "- [Missing](missing.md)\n",

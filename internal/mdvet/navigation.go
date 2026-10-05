@@ -10,7 +10,8 @@ import (
 	"strings"
 )
 
-// NavigationCheck verifies that SUMMARY.md covers the markdown tree.
+// NavigationCheck verifies that SUMMARY.md covers the markdown tree,
+// apart from pages marked draft: true.
 type NavigationCheck struct{}
 
 // Name implements [Check].
@@ -62,8 +63,12 @@ func (NavigationCheck) Check(doc *Document) ([]Diagnostic, error) {
 	}
 	for _, rel := range files {
 		if _, ok := refs[rel]; !ok {
+			file := filepath.Join(root, filepath.FromSlash(rel))
+			if isDraft(file) {
+				continue
+			}
 			diags = append(diags, Diagnostic{
-				File:    filepath.Join(root, filepath.FromSlash(rel)),
+				File:    file,
 				Line:    1,
 				Col:     1,
 				Check:   "nav",
@@ -72,6 +77,22 @@ func (NavigationCheck) Check(doc *Document) ([]Diagnostic, error) {
 		}
 	}
 	return diags, nil
+}
+
+// isDraft reports whether the page in file is marked draft: true.
+// md2html does not publish a draft, so it has no place in the
+// navigation to be missing from.
+func isDraft(file string) bool {
+	src, err := os.ReadFile(file)
+	if err != nil {
+		return false
+	}
+	fm, ok, err := frontmatter(src)
+	if !ok || err != nil {
+		return false
+	}
+	draft, _ := fm["draft"].(bool)
+	return draft
 }
 
 func navDiag(file string, line, col int, msg string) Diagnostic {
