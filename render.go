@@ -284,6 +284,15 @@ func (s *preparedSite) markdownToHTML(markdown, filePath string) (string, error)
 				if rewritten, ok := s.config.layout().relocate(filePath, string(n.Destination)); ok {
 					n.Destination = []byte(rewritten)
 				}
+			case *ast.FencedCodeBlock:
+				setFenceAttributes(n, source)
+				if v, ok := n.AttributeString("href"); ok {
+					if href, ok := v.([]byte); ok {
+						if rewritten, ok := s.rewriteLink(filePath, string(href)); ok {
+							n.SetAttribute([]byte("href"), []byte(rewritten))
+						}
+					}
+				}
 			case *components.Node:
 				attrs = n.Attrs
 			case *components.Inline:

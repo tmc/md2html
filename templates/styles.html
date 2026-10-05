@@ -312,6 +312,34 @@
         border-top-right-radius: 0;
     }
 
+    /* A caption names the file a block shows. It sits under the
+       language strip when there is one and takes its place otherwise. */
+    .md-code-title {
+        padding: 0.4rem 1.1rem;
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        line-height: 1.4;
+        color: var(--text-2);
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        border-bottom: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .md-code-title:first-child {
+        border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    .md-code-title a {
+        color: inherit;
+    }
+
+    .md-code-title ~ pre,
+    .md-code-title ~ * pre {
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+    }
+
     pre {
         margin: 1.4rem 0;
         padding: 1rem 1.1rem;

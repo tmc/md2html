@@ -1,11 +1,16 @@
 package md2html
 
 import (
+	"bytes"
 	"fmt"
 	"html"
+	"net/url"
 	"strings"
 
 	"github.com/yuin/goldmark-highlighting/v2"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
 )
 
@@ -69,6 +74,69 @@ func codeLanguageLabel(lang string) string {
 	return strings.ToUpper(lang)
 }
 
+// writeCodeTitle writes the caption of a code block whose fence names
+// one, as in
+//
+//	```go {title="main.go" href="https://example.com/main.go"}
+//
+// The href, which is optional, makes the caption a link. Only a web
+// address or a relative one is accepted, since the attribute is as
+// much the author's as any link in the page.
+func writeCodeTitle(w util.BufWriter, ctx highlighting.CodeBlockContext) {
+	attrs := ctx.Attributes()
+	if attrs == nil {
+		return
+	}
+	attr := func(name string) string {
+		v, _ := attrs.Get([]byte(name))
+		b, _ := v.([]byte)
+		return string(b)
+	}
+	title, href := attr("title"), attr("href")
+	if title == "" {
+		return
+	}
+	if u, err := url.Parse(href); err != nil || (u.Scheme != "" && u.Scheme != "http" && u.Scheme != "https") {
+		href = ""
+	}
+	w.WriteString(`<div class="md-code-title">`)
+	if href != "" {
+		fmt.Fprintf(w, `<a href="%s">%s</a>`, html.EscapeString(href), html.EscapeString(title))
+	} else {
+		w.WriteString(html.EscapeString(title))
+	}
+	w.WriteString("</div>\n")
+}
+
+// setFenceAttributes sets on n the attributes its fence names in
+// braces, as in
+//
+//	```go {title="main.go" href="main.go"}
+//
+// The highlighter reads them from the fence itself only when n has no
+// attributes of its own, so setting them on n lets a caption's link be
+// rewritten as any other link in the page is, and keeps them when an
+// extension has set attributes of its own. Those take precedence.
+func setFenceAttributes(n *ast.FencedCodeBlock, source []byte) {
+	if n.Info == nil {
+		return
+	}
+	info := n.Info.Segment.Value(source)
+	i := bytes.IndexByte(info, '{')
+	if i <= 0 {
+		return
+	}
+	attrs, ok := parser.ParseAttributes(text.NewReader(info[i:]))
+	if !ok {
+		return
+	}
+	for _, a := range attrs {
+		if _, ok := n.Attribute(a.Name); !ok {
+			n.SetAttribute(a.Name, a.Value)
+		}
+	}
+}
+
 // codeBlockWrapper wraps every highlighted code block in a container
 // carrying the fence language, so a reader can tell Go from shell without
 // reading the code and the copy button has somewhere to sit. inner, when
@@ -90,6 +158,7 @@ func codeBlockWrapper(inner highlighting.WrapperRenderer) highlighting.WrapperRe
 			if label != "" {
 				fmt.Fprintf(w, `<span class="md-code-lang" aria-hidden="true">%s</span>`+"\n", html.EscapeString(label))
 			}
+			writeCodeTitle(w, ctx)
 		}
 
 		if inner != nil {
