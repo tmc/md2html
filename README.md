@@ -30,7 +30,9 @@ Generate static output with docs navigation:
 
 `-nav` takes navigation from `SUMMARY.md`, then from a Mintlify `docs.json` covering the tree, then from the shape of the tree itself. A `docs.json` is looked for in the source directory and its parents, since it sits at the root of the published site while the Markdown often lives in a subdirectory; its page paths are resolved against that root, and pages outside the directory being served are skipped. Its `name` becomes the site title unless `-title` says otherwise.
 
-Links to `.md` files become links to the rendered pages. A static build also rewrites root-absolute links to pages in the tree, such as `/docs/quickstart`, relative to each page, so the output works when hosted under a prefix. Those paths are resolved from the directory holding `docs.json`, or from the source directory if there is none. Links that name no page are left alone.
+A static build writes `guide.md` as `guide.html`. With `-html-layout dir` it writes `guide/index.html` instead and links to it as `guide/`, for hosts that serve files as they are; references to images and other files beside a page are adjusted to match.
+
+Files named `.md`, `.markdown`, and `.mdx` are pages. Links to them become links to the rendered pages. A static build also rewrites root-absolute links to pages in the tree, such as `/docs/quickstart`, relative to each page, so the output works when hosted under a prefix. Those paths are resolved from the directory holding `docs.json`, or from the source directory if there is none. Links that name no page are left alone.
 
 Navigation and component icons work without installation. md2html embeds pinned Font Awesome Free, Lucide, and Tabler Outline sets and follows `docs.json`'s `icons.library`; the Mintlify default is Font Awesome. Font Awesome's `iconType` supports the free `solid`, `regular`, and `brands` styles. An unavailable icon is left blank and reported once.
 
