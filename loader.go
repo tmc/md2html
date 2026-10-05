@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/tmc/md2html/internal/anchor"
+	"github.com/tmc/md2html/internal/markdownfile"
 	"github.com/yuin/goldmark"
 	meta "github.com/yuin/goldmark-meta"
 	"github.com/yuin/goldmark/ast"
@@ -36,12 +37,12 @@ func NewLoader(baseDir, htmlExt string) *Loader {
 // Load auto-detects file type by extension and loads accordingly.
 func (l *Loader) Load(path string) (any, error) {
 	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".json":
+	switch {
+	case ext == ".json":
 		return l.LoadJSON(path)
-	case ".yaml", ".yml":
+	case ext == ".yaml", ext == ".yml":
 		return l.LoadYAML(path)
-	case ".md", ".markdown":
+	case markdownfile.Is(path):
 		return l.LoadMD(path)
 	default:
 		// Return raw content for unknown types

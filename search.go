@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/tmc/md2html/internal/markdownfile"
 )
 
 // SearchDocument represents a document in the search index.
@@ -41,7 +43,7 @@ func buildSearchIndex(sourceDir string, cfg Config) ([]SearchDocument, error) {
 		if info.IsDir() && path != sourceDir && isDependencyDir(info.Name()) {
 			return filepath.SkipDir
 		}
-		if info.IsDir() || !strings.HasSuffix(path, ".md") {
+		if info.IsDir() || !markdownfile.Is(path) {
 			return nil
 		}
 
@@ -62,7 +64,7 @@ func buildSearchIndex(sourceDir string, cfg Config) ([]SearchDocument, error) {
 		if t, ok := doc.Frontmatter["title"].(string); ok {
 			title = t
 		} else {
-			title = strings.TrimSuffix(filepath.Base(path), ".md")
+			title = markdownfile.TrimExt(filepath.Base(path))
 		}
 
 		blurb := ""
@@ -248,7 +250,7 @@ func extractBlurb(content string) string {
 
 // convertPathToURL converts a file path to a URL
 func convertPathToURL(relPath string, htmlExt string) string {
-	url := strings.TrimSuffix(relPath, ".md")
+	url := markdownfile.TrimExt(relPath)
 
 	if htmlExt != "" {
 		url += "." + htmlExt

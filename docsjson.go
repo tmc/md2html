@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/tmc/md2html/internal/markdownfile"
 )
 
 // docsJSONName is the Mintlify site configuration file. It sits at the
@@ -286,7 +288,7 @@ func (b docsJSONBuilder) page(pagePath string, level int) *NavItem {
 		return nil
 	}
 
-	for _, ext := range []string{".md", ".markdown", ".mdx"} {
+	for _, ext := range markdownfile.Exts() {
 		source := rel + ext
 		full := filepath.Join(b.sourceDir, filepath.FromSlash(source))
 		data, err := os.ReadFile(full)

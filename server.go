@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/tmc/md2html/internal/markdownfile"
 )
 
 func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *server {
@@ -347,8 +348,7 @@ func (s *server) handleWatchEvent(ctx context.Context, event fsnotify.Event) {
 	// changes every page, not only the one being viewed. A page is a
 	// navigation source too: its frontmatter supplies the title and icon
 	// of its sidebar entry, and creating or removing it changes the tree.
-	name := strings.ToLower(event.Name)
-	if samePath(event.Name, s.navConfig) || strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".markdown") {
+	if samePath(event.Name, s.navConfig) || markdownfile.Is(event.Name) {
 		s.reloadNavigation(ctx)
 		s.notifyClients()
 		return
@@ -518,8 +518,11 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	candidates := []string{cleanPath}
-	if !strings.HasSuffix(cleanPath, ".md") && !strings.HasSuffix(cleanPath, ".markdown") {
-		candidates = []string{cleanPath + ".md", cleanPath + ".markdown"}
+	if !markdownfile.Is(cleanPath) {
+		candidates = nil
+		for _, ext := range markdownfile.Exts() {
+			candidates = append(candidates, cleanPath+ext)
+		}
 	}
 	for _, candidate := range candidates {
 		var fileContent []byte

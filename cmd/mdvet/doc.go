@@ -5,7 +5,7 @@
 //	mdvet [flags] path...
 //
 // Each path may be a Markdown file or a directory; directories are
-// walked recursively for .md and .markdown files.
+// walked recursively for .md, .markdown, and .mdx files.
 //
 // Available checks:
 //

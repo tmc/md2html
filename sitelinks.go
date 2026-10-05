@@ -5,6 +5,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/tmc/md2html/internal/markdownfile"
 )
 
 // siteLinks resolves root-absolute links such as "/docs/quickstart" to the
@@ -82,14 +84,17 @@ func pageCandidates(rel string) []string {
 	if rel == "" {
 		return indexNames
 	}
-	switch path.Ext(rel) {
-	case ".md", ".markdown":
+	if markdownfile.Is(rel) {
 		return []string{rel}
 	}
-	stem := strings.TrimSuffix(rel, path.Ext(rel))
-	out := []string{rel + ".md", rel + ".markdown"}
-	if stem != rel {
-		out = append(out, stem+".md", stem+".markdown")
+	var out []string
+	for _, ext := range markdownfile.Exts() {
+		out = append(out, rel+ext)
+	}
+	if stem := strings.TrimSuffix(rel, path.Ext(rel)); stem != rel {
+		for _, ext := range markdownfile.Exts() {
+			out = append(out, stem+ext)
+		}
 	}
 	for _, name := range indexNames {
 		out = append(out, path.Join(rel, name))

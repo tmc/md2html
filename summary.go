@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/tmc/md2html/internal/markdownfile"
 )
 
 // NavItem represents a single navigation entry from SUMMARY.md.
@@ -263,7 +265,7 @@ func (n *Navigation) findAncestors(path string) []*NavItem {
 func normalizePath(path string) string {
 	path = strings.TrimPrefix(path, "./")
 	path = strings.TrimPrefix(path, "/")
-	if !strings.HasSuffix(path, ".md") && !strings.HasSuffix(path, ".markdown") {
+	if !markdownfile.Is(path) {
 		path = path + ".md"
 	}
 	return path
@@ -360,8 +362,7 @@ func autoNavigationFromDir(sourceDir, htmlExt string) (*Navigation, error) {
 			}
 			return nil
 		}
-		ext := strings.ToLower(filepath.Ext(base))
-		if ext != ".md" && ext != ".markdown" {
+		if !markdownfile.Is(base) {
 			return nil
 		}
 		rel, err := filepath.Rel(sourceDir, name)
@@ -585,12 +586,15 @@ func landingLess(a, b autoNavFile) bool {
 }
 
 func landingRank(base string) int {
-	switch strings.ToLower(base) {
-	case "index.md", "index.markdown":
+	if !markdownfile.Is(base) {
+		return 3
+	}
+	switch strings.ToLower(markdownfile.TrimExt(base)) {
+	case "index":
 		return 0
-	case "readme.md", "readme.markdown":
+	case "readme":
 		return 1
-	case "skill.md", "skill.markdown":
+	case "skill":
 		// An agent skill is the landing page of the directory named for
 		// it, but yields to a README written for people.
 		return 2

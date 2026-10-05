@@ -7,9 +7,12 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/tmc/md2html/internal/markdownfile"
 )
 
 // listingTitle names a generated directory listing. The label is the
@@ -147,8 +150,7 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 				continue
 			}
 
-			name := strings.ToLower(info.Name())
-			if strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".markdown") {
+			if markdownfile.Is(info.Name()) {
 				if ignore.excludes(apparentPath, false) {
 					continue
 				}
@@ -242,9 +244,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 	// A README.md or SKILL.md root is then treated as if named by -index,
 	// so links and canonical URLs for it name the site root.
 	if cfg.Index == "" {
-		switch name := rootIndexName(sourceDir, files, cfg.Drafts); name {
-		case "", "index.md", "index.markdown":
-		default:
+		if name := rootIndexName(sourceDir, files, cfg.Drafts); name != "" && !markdownfile.IsIndex(name) {
 			cfg.Index = name
 			site.config.Index = name
 		}
@@ -348,7 +348,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 				logger.Debug("processed index file", "file", indexFile)
 			}
 		}
-	} else if !rendered["index.md"] && !rendered["index.markdown"] {
+	} else if !slices.ContainsFunc(markdownfile.Exts(), func(ext string) bool { return rendered["index"+ext] }) {
 		if err := generateTOCIndex(outputDir, files, cssContent, site, assets); err != nil {
 			logger.Error("error generating TOC index", "error", err)
 		} else {
@@ -576,7 +576,7 @@ func generateTOCIndex(outputDir string, files []markdownFile, cssContent string,
 
 // indexNames are the file names that stand for the directory holding
 // them, in order of preference.
-var indexNames = []string{"index.md", "index.markdown", "README.md", "readme.md", "SKILL.md"}
+var indexNames = []string{"index.md", "index.markdown", "index.mdx", "README.md", "readme.md", "SKILL.md"}
 
 // rootIndexName returns the file among files that is the site's root
 // page, as the server would choose it, or "" if there is none.

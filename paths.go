@@ -6,6 +6,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/tmc/md2html/internal/markdownfile"
 )
 
 // resolveBase returns the absolute directory that a Config's relative
@@ -257,8 +259,7 @@ func rewriteLocalMarkdownReference(currentSourcePath, href, htmlExt, indexFile s
 	}
 
 	base, suffix := splitLinkSuffix(href)
-	ext := strings.ToLower(path.Ext(base))
-	if ext != ".md" && ext != ".markdown" {
+	if !markdownfile.Is(base) {
 		return href, false
 	}
 
@@ -281,8 +282,7 @@ func rewriteMarkdownReference(format, currentSourcePath, href, htmlExt, indexFil
 	}
 
 	base, suffix := splitLinkSuffix(href)
-	ext := strings.ToLower(path.Ext(base))
-	if ext != ".md" && ext != ".markdown" {
+	if !markdownfile.Is(base) {
 		return href, false
 	}
 	targetSourcePath := strings.TrimPrefix(path.Clean(base), "/")

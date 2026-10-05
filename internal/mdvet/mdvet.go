@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/tmc/md2html/internal/anchor"
 	"github.com/tmc/md2html/internal/markdown/components"
+	"github.com/tmc/md2html/internal/markdownfile"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
@@ -235,11 +235,7 @@ func collectFiles(paths []string) ([]string, error) {
 }
 
 func isMarkdown(path string) bool {
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".md", ".markdown":
-		return true
-	}
-	return false
+	return markdownfile.Is(path)
 }
 
 // env holds per-Run state shared across checks: cached anchor sets for

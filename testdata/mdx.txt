@@ -1,0 +1,63 @@
+# Pages named .mdx are pages like any other: a static build renders
+# them, links to them are rewritten, and the server serves them.
+
+md2html -html out -nav -search src
+exists out/index.html
+exists out/guide.html
+exists out/api/client.html
+grep -q 'Guide body' out/guide.html
+grep -q 'Client body' out/api/client.html
+! exists out/guide.mdx.html
+
+# index.mdx is the site index, so no listing replaces it.
+grep -q 'Home body' out/index.html
+! grep -q 'Index of /' out/index.html
+
+# Links to .mdx pages name the rendered pages.
+grep -q 'href="guide.html"' out/index.html
+grep -q 'href="api/client.html#usage"' out/index.html
+grep -q 'href="../guide.html"' out/api/client.html
+
+# The navigation lists them.
+grep -q 'The Guide' out/index.html
+
+# The server renders an .mdx page rather than sending its source.
+cd src
+md2html -search -http :9141 &
+wait-port :9141
+curl -s http://localhost:9141/guide
+stdout '<h1[^>]*>The Guide</h1>'
+stdout 'Guide body'
+curl -s http://localhost:9141/guide.mdx
+stdout 'Guide body'
+stdout '<!DOCTYPE html>'
+curl -s http://localhost:9141/
+stdout 'Home body'
+
+# The search index covers them, under their rendered URLs.
+curl -s http://localhost:9141/search-index.js
+stdout '"title":"The Guide"'
+stdout '"url":"/api/client"'
+! stdout 'client\.mdx'
+
+-- src/index.mdx --
+---
+title: Home
+---
+
+Home body. See the [guide](guide.mdx) and the
+[client](api/client.mdx#usage).
+-- src/guide.mdx --
+---
+title: The Guide
+---
+
+# The Guide
+
+Guide body.
+-- src/api/client.mdx --
+# Client
+
+## Usage
+
+Client body. Back to the [guide](../guide.mdx).

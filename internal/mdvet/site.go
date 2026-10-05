@@ -6,6 +6,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/tmc/md2html/internal/markdownfile"
 )
 
 // Site describes how the documents being checked are addressed once
@@ -101,21 +103,23 @@ func (s Site) resolve(dest string) (file, frag string, ok bool) {
 // rendered path rel, in the order md2html itself would try them.
 func sourceCandidates(rel string) []string {
 	if rel == "" || rel == "." {
-		return []string{"index.md", "index.markdown", "README.md"}
+		return []string{"index.md", "index.markdown", "index.mdx", "README.md"}
 	}
 	// A link may name the rendered file outright.
-	if ext := path.Ext(rel); ext == ".md" || ext == ".markdown" {
+	if markdownfile.Is(rel) {
 		return []string{rel}
 	}
+	exts := markdownfile.Exts()
 	stem := strings.TrimSuffix(rel, path.Ext(rel))
-	return []string{
-		rel + ".md",
-		rel + ".markdown",
-		stem + ".md",
-		stem + ".markdown",
-		path.Join(rel, "index.md"),
-		path.Join(rel, "index.markdown"),
-		path.Join(rel, "README.md"),
-		path.Join(rel, "SKILL.md"),
+	var out []string
+	for _, ext := range exts {
+		out = append(out, rel+ext)
 	}
+	for _, ext := range exts {
+		out = append(out, stem+ext)
+	}
+	for _, ext := range exts {
+		out = append(out, path.Join(rel, "index"+ext))
+	}
+	return append(out, path.Join(rel, "README.md"), path.Join(rel, "SKILL.md"))
 }
