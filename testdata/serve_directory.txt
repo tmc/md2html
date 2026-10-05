@@ -1,0 +1,26 @@
+# A directory named on the command line is served like the working
+# directory: its index page at the root, or a listing when it has none.
+
+md2html -http :9142 site &
+wait-port :9142
+curl -s http://localhost:9142/
+stdout 'Site home'
+curl -s http://localhost:9142/guide
+stdout 'Guide body'
+
+md2html -http :9143 plain &
+wait-port :9143
+curl -s http://localhost:9143/
+stdout 'Index of /'
+stdout 'notes'
+
+-- site/README.md --
+# Site
+
+Site home.
+-- site/guide.md --
+# Guide
+
+Guide body.
+-- plain/notes.md --
+# Notes

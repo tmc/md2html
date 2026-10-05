@@ -86,7 +86,10 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 		}
 	}
 
-	if cfg.Source != "" && cfg.Source != "-" {
+	if info, err := os.Stat(resolveAgainst(s.base, cfg.Source)); err == nil && info.IsDir() {
+		s.sourceIsDir = true
+	}
+	if cfg.Source != "" && cfg.Source != "-" && !s.sourceIsDir {
 		content, err := os.ReadFile(cfg.Source)
 		if err != nil {
 			logger.Error("error reading initial file", "error", err, "file", cfg.Source)
@@ -131,7 +134,10 @@ type server struct {
 	clientsMu  sync.RWMutex
 	cssContent string
 	inputPath  string
-	jsonData   any // Generic JSON data for templates
+	// sourceIsDir records that inputPath names a directory, which is
+	// served like the working directory is when no source is given.
+	sourceIsDir bool
+	jsonData    any // Generic JSON data for templates
 	// shutdownCh is closed once, by Run, to release background work and
 	// tell connected browsers the server is going away.
 	shutdownCh   chan struct{}
@@ -490,7 +496,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if filePath == "" || filePath == "/" {
 		// With no source file and no content, serve the root directory:
 		// its index file if it has one, otherwise a listing.
-		if s.inputPath == "" && content == "" {
+		if s.sourceIsDir || (s.inputPath == "" && content == "") {
 			s.serveDirectory(ctx, w, root, "", css, "")
 			return
 		}
