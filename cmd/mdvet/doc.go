@@ -18,6 +18,7 @@
 //	heading-skip       no heading-level jumps; at most one h1
 //	case               link path matches on-disk casing
 //	raw-html           no raw HTML in prose, which renders to nothing
+//	includes           <Code> tags name files md2html can include
 //	gitignored         link targets are carried by the repository
 //
 // Flags:
@@ -25,6 +26,9 @@
 //	-c list      comma-separated list of checks to run (default: all)
 //	-list        print the available checks and exit
 //	-base path   URL path prefix the tree is served under (e.g. /docs)
+//	-include-root dir
+//	             directory files included with <Code src> must be
+//	             inside, as passed to md2html
 //
 // Docs written for a hosted site link to each other by rendered URL:
 // "/docs/churl#exit-status" rather than "churl.md#exit-status". Such a

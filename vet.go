@@ -33,6 +33,7 @@ func runVet(site *preparedSite, logger *slog.Logger) {
 	}
 	checks = withVetComponents(site, checks)
 	checks = withVetIcons(site, checks)
+	checks = withVetIncludes(site, checks)
 
 	// md2html already knows the prefix the tree is served under, which
 	// is what makes a link written as "/docs/quickstart" resolvable back
@@ -86,6 +87,23 @@ func withVetComponents(site *preparedSite, checks []mdvet.Check) []mdvet.Check {
 	for i, c := range out {
 		if _, ok := c.(mdvet.ComponentCheck); ok {
 			out[i] = mdvet.ComponentCheck{Registry: site.componentRegistry, Configured: true}
+		}
+	}
+	return out
+}
+
+// withVetIncludes points the includes check at the resolver the site
+// renders with, so that it knows the include root, the ignore file, and
+// whether a repository is named for links.
+func withVetIncludes(site *preparedSite, checks []mdvet.Check) []mdvet.Check {
+	if site == nil || site.includes == nil {
+		return checks
+	}
+	out := make([]mdvet.Check, len(checks))
+	copy(out, checks)
+	for i, c := range out {
+		if _, ok := c.(mdvet.IncludeCheck); ok {
+			out[i] = mdvet.IncludeCheck{Resolver: site.includes.resolver}
 		}
 	}
 	return out

@@ -17,10 +17,11 @@ type ParseError struct {
 	Msg  string
 
 	// UnknownComponent reports that the failure was an unregistered
-	// component name, and Known lists the names that were registered.
-	// Callers use this to explain how the registry is configured, which
-	// the parser itself has no way to know.
+	// component, Name is its name, and Known lists the names that were
+	// registered. Callers use this to explain how the registry is
+	// configured, which the parser itself has no way to know.
 	UnknownComponent bool
+	Name             string
 	Known            []string
 }
 
@@ -245,6 +246,7 @@ func (p *blockParser) Open(parent ast.Node, reader text.Reader, pc parser.Contex
 			Line:             currentLine(reader),
 			Msg:              fmt.Sprintf("unknown component <%s>", name),
 			UnknownComponent: true,
+			Name:             name,
 			Known:            p.registry.Names(),
 		})
 		return nil, parser.NoChildren

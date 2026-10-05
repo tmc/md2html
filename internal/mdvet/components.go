@@ -36,6 +36,11 @@ func (c ComponentCheck) Check(doc *Document) ([]Diagnostic, error) {
 	}
 	var diags []Diagnostic
 	for _, e := range components.Errors(doc.ctx) {
+		// A Code tag is replaced by the file it names before a page
+		// is parsed, so it is no component. IncludeCheck answers for it.
+		if e.UnknownComponent && e.Name == "Code" {
+			continue
+		}
 		diags = append(diags, Diagnostic{
 			File:    doc.File,
 			Line:    e.Line,

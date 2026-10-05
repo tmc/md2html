@@ -26,6 +26,7 @@ func run(args []string, stdout, stderr *os.File) int {
 	checksAliasFlag := fs.String("checks", "", "comma-separated list of checks to run (default: all)")
 	listFlag := fs.Bool("list", false, "print the available checks and exit")
 	componentsFlag := fs.String("components", "", "directory of component definitions, as passed to md2html")
+	includeRootFlag := fs.String("include-root", "", "directory that files included with <Code src> must be inside, as passed to md2html (default: the directory being vetted)")
 	baseFlag := fs.String("base", "", "URL path prefix the tree is served under (e.g. /docs), so links written as rendered URLs can be resolved")
 
 	if err := fs.Parse(args); err != nil {
@@ -40,6 +41,14 @@ func run(args []string, stdout, stderr *os.File) int {
 			return 2
 		}
 		all = withComponentRegistry(all, reg)
+	}
+	if *includeRootFlag != "" {
+		root, err := filepath.Abs(*includeRootFlag)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+		all = withIncludeRoot(all, root)
 	}
 	if *listFlag {
 		for _, c := range all {
@@ -97,6 +106,19 @@ func withComponentRegistry(checks []mdvet.Check, reg components.Registry) []mdve
 	for i, c := range out {
 		if _, ok := c.(mdvet.ComponentCheck); ok {
 			out[i] = mdvet.ComponentCheck{Registry: reg, Configured: true}
+		}
+	}
+	return out
+}
+
+// withIncludeRoot points the includes check at the include root the
+// site is built with.
+func withIncludeRoot(checks []mdvet.Check, root string) []mdvet.Check {
+	out := make([]mdvet.Check, len(checks))
+	copy(out, checks)
+	for i, c := range out {
+		if _, ok := c.(mdvet.IncludeCheck); ok {
+			out[i] = mdvet.IncludeCheck{Root: root}
 		}
 	}
 	return out

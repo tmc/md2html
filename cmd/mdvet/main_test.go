@@ -63,3 +63,37 @@ func TestRunAssetsFlag(t *testing.T) {
 		t.Fatalf("stdout missing asset diagnostic:\n%s", got)
 	}
 }
+
+func TestRunIncludeRootFlag(t *testing.T) {
+	repo := t.TempDir()
+	for name, content := range map[string]string{
+		"examples/main.go": "package main\n",
+		"docs/page.md":     "# Page\n\n<Code src=\"/examples/main.go\" />\n",
+	} {
+		path := filepath.Join(repo, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	docs := filepath.Join(repo, "docs")
+	tests := []struct {
+		args []string
+		code int
+	}{
+		{[]string{"-checks=includes", docs}, 1},
+		{[]string{"-checks=includes", "-include-root", repo, docs}, 0},
+	}
+	for _, tt := range tests {
+		stdout, err := os.CreateTemp(t.TempDir(), "stdout")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if code := run(tt.args, stdout, os.Stderr); code != tt.code {
+			out, _ := os.ReadFile(stdout.Name())
+			t.Errorf("mdvet %s: exit code %d, want %d\n%s", strings.Join(tt.args, " "), code, tt.code, out)
+		}
+	}
+}
