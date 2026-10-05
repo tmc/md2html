@@ -30,6 +30,55 @@ func TestLLMSSummary(t *testing.T) {
 			want: "First paragraph with a link.",
 		},
 		{
+			name: "component",
+			doc: DocumentData{
+				Content: "# Agents\n\nimport Tabs from '@theme/Tabs';\n\n<Info>\nConceptual guide to agents.\n</Info>\n\nMore.",
+			},
+			want: "Conceptual guide to agents.",
+		},
+		{
+			name: "inline tags",
+			doc: DocumentData{
+				Content: "<Info> Conceptual <b>guide</b> to agents, see <https://go.dev>. </Info>\n",
+			},
+			want: "Conceptual guide to agents, see <https://go.dev>.",
+		},
+		{
+			name: "markup only",
+			doc: DocumentData{
+				Content: "# Title\n\n<Frame>\n\n![shot](shot.png)\n\n</Frame>\n\n```go\n// not prose\n```\n\nThe prose.\n",
+			},
+			want: "The prose.",
+		},
+		{
+			name: "longer fence",
+			doc: DocumentData{
+				Content: "````md\n```go\nx\n```\nstill code\n````\n\nThe prose.\n",
+			},
+			want: "The prose.",
+		},
+		{
+			name: "tag over several lines",
+			doc: DocumentData{
+				Content: "<Card\n  title=\"Start\"\n  href=\"/start\"\n>\nBegin here.\n</Card>\n",
+			},
+			want: "Begin here.",
+		},
+		{
+			name: "code span",
+			doc: DocumentData{
+				Content: "Returns a `List<T>` of <b>items</b>.\n",
+			},
+			want: "Returns a List<T> of items.",
+		},
+		{
+			name: "no prose",
+			doc: DocumentData{
+				Content: "# Title\n\n<DocCardList />\n",
+			},
+			want: "",
+		},
+		{
 			name: "truncate",
 			doc: DocumentData{
 				Frontmatter: map[string]any{},

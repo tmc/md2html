@@ -281,23 +281,97 @@ func firstHeading(markdown string) string {
 	return ""
 }
 
+// firstParagraph returns the text of the first paragraph of prose in
+// markdown. Headings, code blocks, component and HTML tags, images,
+// and MDX import and export lines are not prose: a description made
+// of them would show markup to a reader who has no page to render it.
 func firstParagraph(markdown string) string {
 	var lines []string
+	fence := ""
+	inTag := false
 	for _, line := range strings.Split(markdown, "\n") {
 		line = strings.TrimSpace(line)
+		if fence != "" {
+			if isClosingFence(line, fence) {
+				fence = ""
+			}
+			continue
+		}
+		if inTag {
+			// A tag whose attributes run over several lines ends at
+			// the first ">".
+			_, after, ok := strings.Cut(line, ">")
+			if !ok {
+				continue
+			}
+			inTag = false
+			line = strings.TrimSpace(after)
+		}
+		if f := openingFence(line); f != "" {
+			fence = f
+			continue
+		}
+		if strings.HasPrefix(line, "#") || strings.HasPrefix(line, "import ") || strings.HasPrefix(line, "export ") {
+			continue
+		}
+		if line != "" {
+			if openTagPattern.MatchString(line) {
+				inTag = true
+				continue
+			}
+			line = strings.TrimSpace(stripTags(imagePattern.ReplaceAllString(line, "")))
+			if line == "" {
+				continue
+			}
+		}
 		if line == "" {
 			if len(lines) > 0 {
 				break
 			}
 			continue
 		}
-		if strings.HasPrefix(line, "#") {
-			continue
-		}
 		lines = append(lines, line)
 	}
 	return plainMarkdown(strings.Join(lines, " "))
 }
+
+// openingFence returns the run of backticks or tildes that opens a
+// fenced code block on line, or "" if line opens none.
+func openingFence(line string) string {
+	if !strings.HasPrefix(line, "```") && !strings.HasPrefix(line, "~~~") {
+		return ""
+	}
+	return line[:len(line)-len(strings.TrimLeft(line, line[:1]))]
+}
+
+// isClosingFence reports whether line closes a block opened by fence:
+// a run of the same character at least as long, and nothing after it.
+func isClosingFence(line, fence string) bool {
+	rest := strings.TrimLeft(line, fence[:1])
+	return len(line)-len(rest) >= len(fence) && strings.TrimSpace(rest) == ""
+}
+
+// stripTags removes tags from line, except inside code spans, where
+// List<T> is code and not a tag.
+func stripTags(line string) string {
+	parts := strings.Split(line, "`")
+	for i := 0; i < len(parts); i += 2 {
+		parts[i] = tagPattern.ReplaceAllString(parts[i], "")
+	}
+	return strings.Join(parts, "`")
+}
+
+var (
+	// tagPattern matches an HTML or component tag, opening or closing.
+	// An autolink such as <https://go.dev> is not one.
+	tagPattern = regexp.MustCompile(`</?[A-Za-z][A-Za-z0-9.-]*(\s[^<>]*)?/?>`)
+
+	// openTagPattern matches a line that begins a tag and does not end
+	// it, as when each attribute is on a line of its own.
+	openTagPattern = regexp.MustCompile(`^<[A-Za-z][A-Za-z0-9.-]*(\s[^<>]*)?$`)
+
+	imagePattern = regexp.MustCompile(`!\[[^\]]*\]\([^)]*\)`)
+)
 
 func plainMarkdown(s string) string {
 	s = strings.ReplaceAll(s, "**", "")
