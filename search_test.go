@@ -1,6 +1,7 @@
 package md2html
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -51,5 +52,31 @@ func TestBuildSearchIndex(t *testing.T) {
 				t.Errorf("urls = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestBuildSearchIndexTitles(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"named.md":   "---\ntitle: From Frontmatter\n---\n# A Heading\n",
+		"heading.md": "# Getting Started\n",
+		"bare.mdx":   "Just text.\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	docs, err := buildSearchIndex(root, Config{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make(map[string]string)
+	for _, doc := range docs {
+		got[doc.URL] = doc.Title
+	}
+	want := map[string]string{"named": "From Frontmatter", "heading": "Getting Started", "bare": "bare"}
+	if !maps.Equal(got, want) {
+		t.Errorf("titles = %q, want %q", got, want)
 	}
 }

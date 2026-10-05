@@ -1,0 +1,29 @@
+# A static page is titled as the server titles it: by its frontmatter,
+# then its first heading, then its file name. The description comes
+# from prose, never from the tags around it.
+
+md2html -html out src
+
+grep -q '<title>Getting Started</title>' out/guide.html
+grep -q '<title>From Frontmatter</title>' out/named.html
+grep -q '<title>bare</title>' out/bare.html
+grep -q '<meta name="description" content="How to begin.">' out/guide.html
+! grep '<meta name="description" content="[^"]*Note' out/guide.html
+
+-- src/guide.md --
+# Getting Started
+
+<Note>
+How to begin.
+</Note>
+
+-- src/named.md --
+---
+title: From Frontmatter
+---
+# A Heading
+
+Text.
+
+-- src/bare.md --
+Just text.

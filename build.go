@@ -455,24 +455,13 @@ func processMarkdownFile(file markdownFile, sourceDir, outputDir, cssContent str
 		}
 	}
 
-	title := pageTitle(doc.Frontmatter, file.RelPath, cfg.Title)
+	title := documentTitle(doc, file.RelPath, cfg.Title)
 
 	finalHTML, err := site.renderTemplate(htmlContent, title, cssContent, false, doc.Frontmatter, opts)
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(outputPath, []byte(finalHTML), 0644)
-}
-
-func pageTitle(frontmatter map[string]any, filePath, fallback string) string {
-	if title, ok := frontmatter["title"].(string); ok && title != "" {
-		return title
-	}
-	name := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
-	if name != "" {
-		return name
-	}
-	return fallback
 }
 
 // promoteTitleHeading returns the document body with its frontmatter

@@ -66,12 +66,7 @@ func buildSearchIndex(sourceDir string, cfg Config, inc *siteIncludes) ([]Search
 		relPath, _ := filepath.Rel(sourceDir, path)
 		doc = inc.expandPage(string(content), doc, relPath)
 
-		title := ""
-		if t, ok := doc.Frontmatter["title"].(string); ok {
-			title = t
-		} else {
-			title = markdownfile.TrimExt(filepath.Base(path))
-		}
+		title := documentTitle(doc, relPath, "")
 
 		blurb := ""
 		if b, ok := doc.Frontmatter["description"].(string); ok {
