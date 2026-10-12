@@ -30,6 +30,15 @@ func TestNavigationCheck(t *testing.T) {
 			},
 		},
 		{
+			name: "drafts with other line endings",
+			files: map[string]string{
+				"SUMMARY.md": "- [Intro](intro.md)\n",
+				"intro.md":   "# Intro\n",
+				"crlf.md":    "---\r\ndraft: true\r\n---\r\n# Later\r\n",
+				"spaces.md":  "---  \ndraft: true\n--- \n# Later\n",
+			},
+		},
+		{
 			name: "missing target",
 			files: map[string]string{
 				"SUMMARY.md": "- [Missing](missing.md)\n",
@@ -106,6 +115,11 @@ func TestFrontmatterCheck(t *testing.T) {
 		{
 			name: "title from setext heading",
 			src:  "---\ndescription: Intro page\n---\nIntro\n=====\n",
+		},
+		{
+			name: "crlf",
+			src:  "---\r\ndescription: Intro page\r\n---\r\nIntro.\r\n",
+			want: []string{"title is missing"},
 		},
 		{
 			name: "yaml comment is not a heading",

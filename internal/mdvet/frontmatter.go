@@ -89,22 +89,34 @@ func hasTitleHeading(doc *Document) bool {
 // of the body that follows it. It reports false if src has no
 // frontmatter, in which case the body is all of src, or if the
 // frontmatter is not closed, in which case body is -1.
+//
+// The frontmatter is found as md2html finds it: it opens on the first
+// line and closes at the next, each a line of dashes, which may have
+// space around it or end in a carriage return.
 func splitFrontmatter(src []byte) (fm []byte, body int, ok bool) {
-	if !bytes.HasPrefix(src, []byte("---\n")) {
+	first, _, _ := bytes.Cut(src, []byte("\n"))
+	if !isFrontmatterMarker(first) {
 		return nil, 0, false
 	}
-	rest := src[len("---\n"):]
-	end := bytes.Index(rest, []byte("\n---"))
-	if end < 0 {
-		return nil, -1, false
+	start := len(first) + 1
+	for off := start; off < len(src); {
+		line, _, found := bytes.Cut(src[off:], []byte("\n"))
+		next := off + len(line) + 1
+		if !found {
+			next = len(src)
+		}
+		if isFrontmatterMarker(line) {
+			return src[start:off], next, true
+		}
+		off = next
 	}
-	body = len(src) - len(rest) + end + len("\n---")
-	if i := bytes.IndexByte(src[body:], '\n'); i >= 0 {
-		body += i + 1
-	} else {
-		body = len(src)
-	}
-	return rest[:end], body, true
+	return nil, -1, false
+}
+
+// isFrontmatterMarker reports whether line opens or closes frontmatter.
+func isFrontmatterMarker(line []byte) bool {
+	line = bytes.TrimSpace(line)
+	return len(line) > 0 && len(bytes.Trim(line, "-")) == 0
 }
 
 func frontmatter(src []byte) (map[string]any, bool, error) {
