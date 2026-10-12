@@ -8,7 +8,7 @@ pid=56456
 iterm_session_id=w3t11p14:BFF82695-9B31-40E4-89FC-B5F9896EC4D4
 session=6eeb409e-7c8f-4e0c-b57a-b4ab335e2d7d
 
-rewritten=f3d3c1792a89080d5b0035f7bd274a2541668813
+rewritten=0b4d02a6aad9c9ea36e5923fd8bf2480a4477cb8
 from=ef18c88f5eac40b92fe4443a32a36bab02eb5fcd
 rewrite-date=2026-10-12T10:36:02-07:00
 reason=pre-push review fixups and autosquash
