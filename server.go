@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/tmc/md2html/internal/ignorefile"
 	"github.com/tmc/md2html/internal/markdownfile"
 )
 
@@ -254,7 +255,7 @@ func (s *server) watchNavTree() {
 	if s.navRoot == "" {
 		return
 	}
-	ignore, err := loadIgnoreSet(s.navRoot)
+	ignore, err := ignorefile.Load(s.navRoot)
 	if err != nil {
 		s.logger.Debug("watch navigation tree", "path", s.navRoot, "error", err)
 		return
@@ -265,7 +266,7 @@ func (s *server) watchNavTree() {
 		}
 		if name != s.navRoot {
 			base := entry.Name()
-			if strings.HasPrefix(base, ".") || base == "output" || isDependencyDir(base) || ignore.excludes(name, true) {
+			if strings.HasPrefix(base, ".") || base == "output" || isDependencyDir(base) || ignore.Excludes(name, true) {
 				return filepath.SkipDir
 			}
 		}
@@ -541,10 +542,10 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	// A page the repository excludes from its site is not served
 	// here either. Listing it nowhere but answering for it anyway
 	// would still publish it to anyone holding the URL.
-	if ignore, err := loadIgnoreSet(root); err == nil && ignore != nil {
+	if ignore, err := ignorefile.Load(root); err == nil && ignore != nil {
 		if full, joinErr := secureJoin(root, filepath.FromSlash(cleanPath)); joinErr == nil {
 			info, statErr := os.Stat(full)
-			if ignore.excludes(full, statErr == nil && info.IsDir()) {
+			if ignore.Excludes(full, statErr == nil && info.IsDir()) {
 				s.serveNotFound(ctx, w, requestedURL(r), css)
 				return
 			}

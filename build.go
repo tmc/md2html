@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tmc/md2html/internal/ignorefile"
 	"github.com/tmc/md2html/internal/markdownfile"
 )
 
@@ -83,7 +84,7 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 	// file. Reading it here covers both the server and static output,
 	// since everything that enumerates the tree comes through this
 	// function.
-	ignore, err := loadIgnoreSet(rootDir)
+	ignore, err := ignorefile.Load(rootDir)
 	if err != nil {
 		slog.Default().Warn("skipping the ignore file", "error", err)
 	}
@@ -127,7 +128,7 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 				if depth >= maxDepth || isDependencyDir(entry.Name()) {
 					continue
 				}
-				if ignore.excludes(apparentPath, true) {
+				if ignore.Excludes(apparentPath, true) {
 					continue
 				}
 				real, err := filepath.EvalSymlinks(apparentPath)
@@ -152,7 +153,7 @@ func findMarkdownFiles(rootDir string, maxDepth int) ([]markdownFile, error) {
 			}
 
 			if markdownfile.Is(info.Name()) {
-				if ignore.excludes(apparentPath, false) {
+				if ignore.Excludes(apparentPath, false) {
 					continue
 				}
 				files = append(files, markdownFile{

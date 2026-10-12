@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/tmc/md2html/internal/ignorefile"
 	"github.com/tmc/md2html/internal/markdown/include"
 )
 
@@ -57,7 +58,7 @@ func (s *preparedSite) prepareIncludes(sourceDir, pagesDir string) error {
 			return fmt.Errorf("include root: %s is not a directory", root)
 		}
 	}
-	ignore, err := loadIgnoreSet(sourceDir)
+	ignore, err := ignorefile.Load(sourceDir)
 	if err != nil {
 		return err
 	}
@@ -65,7 +66,7 @@ func (s *preparedSite) prepareIncludes(sourceDir, pagesDir string) error {
 		resolver: &include.Resolver{
 			Root: root,
 			Excluded: func(path string) bool {
-				return ignore.excludes(path, false)
+				return ignore.Excludes(path, false)
 			},
 			Link: repositoryLinks(sourceDir, root),
 		},

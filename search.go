@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/tmc/md2html/internal/ignorefile"
 	"github.com/tmc/md2html/internal/markdownfile"
 )
 
@@ -26,7 +27,7 @@ type SearchDocument struct {
 func buildSearchIndex(sourceDir string, cfg Config, inc *siteIncludes) ([]SearchDocument, error) {
 	var documents []SearchDocument
 
-	ignore, err := loadIgnoreSet(sourceDir)
+	ignore, err := ignorefile.Load(sourceDir)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +35,7 @@ func buildSearchIndex(sourceDir string, cfg Config, inc *siteIncludes) ([]Search
 		if err != nil {
 			return err
 		}
-		if ignore.excludes(path, info.IsDir()) {
+		if ignore.Excludes(path, info.IsDir()) {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/tmc/md2html/internal/ignorefile"
 	"github.com/tmc/md2html/internal/markdownfile"
 )
 
@@ -332,7 +333,7 @@ type autoNavFile struct {
 
 func autoNavigationFromDir(sourceDir, htmlExt string) (*Navigation, error) {
 	var files []autoNavFile
-	ignore, err := loadIgnoreSet(sourceDir)
+	ignore, err := ignorefile.Load(sourceDir)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +344,7 @@ func autoNavigationFromDir(sourceDir, htmlExt string) (*Navigation, error) {
 		if name == sourceDir {
 			return nil
 		}
-		if ignore.excludes(name, entry.IsDir()) {
+		if ignore.Excludes(name, entry.IsDir()) {
 			if entry.IsDir() {
 				return filepath.SkipDir
 			}

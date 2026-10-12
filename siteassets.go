@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/tmc/md2html/internal/ignorefile"
 )
 
 // assetExtensions are the file types copied from the source tree into
@@ -51,7 +53,7 @@ func copySourceAssets(sourceDir, outputDir string, logger *slog.Logger) (int, er
 	if err != nil {
 		return 0, err
 	}
-	ignore, err := loadIgnoreSet(source)
+	ignore, err := ignorefile.Load(source)
 	if err != nil {
 		logger.Warn("skipping the ignore file", "error", err)
 	}
@@ -70,7 +72,7 @@ func copySourceAssets(sourceDir, outputDir string, logger *slog.Logger) (int, er
 			if p != source && strings.HasPrefix(name, ".") {
 				return filepath.SkipDir
 			}
-			if p != source && ignore.excludes(p, true) {
+			if p != source && ignore.Excludes(p, true) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -78,7 +80,7 @@ func copySourceAssets(sourceDir, outputDir string, logger *slog.Logger) (int, er
 		if strings.HasPrefix(name, ".") || !assetExtensions[strings.ToLower(filepath.Ext(name))] {
 			return nil
 		}
-		if ignore.excludes(p, false) {
+		if ignore.Excludes(p, false) {
 			return nil
 		}
 		rel, err := filepath.Rel(source, p)
