@@ -7,3 +7,14 @@ none
 pid=72602
 iterm_session_id=w3t11p14:BFF82695-9B31-40E4-89FC-B5F9896EC4D4
 session=6eeb409e-7c8f-4e0c-b57a-b4ab335e2d7d
+
+rewritten=497095e617b4a4c26384d0201a8d36b85b18d798
+from=c755649f3f775e70cb668452535548334055fa6d
+rewrite-date=2026-10-12T10:35:59-07:00
+reason=pre-push review fixups and autosquash
+agent=claude-code 2.1.284 (Claude Code)
+model=claude-opus-5-5
+tty=not a tty
+pid=86221
+iterm_session_id=w5t3p1:A28648E5-5104-4A3A-8130-B56CCD1A6C60
+session=482659fa-aba8-4105-a9d7-0ebc5472a222
