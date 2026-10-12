@@ -9,6 +9,10 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/text"
 )
 
 var llmsFullMaxBytes = 1 << 20
@@ -269,13 +273,29 @@ func llmsSummary(doc DocumentData) string {
 	return truncateRunes(singleLine(firstParagraph(doc.Content)), 160)
 }
 
-var headingPattern = regexp.MustCompile(`^#\s+(.+?)\s*$`)
-
+// firstHeading returns the text of the first level 1 heading in
+// markdown, or "" if it has none. A heading is found as a reader sees
+// it: a line in a code block is not one, and a heading may be written
+// either way Markdown allows.
 func firstHeading(markdown string) string {
-	for _, line := range strings.Split(markdown, "\n") {
-		m := headingPattern.FindStringSubmatch(strings.TrimSpace(line))
-		if m != nil {
-			return plainMarkdown(m[1])
+	src := []byte(markdown)
+	doc := goldmark.DefaultParser().Parse(text.NewReader(src))
+	for n := doc.FirstChild(); n != nil; n = n.NextSibling() {
+		h, ok := n.(*ast.Heading)
+		if !ok || h.Level != 1 {
+			continue
+		}
+		var b strings.Builder
+		lines := h.Lines()
+		for i := range lines.Len() {
+			if i > 0 {
+				b.WriteByte(' ')
+			}
+			seg := lines.At(i)
+			b.Write(bytes.TrimSpace(seg.Value(src)))
+		}
+		if s := plainMarkdown(b.String()); s != "" {
+			return s
 		}
 	}
 	return ""

@@ -127,3 +127,29 @@ func TestWriteLLMSFullSplits(t *testing.T) {
 		t.Fatalf("unsplit llms-full.txt exists after split")
 	}
 }
+
+func TestFirstHeading(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"atx", "# Title\n\nBody.", "Title"},
+		{"atx closed", "# Title #\n", "Title"},
+		{"after prose", "Intro.\n\n# Title\n", "Title"},
+		{"setext", "Title\n=====\n\nBody.", "Title"},
+		{"markup", "# The `Run` **function**\n", "The Run function"},
+		{"level 2 only", "## Section\n", ""},
+		{"comment in fence", "```bash\n# install the tool\n```\n\n# Title\n", "Title"},
+		{"comment in tilde fence", "~~~\n# not a heading\n~~~\n", ""},
+		{"empty heading", "#\n\n# Title\n", "Title"},
+		{"none", "Body.", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := firstHeading(tt.in); got != tt.want {
+				t.Errorf("firstHeading(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
