@@ -9,6 +9,9 @@
 //
 // Available checks:
 //
+//	nav                SUMMARY.md lists every page that is not a draft
+//	frontmatter        frontmatter is well formed and the page has a title
+//	assets             local links, images, and media exist
 //	links              relative link targets exist on disk
 //	images             image src targets exist on disk
 //	anchors            "#section" fragments resolve to a heading
@@ -18,13 +21,17 @@
 //	heading-skip       no heading-level jumps; at most one h1
 //	case               link path matches on-disk casing
 //	raw-html           no raw HTML in prose, which renders to nothing
+//	components         component tags are known, complete, and closed
 //	includes           <Code> tags name files md2html can include
+//	icons              icon names exist in the selected icon set
 //	gitignored         link targets are carried by the repository
 //
 // Flags:
 //
 //	-c list      comma-separated list of checks to run (default: all)
 //	-list        print the available checks and exit
+//	-components dir
+//	             directory of component definitions, as passed to md2html
 //	-base path   URL path prefix the tree is served under (e.g. /docs)
 //	-include-root dir
 //	             directory files included with <Code src> must be
