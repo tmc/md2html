@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/tmc/md2html/internal/docversions"
 )
 
 // GitVersion is a git tag or branch that versioned docs can be served from.
@@ -47,8 +49,8 @@ func (g *gitVersions) isRepo(ctx context.Context) bool {
 }
 
 // versions returns the tags matching tagPattern, followed by the remote
-// branches if includeBranches is set. Tags come first, and each group is
-// in reverse alphabetical order.
+// branches if includeBranches is set. Tags come first, newest first by
+// semantic version; branches follow in reverse alphabetical order.
 func (g *gitVersions) versions(ctx context.Context, includeBranches bool, tagPattern string) ([]GitVersion, error) {
 	vs, err := g.tags(ctx, tagPattern)
 	if err != nil {
@@ -67,7 +69,7 @@ func (g *gitVersions) versions(ctx context.Context, includeBranches bool, tagPat
 		if vs[i].IsTag != vs[j].IsTag {
 			return vs[i].IsTag
 		}
-		return vs[i].Name > vs[j].Name
+		return docversions.Compare(vs[i].Name, vs[j].Name) > 0
 	})
 	return vs, nil
 }

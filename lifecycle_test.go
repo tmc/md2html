@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -405,5 +406,30 @@ func TestGitVersions(t *testing.T) {
 	}
 	if current, err := g.currentVersion(ctx); err != nil || current != "v1.0.0" {
 		t.Fatalf("currentVersion() = %q, %v, want v1.0.0", current, err)
+	}
+}
+
+// TestGitVersionsSemverOrder checks that tags are listed newest first by
+// semantic version, not as strings, which would put v0.1.9 above v0.1.10.
+func TestGitVersionsSemverOrder(t *testing.T) {
+	dir := t.TempDir()
+	runGit(t, dir, "init")
+	runGit(t, dir, "config", "user.email", "test@example.com")
+	runGit(t, dir, "config", "user.name", "Test User")
+	runGit(t, dir, "commit", "--allow-empty", "-m", "init")
+	for _, tag := range []string{"v0.1.9", "v0.1.10", "v0.1.10-rc1", "v0.2.0"} {
+		runGit(t, dir, "tag", tag)
+	}
+	versions, err := newGitVersions(dir).versions(context.Background(), false, "v*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, v := range versions {
+		got = append(got, v.Name)
+	}
+	want := []string{"v0.2.0", "v0.1.10", "v0.1.10-rc1", "v0.1.9"}
+	if !slices.Equal(got, want) {
+		t.Errorf("versions = %v, want %v", got, want)
 	}
 }
