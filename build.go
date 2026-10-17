@@ -291,7 +291,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 			logger.Error("error generating search index", "error", err)
 		} else {
 			var writeErr error
-			assets, writeErr = writeFingerprintedSearchAssets(outputDir, body)
+			assets, writeErr = writeFingerprintedSearchAssets(outputDir, body, site.shared)
 			if writeErr != nil {
 				logger.Error("error writing search assets", "error", writeErr)
 				assets = map[string]string{}

@@ -138,6 +138,18 @@ func TestVersionedStaticBuild(t *testing.T) {
 		t.Errorf("latest/agents/agents.html is not a redirect to the moved page:\n%s", got)
 	}
 
+	// The search scripts, the same in every version, are kept once.
+	for _, pattern := range []string{"_shared/js/search.*.js", "_shared/js/minisearch.min.*.js"} {
+		if matches, _ := filepath.Glob(filepath.Join(out, pattern)); len(matches) != 1 {
+			t.Errorf("%s matches %q, want one file", pattern, matches)
+		}
+	}
+	for _, v := range []string{"latest", "v0.1.10", "v0.1.9", "stable"} {
+		if matches, _ := filepath.Glob(filepath.Join(out, v, "js", "search.*.js")); len(matches) != 0 {
+			t.Errorf("%s keeps its own search script: %q", v, matches)
+		}
+	}
+
 	// Pages carry the switcher, scoped to their version.
 	page := readFile(t, filepath.Join(out, "v0.1.9", "agents", "agents.html"))
 	for _, want := range []string{
@@ -145,6 +157,8 @@ func TestVersionedStaticBuild(t *testing.T) {
 		`data-version="v0.1.9"`,
 		`data-page="agents/agents"`,
 		`href="../../versions/"`,
+		`src="../../_shared/js/search.`,
+		`data-root="../"`,
 		`<link rel="canonical" href="https://example.com/docs/v0.1.9/agents/agents.html"`,
 	} {
 		if !strings.Contains(page, want) {
@@ -180,6 +194,7 @@ func TestVersionedStaticBuildCache(t *testing.T) {
 			VersionPattern: "v*",
 			VersionCache:   cache,
 			VersionsOnly:   only,
+			Search:         true,
 		}
 		if err := Run(context.Background(), cfg, logger, io.Discard, nil); err != nil {
 			t.Fatal(err)
@@ -195,6 +210,19 @@ func TestVersionedStaticBuildCache(t *testing.T) {
 	// A subset build takes the other tags from the cache.
 	second := filepath.Join(t.TempDir(), "out")
 	build(second, "latest")
+	shared, err := filepath.Glob(filepath.Join(first, "_shared", "js", "*.js"))
+	if err != nil || len(shared) == 0 {
+		t.Fatalf("no shared scripts in the full build (%v)", err)
+	}
+	for _, f := range shared {
+		rel, err := filepath.Rel(first, f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(second, rel)); err != nil {
+			t.Errorf("cached build is missing %s: %v", rel, err)
+		}
+	}
 	for _, f := range []string{"latest/guide.html", "v0.1.9/guide.html", "v0.1.10/guide.html"} {
 		if a, b := readFile(t, filepath.Join(first, f)), readFile(t, filepath.Join(second, f)); a != b {
 			t.Errorf("%s differs between the full and the cached build", f)

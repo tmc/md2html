@@ -23,6 +23,10 @@ import (
 // latestVersion names the version built from the working tree.
 const latestVersion = "latest"
 
+// sharedDirName is the directory at the root of a versioned static
+// site holding the content-named files its versions share.
+const sharedDirName = "_shared"
+
 // versionConfigName is the version policy file read from the source
 // directory when -version-config names none.
 const versionConfigName = "versions.yaml"
@@ -125,7 +129,7 @@ func (s *preparedSite) planVersions(ctx context.Context) (*versionPlan, error) {
 	}
 	for _, r := range refs {
 		switch {
-		case r.Name == latestVersion || archived[r.Name] || docversions.CheckName(r.Name) != nil:
+		case r.Name == latestVersion || r.Name == sharedDirName || archived[r.Name] || docversions.CheckName(r.Name) != nil:
 			continue
 		case r.IsTag && !vcfg.Publishes(r.Name):
 			continue
@@ -379,6 +383,12 @@ func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slo
 	pv := func(name string) *pageVersion {
 		return vs.pageVersion(name, "../"+docversions.ManifestName)
 	}
+	// Every version is rebuilt or restored below, each bringing the
+	// shared files it uses, so none left by an earlier build is kept.
+	sharedDir := filepath.Join(outDir, sharedDirName)
+	if err := os.RemoveAll(sharedDir); err != nil {
+		return err
+	}
 
 	var built []docversions.Version
 	var errs []error
@@ -401,6 +411,7 @@ func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slo
 			latest.config.HTML = dir
 			latest.config.SiteURL = versionSiteURL(cfg.SiteURL, v.Name)
 			latest.version = pv(v.Name)
+			latest.shared = newSharedAssets(sharedDir)
 			err = latest.generateStaticHTML(ctx, logger)
 			if err == nil {
 				err = writeMoveStubs(dir, layout, vs.latestMoves())
@@ -408,7 +419,7 @@ func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slo
 		default:
 			ref, _ := plan.ref(v.Name)
 			var ok bool
-			ok, err = site.buildRef(ctx, logger, plan, ref, pv(v.Name), dir, only == nil || only[v.Name])
+			ok, err = site.buildRef(ctx, logger, plan, ref, pv(v.Name), dir, sharedDir, only == nil || only[v.Name])
 			if err == nil && !ok {
 				logger.Info("skipping version", "version", v.Name)
 				continue
@@ -524,7 +535,7 @@ func parseVersionAliases(list string, m *docversions.Manifest, plan *versionPlan
 		if err := docversions.CheckName(name); err != nil {
 			return nil, fmt.Errorf("-version-alias: %w", err)
 		}
-		if _, clash := m.Lookup(name); clash || name == "versions" {
+		if _, clash := m.Lookup(name); clash || name == "versions" || name == sharedDirName {
 			return nil, fmt.Errorf("-version-alias: %s is already a version", name)
 		}
 		if target == "newest-tag" {
@@ -547,11 +558,18 @@ func parseVersionAliases(list string, m *docversions.Manifest, plan *versionPlan
 	return aliases, nil
 }
 
-// buildRef builds the site as of ref into dir. A build is taken from
-// the cache when one with the same inputs is there; otherwise, unless
-// build is false, the ref is checked out into a worktree and built
-// from it. It reports whether dir was written.
-func (site *preparedSite) buildRef(ctx context.Context, logger *slog.Logger, plan *versionPlan, ref docversions.Ref, pv *pageVersion, dir string, build bool) (bool, error) {
+// newSharedAssets returns where a version writes the files it shares
+// with the other versions: sharedDir, one directory above its root.
+func newSharedAssets(sharedDir string) *sharedAssets {
+	return &sharedAssets{dir: sharedDir, prefix: "../" + sharedDirName + "/"}
+}
+
+// buildRef builds the site as of ref into dir, and the files it shares
+// with other versions into sharedDir. A build is taken from the cache
+// when one with the same inputs is there; otherwise, unless build is
+// false, the ref is checked out into a worktree and built from it. It
+// reports whether dir was written.
+func (site *preparedSite) buildRef(ctx context.Context, logger *slog.Logger, plan *versionPlan, ref docversions.Ref, pv *pageVersion, dir, sharedDir string, build bool) (bool, error) {
 	cfg := site.config
 	var cached string
 	if cfg.VersionCache != "" {
@@ -562,7 +580,7 @@ func (site *preparedSite) buildRef(ctx context.Context, logger *slog.Logger, pla
 		cached = filepath.Join(cfg.VersionCache, "builds", key)
 		if info, err := os.Stat(cached); err == nil && info.IsDir() {
 			logger.Info("using cached version", "version", ref.Name, "commit", shortCommit(ref.Commit))
-			return true, copyTree(cached, dir)
+			return true, restoreCache(cached, dir, sharedDir)
 		}
 	}
 	if !build {
@@ -598,11 +616,12 @@ func (site *preparedSite) buildRef(ctx context.Context, logger *slog.Logger, pla
 	if err != nil {
 		return false, err
 	}
+	vsite.shared = newSharedAssets(sharedDir)
 	if err := vsite.generateStaticHTML(ctx, logger); err != nil {
 		return false, err
 	}
 	if cached != "" {
-		if err := storeCache(dir, cached); err != nil {
+		if err := storeCache(cached, dir, vsite.shared); err != nil {
 			logger.Warn("caching version", "version", ref.Name, "error", err)
 		}
 	}
@@ -664,7 +683,7 @@ func shortCommit(c string) string {
 // site's chrome, and the configuration.
 func (site *preparedSite) versionCacheKey(ref docversions.Ref, name string) (string, error) {
 	h := sha256.New()
-	fmt.Fprintf(h, "md2html version cache 1\x00%s\x00%s\x00", ref.Commit, name)
+	fmt.Fprintf(h, "md2html version cache 2\x00%s\x00%s\x00", ref.Commit, name)
 	exe, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("version cache: %w", err)
@@ -715,9 +734,11 @@ func hashTree(w io.Writer, root string) error {
 	})
 }
 
-// storeCache copies the finished build in dir into the cache at
-// cached, replacing it whole so that a reader never sees part of one.
-func storeCache(dir, cached string) error {
+// storeCache copies the finished build in dir, and the shared files it
+// uses, into the cache at cached, replacing it whole so that a reader
+// never sees part of one. The build is kept in site/ and the shared
+// files in shared/.
+func storeCache(cached, dir string, shared *sharedAssets) error {
 	if err := os.MkdirAll(filepath.Dir(cached), 0o755); err != nil {
 		return err
 	}
@@ -725,7 +746,14 @@ func storeCache(dir, cached string) error {
 	if err != nil {
 		return err
 	}
-	if err := copyTree(dir, tmp); err != nil {
+	err = copyTree(dir, filepath.Join(tmp, "site"))
+	for _, f := range shared.files {
+		if err != nil {
+			break
+		}
+		err = copyFile(filepath.Join(shared.dir, filepath.FromSlash(f)), filepath.Join(tmp, "shared", filepath.FromSlash(f)))
+	}
+	if err != nil {
 		os.RemoveAll(tmp)
 		return err
 	}
@@ -734,6 +762,19 @@ func storeCache(dir, cached string) error {
 		return err
 	}
 	return nil
+}
+
+// restoreCache copies the build cached by storeCache into dir, and its
+// shared files into sharedDir.
+func restoreCache(cached, dir, sharedDir string) error {
+	if err := copyTree(filepath.Join(cached, "site"), dir); err != nil {
+		return err
+	}
+	shared := filepath.Join(cached, "shared")
+	if _, err := os.Stat(shared); err != nil {
+		return nil // the version shares nothing
+	}
+	return copyTree(shared, sharedDir)
 }
 
 // copyTree copies the directory src to dst.
@@ -809,7 +850,7 @@ func writeMoveStubs(dir string, layout pageLayout, moved map[string]string) erro
 // the default version def, so that the URLs the site had before it was
 // versioned, and the root itself, open the default version.
 func writeRootStubs(outDir string, def docversions.Version, m *docversions.Manifest) error {
-	reserved := map[string]bool{"versions": true}
+	reserved := map[string]bool{"versions": true, sharedDirName: true}
 	for _, v := range m.Versions {
 		reserved[v.Name] = true
 	}

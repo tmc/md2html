@@ -44,31 +44,58 @@ func writeJSONSpecAsset(outputDir string) error {
 	return nil
 }
 
-func writeFingerprintedSearchAssets(outputDir string, searchIndex []byte) (map[string]string, error) {
-	assets := map[string][]byte{
-		"search-index.js": searchIndex,
-	}
-	for _, name := range searchAssetFiles {
-		body, err := fs.ReadFile(searchAssets, name)
-		if err != nil {
-			return nil, fmt.Errorf("read embedded %s: %w", name, err)
-		}
-		assets[path.Join("js", filepath.Base(name))] = body
-	}
-
+// writeFingerprintedSearchAssets writes the search index and the search
+// scripts under outputDir, each named for its content, and returns the
+// URL of each relative to outputDir. With shared, the scripts, which
+// are the same in every version of a versioned site, are written to the
+// shared directory instead; the index is the site's own.
+func writeFingerprintedSearchAssets(outputDir string, searchIndex []byte, shared *sharedAssets) (map[string]string, error) {
 	out := make(map[string]string)
-	for name, body := range assets {
+	write := func(dir, name string, body []byte) (string, error) {
 		hashed := fingerprintName(name, body)
-		full := filepath.Join(outputDir, filepath.FromSlash(hashed))
+		full := filepath.Join(dir, filepath.FromSlash(hashed))
 		if err := os.MkdirAll(filepath.Dir(full), 0755); err != nil {
-			return nil, fmt.Errorf("create asset dir: %w", err)
+			return "", fmt.Errorf("create asset dir: %w", err)
 		}
 		if err := os.WriteFile(full, body, 0644); err != nil {
-			return nil, fmt.Errorf("write %s: %w", full, err)
+			return "", fmt.Errorf("write %s: %w", full, err)
 		}
-		out[name] = hashed
+		return hashed, nil
+	}
+	hashed, err := write(outputDir, "search-index.js", searchIndex)
+	if err != nil {
+		return nil, err
+	}
+	out["search-index.js"] = hashed
+	for _, file := range searchAssetFiles {
+		body, err := fs.ReadFile(searchAssets, file)
+		if err != nil {
+			return nil, fmt.Errorf("read embedded %s: %w", file, err)
+		}
+		name := path.Join("js", filepath.Base(file))
+		if shared == nil {
+			if out[name], err = write(outputDir, name, body); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		hashed, err := write(shared.dir, name, body)
+		if err != nil {
+			return nil, err
+		}
+		shared.files = append(shared.files, hashed)
+		out[name] = shared.prefix + hashed
 	}
 	return out, nil
+}
+
+// sharedAssets is where a version of a versioned static site writes the
+// content-named files it shares with the other versions, so that the
+// site holds one copy of each.
+type sharedAssets struct {
+	dir    string   // the shared directory
+	prefix string   // URL of dir relative to the version's root
+	files  []string // files written, relative to dir
 }
 
 func fingerprintName(name string, body []byte) string {

@@ -59,6 +59,9 @@ rm docs/versions.yaml
 md2html -html searched -versions -version-pattern 'v*' -search -include-root . docs
 grep '"search": "search-index\.[0-9a-f]+\.js"' searched/versions.json
 grep 'id="search-all-versions"' searched/v0.1.9/guide.html
+# The search scripts are the same in every version and kept once.
+grep 'src="./../_shared/js/search\.[0-9a-f]+\.js" data-root="./"' searched/v0.1.9/guide.html
+! exists searched/v0.1.9/js
 
 # The server serves the working tree at the root and each other
 # version under /v/<name>/, all of it read at that version's commit.

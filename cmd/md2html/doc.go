@@ -39,8 +39,9 @@
 // worktree, so its pages, navigation, included code, and search index
 // are those of the release. The output root holds versions.json, which
 // every page's version switcher reads when it is viewed, a versions/
-// page listing them, and redirects from the unversioned URLs to the
-// default version. A versions.yaml file in the source directory, read
+// page listing them, redirects from the unversioned URLs to the
+// default version, and _shared/, holding the scripts versions share
+// once each. A versions.yaml file in the source directory, read
 // from the working tree only, chooses which tags to publish and how to
 // label them, and lists archived versions built by other tools, which
 // are copied in verbatim:

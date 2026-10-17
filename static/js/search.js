@@ -3,10 +3,14 @@ let searchIndex = null;
 let searchData = null;
 let selectedResultIndex = -1;
 
-// Index URLs are relative to the site root, which is the parent of the
-// js/ directory this script is served from. Resolving them here keeps
-// search working under a URL prefix and from file://.
-const siteRoot = new URL('../', document.currentScript.src);
+// Index URLs are relative to the site root. The page names it, relative
+// to the page, since the script may be shared by every version of a
+// versioned site; a page that does not is taken to be in a site whose
+// js/ directory holds this script. Resolving them here keeps search
+// working under a URL prefix and from file://.
+const siteRoot = document.currentScript.dataset.root
+    ? new URL(document.currentScript.dataset.root, location.href)
+    : new URL('../', document.currentScript.src);
 
 function resultURL(url) {
     return new URL(url, siteRoot).href;

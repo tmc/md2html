@@ -284,5 +284,5 @@
 {{define "search-scripts"}}
 <script src="{{.AssetBase}}{{asset .Assets "js/minisearch.min.js"}}" defer></script>
 <script src="{{.AssetBase}}{{asset .Assets "search-index.js"}}" defer></script>
-<script src="{{.AssetBase}}{{asset .Assets "js/search.js"}}" defer></script>
+<script src="{{.AssetBase}}{{asset .Assets "js/search.js"}}" data-root="{{.AssetBase}}" defer></script>
 {{end}}

@@ -161,6 +161,10 @@ type preparedSite struct {
 	// version is the version of a versioned site being built, nil
 	// for a site that is not versioned.
 	version *pageVersion
+	// shared is where a version of a versioned static site writes the
+	// files it shares with the other versions. Nil writes them all
+	// into the site's own output.
+	shared *sharedAssets
 }
 
 // newPreparedSite returns a site whose configuration paths are resolved
