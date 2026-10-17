@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -249,5 +251,79 @@ func TestRelativeURL(t *testing.T) {
 		if got := relativeURL(tt.from, tt.target); got != tt.want {
 			t.Errorf("relativeURL(%q, %q) = %q, want %q", tt.from, tt.target, got, tt.want)
 		}
+	}
+}
+
+func TestVersionedServer(t *testing.T) {
+	repo := versionedRepo(t)
+	addr := freeAddr(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		cfg := Config{
+			Chdir:          repo,
+			Source:         "docs",
+			HTTP:           addr,
+			Watch:          "false",
+			IncludeRoot:    ".",
+			Versions:       true,
+			VersionPattern: "v*",
+			Search:         true,
+			Nav:            true,
+		}
+		done <- Run(ctx, cfg, discardLogger(), io.Discard, nil)
+	}()
+	waitServing(t, addr)
+
+	get := func(path string) (int, string) {
+		t.Helper()
+		resp, err := http.Get("http://" + addr + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp.StatusCode, string(body)
+	}
+	for _, tt := range []struct {
+		path string
+		code int
+		want string
+	}{
+		{"/guide", 200, "// main"},
+		{"/guide", 200, `data-versions="./versions.json"`},
+		{"/v/v0.1.9/guide", 200, "// v0.1.9"},
+		{"/v/v0.1.10/guide", 200, "// v0.1.10"},
+		{"/v/v0.1.9/guide", 200, `../../versions.json"`},
+		{"/v/v0.1.9/agents/agents", 200, "Agents"},
+		{"/v/v0.1.9/search-index.js", 200, "Old"},
+		{"/search-index.js", 200, "Replaces the old page"},
+		{"/versions.json", 200, `"path": "v/v0.1.9/"`},
+		{"/versions/", 200, `href="../v/v0.1.10/"`},
+		{"/v/v9.9.9/guide", 404, ""},
+	} {
+		code, body := get(tt.path)
+		if code != tt.code || !strings.Contains(body, tt.want) {
+			t.Errorf("GET %s = %d, want %d containing %q", tt.path, code, tt.code, tt.want)
+		}
+	}
+	if code, body := get("/v/v0.1.9/search-index.js"); code == 200 && strings.Contains(body, "Replaces the old page") {
+		t.Error("v0.1.9's search index lists a page from the working tree")
+	}
+
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command("git", "-C", repo, "worktree", "list").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(out), "\n"); n != 1 {
+		t.Errorf("worktrees left after the server stopped:\n%s", out)
 	}
 }

@@ -47,6 +47,21 @@ grep '// v0.1.10' aliased/stable/guide.html
 ! md2html -html bad -versions -versions-only v9.9.9 docs
 stderr 'no version v9.9.9'
 
+# The server serves the working tree at the root and each other
+# version under /v/<name>/, all of it read at that version's commit.
+md2html -http :9147 -watch=false -versions -version-pattern 'v*' -include-root . docs &
+wait-port :9147
+curl -s http://localhost:9147/guide
+stdout '// main'
+curl -s http://localhost:9147/v/v0.1.9/guide
+stdout '// v0.1.9'
+curl -s http://localhost:9147/v/v0.1.9/agents/agents
+stdout 'Agents call tools'
+curl -s http://localhost:9147/versions.json
+stdout '"path": "v/v0.1.10/"'
+curl -s -o /dev/null -w '%{http_code}' http://localhost:9147/v/v9.9.9/guide
+stdout 404
+
 -- docs/index.md --
 # Home
 

@@ -269,26 +269,82 @@ func (l pageLayout) pageKey(src string) string {
 	return docversions.PageKey(l.url(src), l.ext)
 }
 
+// A versionedSite is a versioned site's plan and the manifest built
+// from it.
+type versionedSite struct {
+	plan     *versionPlan
+	manifest *docversions.Manifest
+	// moves holds the source pages that moved, as [versionPlan.moves]
+	// returns them.
+	moves map[string]map[string]string
+	// files lists the pages of the working tree.
+	files    []markdownFile
+	versions []GitVersion
+}
+
+// newVersionedSite plans the site's versions and builds their manifest.
+// versionPath gives each version's root relative to the manifest.
+func (site *preparedSite) newVersionedSite(ctx context.Context, versionPath func(name string) string) (*versionedSite, error) {
+	cfg := site.config
+	plan, err := site.planVersions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	m := plan.manifest(versionPath)
+	if cfg.VersionDefault != "" {
+		if _, ok := m.Lookup(cfg.VersionDefault); !ok {
+			return nil, fmt.Errorf("-version-default: no version %s", cfg.VersionDefault)
+		}
+		m.Default = cfg.VersionDefault
+	}
+
+	sourceDir, err := filepath.Abs(site.sourceDir())
+	if err != nil {
+		return nil, err
+	}
+	files, err := findMarkdownFiles(sourceDir, 100)
+	if err != nil {
+		return nil, fmt.Errorf("finding markdown files: %w", err)
+	}
+	moves := plan.moves(ctx, m, pageAliases(sourceDir, files))
+	layout := cfg.layout()
+	for name, moved := range moves {
+		keys := make(map[string]string, len(moved))
+		for from, to := range moved {
+			keys[layout.pageKey(from)] = layout.pageKey(to)
+		}
+		if m.Moves == nil {
+			m.Moves = make(map[string]map[string]string)
+		}
+		m.Moves[name] = keys
+	}
+
+	vs := &versionedSite{plan: plan, manifest: m, moves: moves, files: files}
+	for _, v := range m.Versions {
+		vs.versions = append(vs.versions, GitVersion{Name: v.Name, Ref: v.Ref, IsTag: strings.HasPrefix(v.Ref, "refs/tags/"), Commit: v.Commit})
+	}
+	return vs, nil
+}
+
+// pageVersion returns what the pages of version name know about it.
+// manifest is the manifest's URL relative to the version root.
+func (vs *versionedSite) pageVersion(name, manifest string) *pageVersion {
+	return &pageVersion{name: name, manifest: manifest, versions: vs.versions}
+}
+
 // generateVersionedHTML writes every published version of the site to
 // its own directory under the output directory, with a manifest the
 // pages' version switcher reads.
 func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slog.Logger) error {
 	cfg := site.config
-	plan, err := site.planVersions(ctx)
+	vs, err := site.newVersionedSite(ctx, func(name string) string { return name + "/" })
 	if err != nil {
 		return err
 	}
+	plan, m, layout := vs.plan, vs.manifest, cfg.layout()
 	outDir := cfg.HTML
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return fmt.Errorf("creating output directory: %w", err)
-	}
-
-	m := plan.manifest(func(name string) string { return name + "/" })
-	if cfg.VersionDefault != "" {
-		if _, ok := m.Lookup(cfg.VersionDefault); !ok {
-			return fmt.Errorf("-version-default: no version %s", cfg.VersionDefault)
-		}
-		m.Default = cfg.VersionDefault
 	}
 	only, err := parseVersionsOnly(cfg.VersionsOnly, m)
 	if err != nil {
@@ -298,30 +354,8 @@ func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slo
 	if err != nil {
 		return err
 	}
-
-	sourceDir, _ := filepath.Abs(site.sourceDir())
-	files, err := findMarkdownFiles(sourceDir, 100)
-	if err != nil {
-		return fmt.Errorf("finding markdown files: %w", err)
-	}
-	aliases := pageAliases(sourceDir, files)
-	sourceMoves := plan.moves(ctx, m, aliases)
-	layout := cfg.layout()
-	m.Moves = make(map[string]map[string]string)
-	for name, moved := range sourceMoves {
-		keys := make(map[string]string, len(moved))
-		for from, to := range moved {
-			keys[layout.pageKey(from)] = layout.pageKey(to)
-		}
-		m.Moves[name] = keys
-	}
-
-	gitVersions := make([]GitVersion, 0, len(m.Versions))
-	for _, v := range m.Versions {
-		gitVersions = append(gitVersions, GitVersion{Name: v.Name, Ref: v.Ref, IsTag: strings.HasPrefix(v.Ref, "refs/tags/"), Commit: v.Commit})
-	}
 	pv := func(name string) *pageVersion {
-		return &pageVersion{name: name, manifest: "../" + docversions.ManifestName, versions: gitVersions}
+		return vs.pageVersion(name, "../"+docversions.ManifestName)
 	}
 
 	var built []docversions.Version
@@ -347,7 +381,7 @@ func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slo
 			latest.version = pv(v.Name)
 			err = latest.generateStaticHTML(ctx, logger)
 			if err == nil {
-				err = writeMoveStubs(dir, layout, sourceMoves, m, files)
+				err = writeMoveStubs(dir, layout, vs.moves, m, vs.files)
 			}
 		default:
 			ref, _ := plan.ref(v.Name)
@@ -519,27 +553,16 @@ func (site *preparedSite) buildRef(ctx context.Context, logger *slog.Logger, pla
 	}
 	defer plan.repo.RemoveWorktree(context.WithoutCancel(ctx), wt)
 
-	vcfg := cfg
-	vcfg.Chdir = site.base
-	vcfg.Source = filepath.Join(wt, filepath.FromSlash(plan.rel))
-	vcfg.IncludeRoot = plan.remap(cfg.IncludeRoot, wt)
-	vcfg.HTML = dir
-	vcfg.SiteURL = versionSiteURL(cfg.SiteURL, pv.name)
-	if info, err := os.Stat(vcfg.Source); err != nil || !info.IsDir() {
+	cfg.HTML = dir
+	cfg.SiteURL = versionSiteURL(cfg.SiteURL, pv.name)
+	vsite, err := site.refSite(cfg, plan, wt, pv, logger)
+	if errors.Is(err, errNoSource) {
 		logger.Warn("version has no source directory", "version", ref.Name, "dir", plan.rel)
 		return false, nil
 	}
-	vsite, err := prepareSite(vcfg, logger)
 	if err != nil {
 		return false, err
 	}
-	if err := vsite.prepareIncludes(vcfg.Source, vcfg.Source); err != nil {
-		return false, err
-	}
-	if err := vsite.prepareFavicon(vcfg.Source, logger); err != nil {
-		return false, err
-	}
-	vsite.version = pv
 	if err := vsite.generateStaticHTML(ctx, logger); err != nil {
 		return false, err
 	}
@@ -549,6 +572,36 @@ func (site *preparedSite) buildRef(ctx context.Context, logger *slog.Logger, pla
 		}
 	}
 	return true, nil
+}
+
+// errNoSource reports that a version has no source directory: the
+// docs were added after it was released.
+var errNoSource = errors.New("no source directory")
+
+// refSite returns the site cfg describes, read from the worktree wt of
+// one of the plan's refs instead of the working tree. The source and
+// the include root are read at that ref; the chrome (templates, CSS,
+// components, icons) is shared with the working tree.
+func (site *preparedSite) refSite(cfg Config, plan *versionPlan, wt string, pv *pageVersion, logger *slog.Logger) (*preparedSite, error) {
+	cfg.Chdir = site.base
+	cfg.Source = filepath.Join(wt, filepath.FromSlash(plan.rel))
+	cfg.IncludeRoot = plan.remap(cfg.IncludeRoot, wt)
+	cfg.Versions = false
+	if info, err := os.Stat(cfg.Source); err != nil || !info.IsDir() {
+		return nil, errNoSource
+	}
+	vsite, err := prepareSite(cfg, logger)
+	if err != nil {
+		return nil, err
+	}
+	if err := vsite.prepareIncludes(cfg.Source, cfg.Source); err != nil {
+		return nil, err
+	}
+	if err := vsite.prepareFavicon(cfg.Source, logger); err != nil {
+		return nil, err
+	}
+	vsite.version = pv
+	return vsite, nil
 }
 
 // remap returns the path p, if it is inside the repository, at the same
@@ -819,6 +872,12 @@ func writeVersionsPage(file string, m *docversions.Manifest, title string) error
 	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 		return err
 	}
+	return os.WriteFile(file, versionsPage(m, title), 0o644)
+}
+
+// versionsPage returns the list of versions as an HTML page served one
+// directory below the manifest.
+func versionsPage(m *docversions.Manifest, title string) []byte {
 	if title == "" || title == defaultTitle {
 		title = "Documentation"
 	}
@@ -850,5 +909,5 @@ h1{color:var(--fg)}a{color:var(--accent)}li{margin:.25rem 0}.state{color:var(--m
 			html.EscapeString(v.Path), html.EscapeString(v.Label), html.EscapeString(state))
 	}
 	b.WriteString("</ul>\n</body>\n</html>\n")
-	return os.WriteFile(file, []byte(b.String()), 0o644)
+	return []byte(b.String())
 }

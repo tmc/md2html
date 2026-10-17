@@ -63,7 +63,9 @@
 // With -version-cache, a version whose commit and chrome are unchanged
 // is copied from the cache rather than rebuilt; -versions-only builds a
 // subset; -version-alias stable=newest-tag publishes a copy of the
-// newest release as stable/.
+// newest release as stable/. With -http, the working tree is served at
+// the root and each other version under /v/<name>/, from a worktree of
+// its commit made when it is first requested.
 //
 // Markdown supports GitHub-style alerts such as "> [!NOTE]" and
 // fenced admonitions such as "!!!note". Image syntax pointing at

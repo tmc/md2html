@@ -35,20 +35,12 @@ func newServer(ctx context.Context, site *preparedSite, logger *slog.Logger) *se
 	}
 
 	if cfg.Versions {
-		// Versions come from the repository the base directory is in,
-		// not from the source tree, which may be a subdirectory of it or
-		// not versioned at all.
-		s.versionMgr = newGitVersions(s.base)
-		if s.versionMgr.isRepo(ctx) {
-			versions, err := s.versionMgr.versions(ctx, cfg.VersionBranches, cfg.VersionPattern)
-			if err != nil {
-				logger.Error("error listing versions", "error", err)
-			} else {
-				s.versions = versions
-				logger.Info("loaded versions", "count", len(versions))
-			}
+		vm, err := newVersionMounts(ctx, site, logger)
+		if err != nil {
+			logger.Warn("not serving versions", "error", err)
 		} else {
-			logger.Warn("versions enabled but not in a git repository")
+			s.versions = vm
+			logger.Info("loaded versions", "count", len(vm.vs.manifest.Versions))
 		}
 	}
 
@@ -152,9 +144,8 @@ type server struct {
 	watchMu      sync.Mutex
 	watched      map[string]bool
 
-	// Version management
-	versionMgr *gitVersions
-	versions   []GitVersion
+	// versions serves the site's other versions, when it is versioned.
+	versions *versionMounts
 
 	// Navigation and the site presentation its source carries. Both are
 	// rebuilt when their source changes, so they are read under mu.
@@ -483,32 +474,13 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filePath := strings.TrimPrefix(r.URL.Path, "/")
-	var requestedVersion string
-	if s.config.Versions && len(s.versions) > 0 {
-		// URL format: /v/{version}/{path} or /{path}
-		if rest, ok := strings.CutPrefix(filePath, "v/"); ok {
-			requestedVersion, filePath, _ = strings.Cut(rest, "/")
-		} else if s.config.VersionDefault != "" {
-			requestedVersion = s.config.VersionDefault
-		} else {
-			requestedVersion = s.versions[0].Name
-		}
-	}
 
 	if (filePath == "" || filePath == "/") && s.config.Index != "" {
-		var fileContent []byte
-		var err error
 		indexPath := resolveAgainst(s.base, s.config.Index)
-		if requestedVersion != "" && s.versionMgr != nil {
-			fileContent, err = s.versionMgr.fileContent(ctx, requestedVersion, s.config.Index)
-		} else {
-			fileContent, err = os.ReadFile(indexPath)
-		}
+		fileContent, err := os.ReadFile(indexPath)
 		if err == nil {
-			if requestedVersion == "" {
-				_ = s.watchOpenedPath(indexPath)
-			}
-			s.serveMarkdown(ctx, w, string(fileContent), s.config.Index, css, requestedVersion)
+			_ = s.watchOpenedPath(indexPath)
+			s.serveMarkdown(ctx, w, string(fileContent), s.config.Index, css)
 			return
 		}
 		if s.config.Verbose {
@@ -520,7 +492,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		// With no source file and no content, serve the root directory:
 		// its index file if it has one, otherwise a listing.
 		if s.sourceIsDir || (s.inputPath == "" && content == "") {
-			s.serveDirectory(ctx, w, root, "", css, "")
+			s.serveDirectory(ctx, w, root, "", css)
 			return
 		}
 		// The source file is rendered as the page it is, so that its
@@ -529,7 +501,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		if s.inputPath != "" {
 			name = filepath.Base(s.inputPath)
 		}
-		s.serveMarkdown(ctx, w, content, name, css, "")
+		s.serveMarkdown(ctx, w, content, name, css)
 		return
 	}
 
@@ -560,26 +532,17 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for _, candidate := range candidates {
-		var fileContent []byte
-		var fullPath string
-		var err error
-		if requestedVersion != "" && s.versionMgr != nil {
-			fileContent, err = s.versionMgr.fileContent(ctx, requestedVersion, candidate)
-		} else {
-			fullPath, err = secureJoin(root, filepath.FromSlash(candidate))
-			if err != nil {
-				http.Error(w, "invalid path", http.StatusBadRequest)
-				return
-			}
-			fileContent, err = os.ReadFile(fullPath)
+		fullPath, err := secureJoin(root, filepath.FromSlash(candidate))
+		if err != nil {
+			http.Error(w, "invalid path", http.StatusBadRequest)
+			return
 		}
+		fileContent, err := os.ReadFile(fullPath)
 		if err != nil {
 			continue
 		}
-		if requestedVersion == "" {
-			_ = s.watchOpenedPath(fullPath)
-		}
-		s.serveMarkdown(ctx, w, string(fileContent), candidate, css, requestedVersion)
+		_ = s.watchOpenedPath(fullPath)
+		s.serveMarkdown(ctx, w, string(fileContent), candidate, css)
 		return
 	}
 
@@ -594,7 +557,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 					http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
 					return
 				}
-				s.serveDirectory(ctx, w, fullPath, strings.TrimSuffix(cleanPath, "/"), css, requestedVersion)
+				s.serveDirectory(ctx, w, fullPath, strings.TrimSuffix(cleanPath, "/"), css)
 				return
 			}
 			_ = s.watchOpenedPath(fullPath)
@@ -610,7 +573,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 // filePath and writes it. A page is titled from its content or file
 // name; content with no file name, such as standard input, takes the
 // site title.
-func (s *server) serveMarkdown(ctx context.Context, w http.ResponseWriter, content, filePath, css, version string) {
+func (s *server) serveMarkdown(ctx context.Context, w http.ResponseWriter, content, filePath, css string) {
 	doc, err := parseFrontmatter(content)
 	if err != nil {
 		s.logger.Error("error parsing frontmatter", "file", filePath, "error", err)
@@ -621,12 +584,12 @@ func (s *server) serveMarkdown(ctx context.Context, w http.ResponseWriter, conte
 	if filePath != "" {
 		title = documentTitle(doc, filePath, title)
 	}
-	s.serveDocument(ctx, w, doc, title, css, filePath, version)
+	s.serveDocument(ctx, w, doc, title, css, filePath)
 }
 
 // serveDocument renders doc through the page template and writes it.
-func (s *server) serveDocument(ctx context.Context, w http.ResponseWriter, doc DocumentData, title, css, filePath, version string) {
-	html, err := s.renderDocumentWithVersion(ctx, doc, title, css, filePath, version)
+func (s *server) serveDocument(ctx context.Context, w http.ResponseWriter, doc DocumentData, title, css, filePath string) {
+	html, err := s.renderPage(ctx, doc, title, css, filePath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -647,7 +610,7 @@ func (s *server) dirIndexNames() []string {
 // serveDirectory serves the directory at dir, whose path relative to the
 // served root is relDir. A directory with an index file renders that file;
 // one without renders a listing of the Markdown files beneath it.
-func (s *server) serveDirectory(ctx context.Context, w http.ResponseWriter, dir, relDir, css, version string) {
+func (s *server) serveDirectory(ctx context.Context, w http.ResponseWriter, dir, relDir, css string) {
 	for _, name := range s.dirIndexNames() {
 		indexPath := filepath.Join(dir, filepath.FromSlash(name))
 		content, err := os.ReadFile(indexPath)
@@ -655,7 +618,7 @@ func (s *server) serveDirectory(ctx context.Context, w http.ResponseWriter, dir,
 			continue
 		}
 		_ = s.watchOpenedPath(indexPath)
-		s.serveMarkdown(ctx, w, string(content), path.Join(filepath.ToSlash(relDir), name), css, version)
+		s.serveMarkdown(ctx, w, string(content), path.Join(filepath.ToSlash(relDir), name), css)
 		return
 	}
 
@@ -665,7 +628,7 @@ func (s *server) serveDirectory(ctx context.Context, w http.ResponseWriter, dir,
 		return
 	}
 	doc := DocumentData{Content: listing, Frontmatter: make(map[string]any)}
-	s.serveDocument(ctx, w, doc, listingTitle(relDir), css, "", "")
+	s.serveDocument(ctx, w, doc, listingTitle(relDir), css, "")
 }
 
 // requestedURL returns the path the client asked for. Under -base the
@@ -691,7 +654,7 @@ func requestedURL(r *http.Request) string {
 func (s *server) serveNotFound(ctx context.Context, w http.ResponseWriter, urlPath, css string) {
 	body := fmt.Sprintf("# Not found\n\nNo page matches `%s`.\n", strings.ReplaceAll(urlPath, "`", ""))
 	doc := DocumentData{Content: body, Frontmatter: make(map[string]any)}
-	html, err := s.renderDocumentWithVersion(ctx, doc, "Not found", css, "", "")
+	html, err := s.renderPage(ctx, doc, "Not found", css, "")
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -701,8 +664,8 @@ func (s *server) serveNotFound(ctx context.Context, w http.ResponseWriter, urlPa
 	w.Write([]byte(html))
 }
 
-// renderDocumentWithVersion renders a document with version information
-func (s *server) renderDocumentWithVersion(ctx context.Context, doc DocumentData, title, customCSS, filePath, version string) (string, error) {
+// renderPage renders doc as the page for filePath.
+func (s *server) renderPage(ctx context.Context, doc DocumentData, title, customCSS, filePath string) (string, error) {
 	html, err := s.prepared.markdownToHTML(promoteTitleHeading(doc), filePath)
 	if err != nil {
 		return "", err
@@ -727,8 +690,6 @@ func (s *server) renderDocumentWithVersion(ctx context.Context, doc DocumentData
 		ShowStars:   s.config.Stars,
 		Data:        s.jsonData,
 		FilePath:    filePath,
-		Version:     version,
-		Versions:    s.versions,
 		Description: llmsSummary(doc),
 		EditURL:     editURL(s.config.EditURL, filePath),
 	}
@@ -736,6 +697,7 @@ func (s *server) renderDocumentWithVersion(ctx context.Context, doc DocumentData
 	if nav != nil {
 		opts.Nav = nav.ForPage(filePath)
 	}
+	s.prepared.version.apply(&opts)
 
 	return s.prepared.renderTemplate(html, title, customCSS, s.watchEnabled(), doc.Frontmatter, opts)
 }
@@ -1014,7 +976,7 @@ func (s *server) notifyClients() {
 }
 
 // registerEndpoints registers the routes the rendered pages call by
-// absolute URL: live reload, raw Markdown, the versions API, and the
+// absolute URL: live reload, raw Markdown, and the
 // embedded search and JSON schema assets. The search assets are
 // registered ahead of handleIndex so they win over any js/ directory or
 // stale search-index.js in the source tree.
@@ -1023,7 +985,6 @@ func (s *server) registerEndpoints(mux *http.ServeMux) {
 	mux.HandleFunc("/raw", s.handleRaw)
 	mux.HandleFunc("/llms.txt", s.handleLLMS)
 	mux.HandleFunc("/llms-full.txt", s.handleLLMSFull)
-	mux.HandleFunc("/api/versions", s.handleVersionsAPI)
 	mux.HandleFunc("/_jsonspec/schemas.json", s.handleJSONSpecSchemas)
 
 	if s.config.Search {
@@ -1037,6 +998,15 @@ func (s *server) registerEndpoints(mux *http.ServeMux) {
 	if s.prepared != nil && s.prepared.favicon != "" {
 		mux.HandleFunc("/"+s.prepared.faviconName, s.prepared.serveFavicon)
 	}
+}
+
+// contentMux returns a mux serving the source tree and the endpoints
+// its pages call.
+func (s *server) contentMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", s.handleIndex)
+	s.registerEndpoints(mux)
+	return mux
 }
 
 // Run serves until ctx is canceled. It owns every background worker it
@@ -1071,9 +1041,11 @@ func (s *server) Run(ctx context.Context) error {
 		}()
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", s.handleIndex)
-	s.registerEndpoints(mux)
+	mux := s.contentMux()
+	if s.versions != nil {
+		s.versions.register(mux)
+		defer s.versions.close()
+	}
 
 	// Requests descend from a context the server stops, so work a
 	// request started does not outlive the server it was made to. It is
