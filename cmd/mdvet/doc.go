@@ -36,6 +36,11 @@
 //	-include-root dir
 //	             directory files included with <Code src> must be
 //	             inside, as passed to md2html
+//	-versions    also vet the directory as of each published git tag
+//	-version-pattern glob
+//	             git tags to vet with -versions, as passed to md2html
+//	-version-config file
+//	             version policy file, as passed to md2html
 //
 // Docs written for a hosted site link to each other by rendered URL:
 // "/docs/churl#exit-status" rather than "churl.md#exit-status". Such a
@@ -43,6 +48,17 @@
 // its anchor can be checked. With it, mdvet maps the URL back to the
 // source file that renders it. A rooted link inside the prefix that
 // resolves to no page is then reported as broken.
+//
+// With -versions, mdvet vets a versioned site as md2html -versions
+// publishes it: the directory as it is in the working tree, then as it
+// was at each published tag, checked out into a git worktree. A tag's
+// diagnostics name files as tag:path, as git does. Two checks then run
+// across versions:
+//
+//	version-aliases  an aliases entry in frontmatter names a page that
+//	                 exists in some version
+//	version-removed  a page in the newest release still exists, or was
+//	                 moved by a rename git detects or an alias
 //
 // mdvet exits with status 1 when one or more diagnostics are reported,
 // 2 on a usage or I/O error, and 0 otherwise.

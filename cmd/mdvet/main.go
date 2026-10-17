@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -28,6 +29,9 @@ func run(args []string, stdout, stderr *os.File) int {
 	componentsFlag := fs.String("components", "", "directory of component definitions, as passed to md2html")
 	includeRootFlag := fs.String("include-root", "", "directory that files included with <Code src> must be inside, as passed to md2html (default: the directory being vetted)")
 	baseFlag := fs.String("base", "", "URL path prefix the tree is served under (e.g. /docs), so links written as rendered URLs can be resolved")
+	versionsFlag := fs.Bool("versions", false, "also vet the directory as of each published git tag, and check moves and aliases across versions")
+	versionPatternFlag := fs.String("version-pattern", "*", "git tag pattern to match for versions, as passed to md2html")
+	versionConfigFlag := fs.String("version-config", "", "version policy file, as passed to md2html (default: versions.yaml in the directory)")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -81,10 +85,23 @@ func run(args []string, stdout, stderr *os.File) int {
 		return 2
 	}
 
-	diags, err := mdvet.RunSite(fs.Args(), checks, mdvet.Site{
-		Base: *baseFlag,
-		Root: siteRoot(fs.Args()),
-	})
+	var diags []mdvet.Diagnostic
+	if *versionsFlag {
+		if fs.NArg() != 1 {
+			fmt.Fprintln(stderr, "mdvet: -versions takes one directory")
+			return 2
+		}
+		diags, err = mdvet.RunVersions(context.Background(), fs.Arg(0), checks, mdvet.Versions{
+			Pattern: *versionPatternFlag,
+			Config:  *versionConfigFlag,
+			Site:    mdvet.Site{Base: *baseFlag},
+		})
+	} else {
+		diags, err = mdvet.RunSite(fs.Args(), checks, mdvet.Site{
+			Base: *baseFlag,
+			Root: siteRoot(fs.Args()),
+		})
+	}
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
