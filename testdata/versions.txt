@@ -47,6 +47,13 @@ grep '// v0.1.10' aliased/stable/guide.html
 ! md2html -html bad -versions -versions-only v9.9.9 docs
 stderr 'no version v9.9.9'
 
+# since: in versions.yaml publishes no tag older than it.
+cp policy/versions.yaml docs/versions.yaml
+md2html -html floor -versions -version-pattern 'v*' -include-root . docs
+exists floor/v0.1.10
+! exists floor/v0.1.9
+rm docs/versions.yaml
+
 # With -search, the manifest names each version's own index, which
 # search across versions loads on request.
 md2html -html searched -versions -version-pattern 'v*' -search -include-root . docs
@@ -86,6 +93,8 @@ package main // v0.1.9
 package main // v0.1.10
 -- next/examples/hello.go --
 package main // main
+-- policy/versions.yaml --
+since: v0.1.10
 -- next/docs/index.md --
 # Home
 

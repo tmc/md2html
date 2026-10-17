@@ -60,8 +60,8 @@ Generate versioned static output, one directory per release tag plus the working
 
 Each version is built from its own commit, checked out into a git worktree, so its pages, navigation, included code, and search index are those of the release. The output root holds `versions.json`, which every page's version switcher reads when it is viewed, a `versions/` page listing them, and redirects from the unversioned URLs to the default version. A `versions.yaml` file in the source directory, read from the working tree only, chooses which tags to publish and how to label them, and lists archived versions built by other tools, which are copied in verbatim:
 
-	include: ["v0.1.*", "v0.2.*"]
-	exclude: ["v0.1.17-rc*"]
+	since: v0.1.17     # publish no tag older than this
+	exclude: ["*-rc*"] # nor these
 	collapse: minor # list only the newest patch of each minor version
 	labels:
 	  latest: main

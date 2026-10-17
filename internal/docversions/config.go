@@ -17,8 +17,8 @@ import (
 //
 // A typical versions.yaml:
 //
-//	include: ["v0.1.*", "v0.2.*"]
-//	exclude: ["v0.1.17-rc*"]
+//	since: v0.1.17
+//	exclude: ["*-rc*"]
 //	collapse: minor
 //	labels:
 //	  v0.2.0: "v0.2.0 (LTS)"
@@ -30,6 +30,10 @@ import (
 //	  old: "You are reading docs for {version}. The latest release is {latest}."
 //	  dev: "These docs describe unreleased changes on main."
 type Config struct {
+	// Since is the oldest version to publish. Tags below it by
+	// semantic version, including its own prereleases, and tags that
+	// are not semantic versions are not published.
+	Since string `yaml:"since"`
 	// Include lists the tag globs to publish. Empty publishes every tag
 	// the tag pattern matches.
 	Include []string `yaml:"include"`
@@ -90,6 +94,11 @@ func LoadConfig(file string) (*Config, error) {
 }
 
 func (c *Config) check() error {
+	if c.Since != "" {
+		if _, ok := parse(c.Since); !ok {
+			return fmt.Errorf("since: %q is not a semantic version", c.Since)
+		}
+	}
 	switch c.Collapse {
 	case "", "minor", "major":
 	default:
@@ -128,6 +137,9 @@ func CheckName(name string) error {
 
 // Publishes reports whether the tag name is published.
 func (c *Config) Publishes(name string) bool {
+	if c.Since != "" && Compare(name, c.Since) < 0 {
+		return false
+	}
 	if len(c.Include) > 0 && !matchAny(c.Include, name) {
 		return false
 	}

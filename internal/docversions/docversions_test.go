@@ -95,7 +95,27 @@ banner:
 		t.Errorf("Archive = %+v", cfg.Archive)
 	}
 
-	for _, bad := range []string{"collapse: patch\n", "archive:\n  - name: x\n", "archive:\n  - name: a/b\n    path: p\n", "include: ['[']\n"} {
+	if err := os.WriteFile(file, []byte("since: v0.1.17\nexclude: [\"*-*\"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, err = LoadConfig(file); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]bool{
+		"v0.1.16":     false,
+		"v0.1.17-rc1": false,
+		"v0.1.17":     true,
+		"v0.1.100":    true,
+		"v1.0.0":      true,
+		"v1.0.0-rc.1": false,
+		"release-x":   false,
+	} {
+		if got := cfg.Publishes(name); got != want {
+			t.Errorf("since v0.1.17: Publishes(%q) = %v, want %v", name, got, want)
+		}
+	}
+
+	for _, bad := range []string{"since: latest\n", "collapse: patch\n", "archive:\n  - name: x\n", "archive:\n  - name: a/b\n    path: p\n", "include: ['[']\n"} {
 		if err := os.WriteFile(file, []byte(bad), 0o644); err != nil {
 			t.Fatal(err)
 		}
