@@ -12,6 +12,56 @@ function resultURL(url) {
     return new URL(url, siteRoot).href;
 }
 
+// In a versioned site the version switcher names the manifest, which
+// names each version's search index. Search covers the version being
+// read until the reader asks for all of them.
+let allVersions = null;
+
+// loadAllVersions adds every other listed version's index to the
+// search, its results labelled with their version.
+function loadAllVersions() {
+    if (allVersions) return allVersions;
+    const box = document.querySelector('.version-selector[data-versions]');
+    if (!box) return Promise.resolve();
+    initSearch();
+    const manifestURL = new URL(box.dataset.versions, location.href);
+    allVersions = fetch(manifestURL)
+        .then(r => r.ok ? r.json() : { versions: [] })
+        .then(async m => {
+            for (const v of m.versions || []) {
+                if (v.name === box.dataset.version || v.archive || v.hidden || !v.search) continue;
+                const root = new URL(v.path, manifestURL);
+                const docs = await loadIndex(new URL(v.search, root).href);
+                const first = searchData.length;
+                docs.forEach(doc => searchData.push({ ...doc, url: new URL(doc.url, root).href, version: v.label || v.name }));
+                searchIndex.addAll(searchData.slice(first).map((doc, i) => ({ id: first + i, ...doc })));
+            }
+        })
+        .catch(() => {});
+    return allVersions;
+}
+
+// loadIndex loads a search index script, which assigns its documents
+// to window.MD2HTML_SEARCH_INDEX, leaving this page's index in place.
+function loadIndex(src) {
+    return new Promise(resolve => {
+        const own = window.MD2HTML_SEARCH_INDEX;
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => {
+            const docs = window.MD2HTML_SEARCH_INDEX || [];
+            window.MD2HTML_SEARCH_INDEX = own;
+            resolve(docs);
+        };
+        script.onerror = () => resolve([]);
+        document.head.appendChild(script);
+    });
+}
+
+function escapeHTML(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
 // Initialize search when modal is opened
 function initSearch() {
     if (searchIndex) return; // Already initialized
@@ -73,10 +123,14 @@ function performSearch(query) {
         return;
     }
 
-    const results = searchIndex.search(query, {
+    let results = searchIndex.search(query, {
         combineWith: 'AND',
         prefix: true
     });
+    // The version being read comes first; other versions follow, each
+    // group in order of score.
+    results = results.filter(r => !searchData[r.id].version)
+        .concat(results.filter(r => searchData[r.id].version));
 
     displayResults(results.slice(0, 20), query); // Show top 20 results
 }
@@ -101,6 +155,7 @@ function displayResults(results, query) {
                 <div class="search-result-title">${highlightedTitle}</div>
                 ${doc.blurb ? `<div class="search-result-blurb">${highlightedBlurb}</div>` : ''}
                 <div class="search-result-meta">
+                    ${doc.version ? `<span class="search-result-version">${escapeHTML(doc.version)}</span>` : ''}
                     ${doc.category ? `<span class="search-result-category">${doc.category}</span>` : ''}
                 </div>
             </div>
@@ -208,6 +263,21 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    const allLink = document.getElementById('search-all-versions');
+    if (allLink && document.querySelector('.version-selector[data-versions]')) {
+        allLink.hidden = false;
+        allLink.addEventListener('click', e => {
+            e.preventDefault();
+            allLink.textContent = 'Searching all versions';
+            loadAllVersions().then(() => {
+                if (searchInput) {
+                    performSearch(searchInput.value);
+                    searchInput.focus();
+                }
+            });
+        });
+    }
 
     // Close on overlay click
     if (searchOverlay) {

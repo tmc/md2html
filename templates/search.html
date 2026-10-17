@@ -24,6 +24,7 @@
             <span class="search-shortcut">
                 <kbd>Esc</kbd> to close
             </span>
+            <a href="#" id="search-all-versions" class="search-all-versions" hidden>Search all versions</a>
         </div>
     </div>
 </div>
@@ -192,6 +193,24 @@
 .search-result-meta {
     font-size: 12px;
     color: var(--fg-muted, #6a737d);
+}
+
+.search-all-versions {
+    margin-left: auto;
+    color: var(--accent, #0969da);
+}
+
+.search-all-versions[hidden] {
+    display: none;
+}
+
+.search-result-version {
+    display: inline-block;
+    margin-right: 4px;
+    padding: 2px 6px;
+    border: 1px solid var(--line, #d0d7de);
+    border-radius: 3px;
+    font-size: 11px;
 }
 
 .search-result-category {

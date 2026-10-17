@@ -62,6 +62,9 @@ func newVersionMounts(ctx context.Context, site *preparedSite, logger *slog.Logg
 			logger.Warn("not serving remote archive", "version", v.Name)
 			continue
 		}
+		if !v.Archive && site.config.Search {
+			v.Search = "search-index.js"
+		}
 		kept = append(kept, v)
 	}
 	m.Versions = kept

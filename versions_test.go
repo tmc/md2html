@@ -82,6 +82,7 @@ func TestVersionedStaticBuild(t *testing.T) {
 		VersionPattern: "v*",
 		VersionAlias:   "stable=newest-tag",
 		SiteURL:        "https://example.com/docs",
+		Search:         true,
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	if err := Run(context.Background(), cfg, logger, io.Discard, nil); err != nil {
@@ -99,6 +100,13 @@ func TestVersionedStaticBuild(t *testing.T) {
 	}
 	if got, want := strings.Join(states, " "), "dev stable old"; got != want {
 		t.Errorf("states = %s, want %s", got, want)
+	}
+	for _, v := range m.Versions {
+		if v.Search == "" {
+			t.Errorf("version %s names no search index", v.Name)
+		} else if _, err := os.Stat(filepath.Join(out, v.Path, v.Search)); err != nil {
+			t.Errorf("version %s search index: %v", v.Name, err)
+		}
 	}
 	if m.Default != "latest" || m.Aliases["stable"] != "v0.1.10" {
 		t.Errorf("default = %q, aliases = %v", m.Default, m.Aliases)
@@ -303,6 +311,7 @@ func TestVersionedServer(t *testing.T) {
 		{"/v/v0.1.9/search-index.js", 200, "Old"},
 		{"/search-index.js", 200, "Replaces the old page"},
 		{"/versions.json", 200, `"path": "v/v0.1.9/"`},
+		{"/versions.json", 200, `"search": "search-index.js"`},
 		{"/versions/", 200, `href="../v/v0.1.10/"`},
 		{"/v/v9.9.9/guide", 404, ""},
 	} {

@@ -397,6 +397,9 @@ func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slo
 			os.RemoveAll(dir)
 			continue
 		}
+		if !v.Archive {
+			v.Search = searchIndexName(dir)
+		}
 		built = append(built, v)
 	}
 	m.Versions = built
@@ -441,6 +444,16 @@ func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slo
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// searchIndexName returns the name of the search index script in the
+// built site at dir, or "" if it has none.
+func searchIndexName(dir string) string {
+	matches, _ := filepath.Glob(filepath.Join(dir, "search-index.*.js"))
+	if len(matches) != 1 {
+		return ""
+	}
+	return filepath.Base(matches[0])
 }
 
 // versionSiteURL returns the canonical base URL of the version name of

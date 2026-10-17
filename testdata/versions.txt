@@ -47,6 +47,12 @@ grep '// v0.1.10' aliased/stable/guide.html
 ! md2html -html bad -versions -versions-only v9.9.9 docs
 stderr 'no version v9.9.9'
 
+# With -search, the manifest names each version's own index, which
+# search across versions loads on request.
+md2html -html searched -versions -version-pattern 'v*' -search -include-root . docs
+grep '"search": "search-index\.[0-9a-f]+\.js"' searched/versions.json
+grep 'id="search-all-versions"' searched/v0.1.9/guide.html
+
 # The server serves the working tree at the root and each other
 # version under /v/<name>/, all of it read at that version's commit.
 md2html -http :9147 -watch=false -versions -version-pattern 'v*' -include-root . docs &

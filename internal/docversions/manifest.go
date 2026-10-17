@@ -50,6 +50,9 @@ type Version struct {
 	Archive bool   `json:"archive,omitempty"`
 	// Hidden versions are published but left out of the switcher.
 	Hidden bool `json:"hidden,omitempty"`
+	// Search is the version's search index script, relative to its
+	// root, if it has one. Search across versions loads it.
+	Search string `json:"search,omitempty"`
 }
 
 // Version states.
