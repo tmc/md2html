@@ -74,6 +74,8 @@ curl -s http://localhost:9147/versions.json
 stdout '"path": "v/v0.1.10/"'
 curl -s -o /dev/null -w '%{http_code}' http://localhost:9147/v/v9.9.9/guide
 stdout 404
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost:9147/agents/agents
+stdout '301 http://localhost:9147/agents'
 
 -- docs/index.md --
 # Home

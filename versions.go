@@ -332,6 +332,28 @@ func (vs *versionedSite) pageVersion(name, manifest string) *pageVersion {
 	return &pageVersion{name: name, manifest: manifest, versions: vs.versions}
 }
 
+// latestMoves returns the pages that moved between the newest release
+// and the working tree, mapping each old source path to the new one.
+// Only moves whose old path is no page now and whose new path is one
+// are kept: the ones a reader following an old link needs.
+func (vs *versionedSite) latestMoves() map[string]string {
+	m := vs.manifest
+	if len(m.Versions) < 2 || m.Versions[0].Name != latestVersion || m.Versions[1].Archive {
+		return nil
+	}
+	have := make(map[string]bool, len(vs.files))
+	for _, f := range vs.files {
+		have[filepath.ToSlash(f.RelPath)] = true
+	}
+	moves := make(map[string]string)
+	for from, to := range vs.moves[m.Versions[1].Name] {
+		if !have[from] && have[to] {
+			moves[from] = to
+		}
+	}
+	return moves
+}
+
 // generateVersionedHTML writes every published version of the site to
 // its own directory under the output directory, with a manifest the
 // pages' version switcher reads.
@@ -381,7 +403,7 @@ func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slo
 			latest.version = pv(v.Name)
 			err = latest.generateStaticHTML(ctx, logger)
 			if err == nil {
-				err = writeMoveStubs(dir, layout, vs.moves, m, vs.files)
+				err = writeMoveStubs(dir, layout, vs.latestMoves())
 			}
 		default:
 			ref, _ := plan.ref(v.Name)
@@ -769,20 +791,9 @@ func versionBanner(text, label, latestLabel, latestHref, listHref string) string
 // writeMoveStubs writes, into the latest version at dir, a redirect at
 // the old path of every page that moved since the newest release, so
 // that links into the latest docs keep working when a page moves.
-func writeMoveStubs(dir string, layout pageLayout, moves map[string]map[string]string, m *docversions.Manifest, files []markdownFile) error {
-	if len(m.Versions) < 2 || m.Versions[1].Archive {
-		return nil
-	}
-	moved := moves[m.Versions[1].Name]
-	have := make(map[string]bool, len(files))
-	for _, f := range files {
-		have[filepath.ToSlash(f.RelPath)] = true
-	}
+func writeMoveStubs(dir string, layout pageLayout, moved map[string]string) error {
 	layout.index = ""
 	for from, to := range moved {
-		if have[from] || !have[to] {
-			continue
-		}
 		stub := layout.file(from)
 		if stub == "" || layout.file(to) == stub {
 			continue

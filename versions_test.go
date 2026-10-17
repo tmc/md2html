@@ -314,11 +314,22 @@ func TestVersionedServer(t *testing.T) {
 		{"/versions.json", 200, `"search": "search-index.js"`},
 		{"/versions/", 200, `href="../v/v0.1.10/"`},
 		{"/v/v9.9.9/guide", 404, ""},
+		{"/old", 200, "Replaces the old page"}, // through the redirect an alias makes
 	} {
 		code, body := get(tt.path)
 		if code != tt.code || !strings.Contains(body, tt.want) {
 			t.Errorf("GET %s = %d, want %d containing %q", tt.path, code, tt.code, tt.want)
 		}
+	}
+	// A page moved since the newest release redirects to where it went.
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := client.Get("http://" + addr + "/agents/agents")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if loc := resp.Header.Get("Location"); resp.StatusCode != http.StatusMovedPermanently || loc != "../agents" {
+		t.Errorf("GET /agents/agents = %d, Location %q; want 301 to ../agents", resp.StatusCode, loc)
 	}
 	if code, body := get("/v/v0.1.9/search-index.js"); code == 200 && strings.Contains(body, "Replaces the old page") {
 		t.Error("v0.1.9's search index lists a page from the working tree")

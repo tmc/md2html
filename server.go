@@ -566,6 +566,13 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// A page that moved since the newest release is sent to where it
+	// went, as a static build's redirect page would.
+	if to, ok := s.versions.moved(cleanPath); ok {
+		w.Header().Set("Location", relativeURL(cleanPath, to))
+		w.WriteHeader(http.StatusMovedPermanently)
+		return
+	}
 	s.serveNotFound(ctx, w, requestedURL(r), css)
 }
 

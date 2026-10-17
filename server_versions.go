@@ -6,11 +6,13 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/tmc/md2html/internal/docversions"
+	"github.com/tmc/md2html/internal/markdownfile"
 )
 
 // versionMounts serves the versions of a versioned site other than the
@@ -23,6 +25,10 @@ type versionMounts struct {
 	manifest []byte
 	page     []byte
 	logger   *slog.Logger
+
+	// moves maps the URL path, relative to the root, of each page that
+	// moved since the newest release to the page's path now.
+	moves map[string]string
 
 	mu     sync.Mutex
 	mounts map[string]*versionMount
@@ -79,8 +85,27 @@ func newVersionMounts(ctx context.Context, site *preparedSite, logger *slog.Logg
 		manifest: data,
 		page:     versionsPage(m, site.config.Title),
 		logger:   logger,
+		moves:    vs.latestMoves(),
 		mounts:   make(map[string]*versionMount),
 	}, nil
+}
+
+// moved reports where the page at the URL path p, relative to the
+// root, has moved to, as a URL path relative to the root. A nil
+// versionMounts reports no moves.
+func (vm *versionMounts) moved(p string) (string, bool) {
+	if vm == nil {
+		return "", false
+	}
+	for from, to := range vm.moves {
+		if p == from || p == strings.TrimSuffix(from, path.Ext(from)) {
+			if markdownfile.Is(p) {
+				return to, true
+			}
+			return strings.TrimSuffix(to, path.Ext(to)), true
+		}
+	}
+	return "", false
 }
 
 // archivePath returns the configured location of the archive name.
