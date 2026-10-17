@@ -1,0 +1,10 @@
+commit: 30818d63e2d0ea140f3156e4f2d9c63f7ee4f69d
+date: 2026-10-17T12:04:36-07:00
+agent: Claude Code 2.1.284
+model: claude-opus-5-5
+tty: none
+pid: 33180
+iterm_session_id: w0t0p0:7D43873A-159A-4A75-AC65-97235A839E27
+session=383d3163-6aaf-4321-910e-a8a39f0f7fbe
+source: mac2:/tmp/md2html-multiversion.md (multi-version docs proposal)
+rewrites: 4200778 (reworked to repo standards: shared helpers, checked test errors, script tests)
