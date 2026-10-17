@@ -1,9 +1,8 @@
 commit: af3ae6e12024e24e14b53ff3ea9cadc793b06dde
 date: 2026-10-17T11:15:57-07:00
-agent: Claude Code 2.1.284 (Claude Code)
+agent: Claude Code 2.1.284
 model: claude-opus-5-5
-tty: not a tty
-none
+tty: none
 pid: 33180
 iterm_session_id: w0t0p0:7D43873A-159A-4A75-AC65-97235A839E27
 session=383d3163-6aaf-4321-910e-a8a39f0f7fbe
