@@ -20,6 +20,7 @@ func TestScripts(t *testing.T) {
 	engine := script.NewEngine()
 	engine.Cmds["md2html"] = scripttest.BackgroundCmd(exe, nil, 0)
 	engine.Cmds["curl"] = script.Program("curl", nil, 0)
+	engine.Cmds["git"] = script.Program("git", nil, 0)
 	engine.Cmds["wait-port"] = scripttest.WaitPortCmd()
 	delete(engine.Cmds, "exec")
 
@@ -27,6 +28,14 @@ func TestScripts(t *testing.T) {
 		"PATH=" + os.Getenv("PATH"),
 		"HOME=" + os.Getenv("HOME"),
 		"TMPDIR=" + t.TempDir(),
+		// Scripts that commit must not depend on the user's git
+		// configuration, which may sign commits or rename branches.
+		"GIT_CONFIG_GLOBAL=" + os.DevNull,
+		"GIT_CONFIG_NOSYSTEM=1",
+		"GIT_AUTHOR_NAME=md2html",
+		"GIT_AUTHOR_EMAIL=md2html@example.com",
+		"GIT_COMMITTER_NAME=md2html",
+		"GIT_COMMITTER_EMAIL=md2html@example.com",
 	}
 	if gcd := os.Getenv("GOCOVERDIR"); gcd != "" {
 		env = append(env, "GOCOVERDIR="+gcd)

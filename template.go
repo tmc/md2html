@@ -103,6 +103,10 @@ type RenderOptions struct {
 	Version string
 	// Versions is the list of available git-backed documentation versions.
 	Versions []GitVersion
+	// VersionsURL is the URL of the versions.json manifest relative to
+	// the root of the version being rendered. Empty means the site is
+	// not versioned.
+	VersionsURL string
 	// RawMDURL is the URL for the source Markdown file, when available.
 	RawMDURL string
 	// Description is the page description used for metadata and search.
@@ -236,6 +240,8 @@ func (s *preparedSite) renderTemplate(htmlContent, title, customCSS string, live
 		Frontmatter:       frontmatter,
 		Version:           opts.Version,
 		Versions:          opts.Versions,
+		VersionsURL:       opts.VersionsURL,
+		HTMLLayout:        s.config.HTMLLayout,
 		Search:            s.config.Search,
 		Nav:               opts.Nav,
 		SiteTitle:         opts.SiteTitle,
@@ -266,6 +272,9 @@ func (s *preparedSite) renderTemplate(htmlContent, title, customCSS string, live
 		ShowStars:         opts.ShowStars,
 		IconAttribution:   iconAttribution,
 	}
+	if opts.VersionsURL != "" {
+		data.VersionPage = s.config.layout().pageKey(opts.FilePath)
+	}
 
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
 		return "", fmt.Errorf("execute template %q: %w", name, err)
@@ -274,16 +283,23 @@ func (s *preparedSite) renderTemplate(htmlContent, title, customCSS string, live
 }
 
 type templateData struct {
-	Title            string
-	Content          template.HTML
-	CustomCSS        template.CSS
-	ChromaCSS        template.CSS
-	Verbose          bool
-	LiveReload       bool
-	HTMLExt          string
-	Frontmatter      map[string]any
-	Version          string
-	Versions         []GitVersion
+	Title       string
+	Content     template.HTML
+	CustomCSS   template.CSS
+	ChromaCSS   template.CSS
+	Verbose     bool
+	LiveReload  bool
+	HTMLExt     string
+	Frontmatter map[string]any
+	Version     string
+	Versions    []GitVersion
+	// VersionsURL is the URL of the version manifest relative to the
+	// version root, and VersionPage the current page's key in it.
+	// HTMLLayout is the static layout, "dir" or "file", which the
+	// version switcher needs to address a page in another version.
+	VersionsURL      string
+	VersionPage      string
+	HTMLLayout       string
 	Search           bool
 	Nav              *NavContext
 	SiteTitle        string

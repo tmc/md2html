@@ -9,7 +9,7 @@
 <script src="{{$.AssetBase}}js/jsonspec.js"></script>{{end}}
 {{if and .Repo .ShowStars}}{{template "repo-stars-script" .}}{{end}}
 {{if .LiveReload}}{{template "livereload-script" .}}{{end}}
-{{if .Versions}}{{template "version-switcher-script" .}}{{end}}
+{{if .VersionsURL}}{{template "version-switcher-script" .}}{{end}}
 {{end}}
 
 {{define "heading-anchor-script"}}
@@ -318,49 +318,111 @@
 {{end}}
 
 {{define "version-switcher-script"}}
-<!-- Version switcher functionality -->
 <script>
-    function switchVersion(version) {
-        const currentPath = window.location.pathname;
+    // The version switcher. versions.json lists every version, newest
+    // first; its moves map each version's moved pages to their paths in
+    // the next newer version, so changing version keeps the reader on
+    // the same topic even across a reorganization.
+    (function() {
+        var box = document.querySelector('.version-selector[data-versions]');
+        if (!box || !window.fetch || !window.URL) return;
+        var manifestURL = new URL(box.dataset.versions, location.href);
+        var current = box.dataset.version;
+        var page = box.dataset.page || '';
+        var ext = box.dataset.ext ? '.' + box.dataset.ext.replace(/^\./, '') : '';
+        var dirs = box.dataset.layout === 'dir';
 
-        // For static sites, calculate relative path to version directory
-        // Current path format: /v/{version}/{path} or /{path}
-        let filePath = currentPath;
-        let versionPrefix = '';
-
-        // Extract the file path without version prefix
-        const versionPattern = /^\/v\/([^\/]+)\//;
-        const match = currentPath.match(versionPattern);
-        if (match) {
-            // Currently in a versioned path
-            filePath = currentPath.replace(versionPattern, '/');
-        }
-
-        // Construct new path with selected version
-        // For static sites: /v/{version}/{path}
-        const newPath = '/v/' + version + filePath;
-
-        // Use View Transitions API if available for smooth navigation
-        if (document.startViewTransition) {
-            document.startViewTransition(() => {
-                window.location.href = newPath;
-            });
-        } else {
-            window.location.href = newPath;
-        }
-    }
-
-    // Highlight current version in selector on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        const select = document.getElementById('version-select');
-        if (select) {
-            const currentPath = window.location.pathname;
-            const versionPattern = /^\/v\/([^\/]+)\//;
-            const match = currentPath.match(versionPattern);
-            if (match && match[1]) {
-                select.value = match[1];
+        function find(m, name) {
+            for (var i = 0; i < m.versions.length; i++) {
+                if (m.versions[i].name === name) return i;
             }
+            return -1;
         }
-    });
+
+        // mapPage follows the moves from version index i to index j.
+        function mapPage(m, i, j, key) {
+            var moves = m.moves || {};
+            for (; i > j; i--) {
+                var fwd = moves[m.versions[i].name] || {};
+                if (Object.prototype.hasOwnProperty.call(fwd, key)) key = fwd[key];
+            }
+            for (; i < j; i++) {
+                var back = moves[m.versions[i + 1].name] || {};
+                for (var old in back) {
+                    if (back[old] === key) { key = old; break; }
+                }
+            }
+            return key;
+        }
+
+        function candidates(key) {
+            if (key === '') return [''];
+            if (dirs) return [key + '/'];
+            if (ext) return [key + ext, key + '/index' + ext];
+            return [key];
+        }
+
+        function exists(url) {
+            return fetch(url, {method: 'HEAD'}).then(function(r) { return r.ok; }, function() { return false; });
+        }
+
+        function go(m, name) {
+            var j = find(m, name), i = find(m, current);
+            if (j < 0) return;
+            var v = m.versions[j];
+            var root = new URL(v.path, manifestURL);
+            if (v.archive || i < 0 || page === '') {
+                location.href = root.href;
+                return;
+            }
+            var urls = candidates(mapPage(m, i, j, page)).map(function(c) { return new URL(c, root).href; });
+            (function next(k) {
+                if (k >= urls.length) { location.href = root.href; return; }
+                exists(urls[k]).then(function(ok) {
+                    if (ok) location.href = urls[k] + location.hash;
+                    else next(k + 1);
+                });
+            })(0);
+        }
+
+        function banner(m) {
+            var el = document.getElementById('version-banner');
+            var i = find(m, current), d = find(m, m['default']);
+            if (!el || i < 0 || d < 0 || i === d) return;
+            var v = m.versions[i], def = m.versions[d];
+            var text = (m.banner || {})[v.state === 'old' ? 'old' : v.state === 'dev' ? 'dev' : ''];
+            if (!text) return;
+            text.split('{latest}').forEach(function(part, n) {
+                if (n > 0) {
+                    var a = document.createElement('a');
+                    a.href = new URL(def.path, manifestURL).href;
+                    a.textContent = def.label || def.name;
+                    el.appendChild(a);
+                }
+                el.appendChild(document.createTextNode(part.split('{version}').join(v.label || v.name)));
+            });
+            el.hidden = false;
+        }
+
+        fetch(manifestURL).then(function(r) {
+            if (!r.ok) throw new Error(r.status);
+            return r.json();
+        }).then(function(m) {
+            m.versions = m.versions || [];
+            var select = document.getElementById('version-select');
+            m.versions.forEach(function(v) {
+                if (v.hidden && v.name !== current) return;
+                var o = document.createElement('option');
+                o.value = v.name;
+                o.textContent = v.label || v.name;
+                o.selected = v.name === current;
+                select.appendChild(o);
+            });
+            select.addEventListener('change', function() { go(m, select.value); });
+            select.hidden = false;
+            box.querySelector('.version-list-link').hidden = true;
+            banner(m);
+        }).catch(function() {});
+    })();
 </script>
 {{end}}

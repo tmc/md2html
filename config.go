@@ -42,14 +42,33 @@ type Config struct {
 	IncludeRoot string
 	// Favicon is the image file browsers show for the site. Empty
 	// means the one docs.json names, if any.
-	Favicon         string
+	Favicon string
+	// Versions publishes the documentation as of each git tag matching
+	// VersionPattern, and each branch with VersionBranches, alongside
+	// the working tree as "latest". A static build writes each version
+	// to its own directory; the server serves each under /v/<name>/.
 	Versions        bool
 	VersionPattern  string
 	VersionBranches bool
 	VersionDefault  string
-	Search          bool
-	LLMS            bool
-	SiteURL         string
+	// VersionConfig is the version policy file. Empty means
+	// versions.yaml in the source directory, if there is one.
+	VersionConfig string
+	// VersionsOnly is a comma-separated list of the versions a static
+	// build renders. The others are taken from VersionCache when they
+	// are there and left out when not.
+	VersionsOnly string
+	// VersionCache is a directory for worktrees and finished builds of
+	// versions. A version whose inputs are unchanged is copied from it
+	// instead of being rebuilt. Empty disables caching.
+	VersionCache string
+	// VersionAlias is a comma-separated list of name=target pairs, each
+	// publishing a copy of version target under name, such as
+	// stable=newest-tag.
+	VersionAlias string
+	Search       bool
+	LLMS         bool
+	SiteURL      string
 	// OGImage is the social card image used by pages whose frontmatter
 	// names none. A relative value resolves against SiteURL, so a site
 	// served from a subdirectory still advertises an absolute URL.
@@ -138,6 +157,10 @@ type preparedSite struct {
 	// published under at the site root. Both are empty without one.
 	favicon     string
 	faviconName string
+
+	// version is the version of a versioned site being built, nil
+	// for a site that is not versioned.
+	version *pageVersion
 }
 
 // newPreparedSite returns a site whose configuration paths are resolved
@@ -203,7 +226,11 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.Bool("versions", false, "enable versioned documentation using git tags/refs")
 	fs.String("version-pattern", "*", "git tag pattern to match for versions (e.g., 'v*', 'release-*')")
 	fs.Bool("version-branches", false, "include branches as versions alongside tags")
-	fs.String("version-default", "", "default version to show (empty = current/latest)")
+	fs.String("version-default", "", "version the site root opens (default: latest, the working tree)")
+	fs.String("version-config", "", "version policy file (default: versions.yaml in the source directory)")
+	fs.String("versions-only", "", "comma-separated versions to build; others come from -version-cache or are left out")
+	fs.String("version-cache", "", "directory for version worktrees and finished builds, reused when a version is unchanged")
+	fs.String("version-alias", "", "comma-separated name=target copies of versions, e.g. stable=newest-tag")
 	fs.Bool("search", false, "enable client-side search")
 	fs.Bool("llms", false, "emit llms.txt, llms-full.txt, and raw markdown links in static output")
 	fs.String("site-url", "", "canonical base URL for generated pages")
@@ -250,6 +277,10 @@ func ConfigFromFlags(fs *flag.FlagSet) Config {
 		VersionPattern:    flagString(fs, "version-pattern"),
 		VersionBranches:   flagBool(fs, "version-branches"),
 		VersionDefault:    flagString(fs, "version-default"),
+		VersionConfig:     flagString(fs, "version-config"),
+		VersionsOnly:      flagString(fs, "versions-only"),
+		VersionCache:      flagString(fs, "version-cache"),
+		VersionAlias:      flagString(fs, "version-alias"),
 		Search:            flagBool(fs, "search"),
 		LLMS:              flagBool(fs, "llms"),
 		SiteURL:           flagString(fs, "site-url"),

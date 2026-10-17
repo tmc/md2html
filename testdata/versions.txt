@@ -1,0 +1,71 @@
+# With -versions, a static build writes each published tag, built from
+# its own commit, and the working tree as latest, each in a directory
+# of its own, with a manifest the version switcher reads.
+
+git init -q
+git add docs examples
+git commit -q -m v0.1.9
+git tag v0.1.9
+cp v0.1.10/hello.go examples/hello.go
+git commit -q -am v0.1.10
+git tag v0.1.10
+git mv docs/agents/agents.md docs/agents.md
+cp next/docs/index.md docs/index.md
+cp next/examples/hello.go examples/hello.go
+git commit -q -am reorganize
+
+md2html -html out -versions -version-pattern 'v*' -include-root . docs
+exists out/versions.json out/versions/index.html
+grep '"name": "v0.1.10"' out/versions.json
+grep '"state": "stable"' out/versions.json
+
+# Every version shows the code it shipped, not today's.
+grep '// main' out/latest/guide.html
+grep '// v0.1.10' out/v0.1.10/guide.html
+grep '// v0.1.9' out/v0.1.9/guide.html
+
+# A version that moved a page keeps its own paths; latest keeps a
+# redirect at the old one, and the manifest maps it for the switcher.
+exists out/v0.1.9/agents/agents.html
+grep 'url=../agents.html' out/latest/agents/agents.html
+grep '"agents/agents": "agents"' out/versions.json
+
+# Pages carry a switcher scoped to their version.
+grep 'data-versions="../../versions.json"' out/v0.1.9/agents/agents.html
+grep 'data-version="v0.1.9"' out/v0.1.9/agents/agents.html
+
+# The root opens the default version, and unversioned URLs still work.
+grep 'url=latest/' out/index.html
+grep 'url=latest/guide.html' out/guide.html
+
+# -versions-only builds a subset; -version-alias publishes a copy.
+md2html -html some -versions -version-pattern 'v*' -versions-only v0.1.9 -version-alias stable=newest-tag -include-root . docs
+! exists some/latest
+! exists some/stable
+md2html -html aliased -versions -version-pattern 'v*' -version-alias stable=newest-tag -include-root . docs
+grep '// v0.1.10' aliased/stable/guide.html
+! md2html -html bad -versions -versions-only v9.9.9 docs
+stderr 'no version v9.9.9'
+
+-- docs/index.md --
+# Home
+
+See [agents](agents/agents.md).
+-- docs/guide.md --
+# Guide
+
+<Code src="/examples/hello.go" />
+-- docs/agents/agents.md --
+# Agents
+
+Agents call tools in a loop until the task is done, then they stop.
+-- examples/hello.go --
+package main // v0.1.9
+-- v0.1.10/hello.go --
+package main // v0.1.10
+-- next/examples/hello.go --
+package main // main
+-- next/docs/index.md --
+# Home
+
+See [agents](agents.md).

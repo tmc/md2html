@@ -328,6 +328,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 		if nav != nil {
 			opts.Nav = nav.ForPage(relPath)
 		}
+		site.version.apply(&opts)
 		return opts
 	}
 
@@ -587,7 +588,7 @@ func generateTOCIndex(outputDir string, files []markdownFile, cssContent string,
 	}
 
 	doc := DocumentData{Content: buf.String(), Frontmatter: make(map[string]any)}
-	finalHTML, err := site.renderTemplate(htmlContent, listingTitle(""), cssContent, false, doc.Frontmatter, RenderOptions{Assets: assets, SiteTitle: cfg.Title})
+	finalHTML, err := site.renderTemplate(htmlContent, listingTitle(""), cssContent, false, doc.Frontmatter, site.version.options(RenderOptions{Assets: assets, SiteTitle: cfg.Title}))
 	if err != nil {
 		return err
 	}

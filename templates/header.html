@@ -23,37 +23,37 @@
         {{template "theme-toggle" .}}
         {{template "repo-link" .}}
         {{if .LiveReload}}<div id="status" class="connection-status">Connected</div>{{end}}
-        {{if .Versions}}
-        <div class="version-selector">
-            <label for="version-select">Version:</label>
-            <select id="version-select" onchange="switchVersion(this.value)">
-                {{range .Versions}}
-                <option value="{{.Name}}" {{if eq $.Version .Name}}selected{{end}}>
-                    {{.Name}}{{if .IsTag}} (tag){{else}} (branch){{end}}
-                </option>
-                {{end}}
-            </select>
-        </div>
-        {{end}}
+        {{template "version-switcher" .}}
     </div>
 </nav>
+{{template "version-banner" .}}
 {{else}}
 <div class="header-bar">
     {{if .LiveReload}}<div id="status" class="connection-status">Connected</div>{{end}}
-    {{if .Versions}}
-    <div class="version-selector">
-        <label for="version-select">Version:</label>
-        <select id="version-select" onchange="switchVersion(this.value)">
-            {{range .Versions}}
-            <option value="{{.Name}}" {{if eq $.Version .Name}}selected{{end}}>
-                {{.Name}}{{if .IsTag}} (tag){{else}} (branch){{end}}
-            </option>
-            {{end}}
-        </select>
-    </div>
-    {{end}}
+    {{template "version-switcher" .}}
+</div>
+{{template "version-banner" .}}
+{{end}}
+{{end}}
+
+{{/*
+  The version switcher lists the versions in the site's versions.json,
+  which it loads when the page is viewed, so a frozen old version still
+  offers the versions released after it. Without JavaScript it is a
+  link to the list of versions.
+*/}}
+{{define "version-switcher"}}
+{{if .VersionsURL}}
+<div class="version-selector" data-versions="{{.AssetBase}}{{.VersionsURL}}" data-root="{{.AssetBase}}" data-version="{{.Version}}" data-page="{{.VersionPage}}" data-ext="{{.HTMLExt}}" data-layout="{{.HTMLLayout}}">
+    <label for="version-select">Version</label>
+    <select id="version-select" hidden></select>
+    <a class="version-list-link" href="{{.AssetBase}}{{replace .VersionsURL "versions.json" "versions/"}}">{{if .Version}}{{.Version}}{{else}}Versions{{end}}</a>
 </div>
 {{end}}
+{{end}}
+
+{{define "version-banner"}}
+{{if .VersionsURL}}<div id="version-banner" class="version-banner" role="note" hidden></div>{{end}}
 {{end}}
 
 {{/*

@@ -92,6 +92,9 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, out io.Writer, ar
 			cfg.HTMLExt = "html"
 			site.config.HTMLExt = "html"
 		}
+		if cfg.Versions {
+			return site.generateVersionedHTML(ctx, logger)
+		}
 		return site.generateStaticHTML(ctx, logger)
 	}
 
