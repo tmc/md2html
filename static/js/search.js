@@ -275,6 +275,9 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             allLink.textContent = 'Searching all versions';
             loadAllVersions().then(() => {
+                // Results now carry their version; the link has
+                // nothing more to do.
+                allLink.hidden = true;
                 if (searchInput) {
                     performSearch(searchInput.value);
                     searchInput.focus();
