@@ -60,6 +60,11 @@ md2html -html reserved -versions -version-pattern 'v*' -include-root . docs
 ! grep '"name": "versions"' reserved/versions.json
 grep 'href="../latest/"' reserved/versions/index.html
 git tag -d versions
+# Case does not matter: many file systems ignore it.
+git tag Versions
+md2html -html reserved3 -versions -version-pattern '[vV]*' -include-root . docs
+! grep '"name": "Versions"' reserved3/versions.json
+git tag -d Versions
 cp policy/reserved.yaml docs/versions.yaml
 ! md2html -html reserved2 -versions -version-pattern 'v*' -include-root . docs
 stderr 'archive name "latest" is reserved'

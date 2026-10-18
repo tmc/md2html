@@ -32,9 +32,15 @@ const sharedDirName = "_shared"
 const versionsPageDir = "versions"
 
 // reservedName reports whether name is used at the root of a versioned
-// site for something other than a version.
+// site for something other than a version. Case is ignored, as many
+// file systems ignore it.
 func reservedName(name string) bool {
-	return name == latestVersion || name == versionsPageDir || name == sharedDirName
+	for _, r := range []string{latestVersion, versionsPageDir, sharedDirName, docversions.ManifestName} {
+		if strings.EqualFold(name, r) {
+			return true
+		}
+	}
+	return false
 }
 
 // versionConfigName is the version policy file read from the source
@@ -686,7 +692,10 @@ func parseVersionAliases(list string, m *docversions.Manifest, plan *versionPlan
 		if err := docversions.CheckName(name); err != nil {
 			return nil, fmt.Errorf("-version-alias: %w", err)
 		}
-		if _, clash := m.Lookup(name); clash || reservedName(name) {
+		if reservedName(name) {
+			return nil, fmt.Errorf("-version-alias: %s is a reserved name", name)
+		}
+		if _, clash := m.Lookup(name); clash {
 			return nil, fmt.Errorf("-version-alias: %s is already a version", name)
 		}
 		if target == "newest-tag" {
@@ -964,7 +973,7 @@ func (p *versionPlan) copyArchive(ctx context.Context, v docversions.Version, m 
 	def, _ := m.Lookup(m.Default)
 	return docversions.CopyArchive(ctx, src, dir, func(rel string) []byte {
 		root := strings.Repeat("../", strings.Count(rel, "/")+1)
-		return []byte(versionBanner(m.Banner.Old, v.Label, def.Label, root+def.Path, root+"versions/"))
+		return []byte(versionBanner(m.Banner.Old, v.Label, def.Label, root+def.Path, root+versionsPageDir+"/"))
 	})
 }
 
@@ -1003,7 +1012,7 @@ func writeMoveStubs(dir string, layout pageLayout, moved map[string]string) erro
 // already at a stub's path, such as a page of an earlier build that was
 // not versioned or a stub for an earlier default, is replaced.
 func writeRootStubs(outDir string, def docversions.Version, m *docversions.Manifest) error {
-	reserved := map[string]bool{versionsPageDir: true, sharedDirName: true}
+	reserved := make(map[string]bool)
 	for _, v := range m.Versions {
 		reserved[v.Name] = true
 	}
@@ -1021,7 +1030,7 @@ func writeRootStubs(outDir string, def docversions.Version, m *docversions.Manif
 		}
 		rel = filepath.ToSlash(rel)
 		first, _, _ := strings.Cut(rel, "/")
-		if reserved[first] {
+		if reserved[first] || reservedName(first) {
 			return nil
 		}
 		target := def.Path + rel
