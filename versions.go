@@ -420,12 +420,6 @@ func (site *preparedSite) newVersionedSite(ctx context.Context, versionPath func
 		return nil, err
 	}
 	m := plan.manifest(versionPath)
-	if cfg.VersionDefault != "" {
-		if _, ok := m.Lookup(cfg.VersionDefault); !ok {
-			return nil, fmt.Errorf("-version-default: no version %s", cfg.VersionDefault)
-		}
-		m.Default = cfg.VersionDefault
-	}
 
 	sourceDir, err := filepath.Abs(site.sourceDir())
 	if err != nil {
@@ -503,6 +497,12 @@ func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slo
 		return err
 	}
 	plan, m, layout := vs.plan, vs.manifest, cfg.layout()
+	if cfg.VersionDefault != "" {
+		if _, ok := m.Lookup(cfg.VersionDefault); !ok {
+			return fmt.Errorf("-version-default: no version %s", cfg.VersionDefault)
+		}
+		m.Default = cfg.VersionDefault
+	}
 	outDir := cfg.HTML
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return fmt.Errorf("creating output directory: %w", err)

@@ -66,7 +66,6 @@ func newVersionMounts(ctx context.Context, site *preparedSite, logger *slog.Logg
 	if d := site.config.VersionDefault; d != "" && d != latestVersion {
 		logger.Warn("-version-default applies to static builds; serving the working tree at /", "version", d)
 	}
-	m.Default = latestVersion
 	// The server shows an archive only from a directory.
 	kept := m.Versions[:0]
 	for _, v := range m.Versions {

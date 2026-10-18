@@ -448,7 +448,7 @@ func TestVersionedServer(t *testing.T) {
 			Nav:            true,
 			EditURL:        "https://example.com/edit/docs/{path}",
 			Index:          "docs/index.md",
-			VersionDefault: "v0.1.10",
+			VersionDefault: "v9.9.9", // ignored, even naming no version
 		}
 		done <- Run(ctx, cfg, discardLogger(), io.Discard, nil)
 	}()
