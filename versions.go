@@ -181,14 +181,18 @@ func (p *versionPlan) manifest(versionPath func(name string) string) *docversion
 		}
 	}
 	hidden := p.config.Hidden(tagNames)
+	// The newest release is stable. A prerelease newer than it is
+	// still under development.
 	stable := false
 	for _, r := range p.refs {
 		state := docversions.StateDev
-		if r.IsTag {
+		switch {
+		case !r.IsTag:
+		case !stable && docversions.Prerelease(r.Name):
+		case !stable:
+			state, stable = docversions.StateStable, true
+		default:
 			state = docversions.StateOld
-			if !stable {
-				state, stable = docversions.StateStable, true
-			}
 		}
 		m.Versions = append(m.Versions, docversions.Version{
 			Name:   r.Name,
@@ -289,10 +293,11 @@ func (p *versionPlan) moves(ctx context.Context, aliases map[string]string, have
 	return moves
 }
 
-// newestTag returns the newest published tag.
+// newestTag returns the newest published tag that is a release, not a
+// prerelease.
 func (p *versionPlan) newestTag() (docversions.Ref, bool) {
 	for _, r := range p.refs {
-		if r.IsTag {
+		if r.IsTag && !docversions.Prerelease(r.Name) {
 			return r, true
 		}
 	}
@@ -623,7 +628,7 @@ func parseVersionsOnly(list string, m *docversions.Manifest) (map[string]bool, e
 
 // parseVersionAliases parses -version-alias, a comma-separated list of
 // name=target pairs, into a map from alias directory to version. The
-// target "newest-tag" names the newest published tag.
+// target "newest-tag" names the newest published release.
 func parseVersionAliases(list string, m *docversions.Manifest, plan *versionPlan) (map[string]string, error) {
 	aliases := make(map[string]string)
 	for pair := range strings.SplitSeq(list, ",") {
@@ -642,16 +647,11 @@ func parseVersionAliases(list string, m *docversions.Manifest, plan *versionPlan
 			return nil, fmt.Errorf("-version-alias: %s is already a version", name)
 		}
 		if target == "newest-tag" {
-			target = ""
-			for _, r := range plan.refs {
-				if r.IsTag {
-					target = r.Name
-					break
-				}
-			}
-			if target == "" {
+			r, ok := plan.newestTag()
+			if !ok {
 				continue // nothing released yet
 			}
+			target = r.Name
 		}
 		if _, ok := m.Lookup(target); !ok {
 			return nil, fmt.Errorf("-version-alias: no version %s", target)

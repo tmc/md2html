@@ -348,6 +348,7 @@ func TestVersionMoves(t *testing.T) {
 	write("docs/b.md", "# Page\n\n"+strings.Repeat("Text written for the next release instead.\n", 5))
 	git("commit", "-q", "-am", "v0.3.0")
 	git("tag", "v0.3.0")
+	git("tag", "v0.4.0-rc.1")
 	git("update-ref", "refs/remotes/origin/next", "HEAD")
 	git("mv", "docs/b.md", "docs/c.md")
 	git("commit", "-q", "-m", "move")
@@ -374,18 +375,20 @@ func TestVersionMoves(t *testing.T) {
 	m := build("")
 	var got []string
 	for _, v := range m.Versions {
-		got = append(got, v.Name)
+		got = append(got, v.Name+":"+v.State)
 	}
-	// Newest first: the working tree, branches, then tags.
-	want := []string{"latest", "next", "v0.3.0", "v0.2.0", "v0.1.0"}
+	// Newest first: the working tree, branches, then tags, of which the
+	// newest release, not the newer release candidate, is stable.
+	want := []string{"latest:dev", "next:dev", "v0.4.0-rc.1:dev", "v0.3.0:stable", "v0.2.0:old", "v0.1.0:old"}
 	if !slices.Equal(got, want) {
 		t.Errorf("versions = %v, want %v", got, want)
 	}
 	for v, want := range map[string]map[string]string{
-		"v0.1.0": {"a": "c"},
-		"v0.2.0": {"b": "c"},
-		"v0.3.0": {"b": "c"},
-		"next":   {"b": "c"},
+		"v0.1.0":      {"a": "c"},
+		"v0.2.0":      {"b": "c"},
+		"v0.3.0":      {"b": "c"},
+		"v0.4.0-rc.1": {"b": "c"},
+		"next":        {"b": "c"},
 	} {
 		if got := m.Moves[v]; !maps.Equal(got, want) {
 			t.Errorf("moves[%s] = %v, want %v", v, got, want)

@@ -143,7 +143,7 @@ func (c *Config) Publishes(name string) bool {
 		if Compare(name, c.Since) < 0 {
 			return false
 		}
-		if prerelease(name) && !prerelease(c.Since) && !matchAny(prereleaseGlobs(c.Include), name) {
+		if Prerelease(name) && !Prerelease(c.Since) && !matchAny(prereleaseGlobs(c.Include), name) {
 			return false
 		}
 	}

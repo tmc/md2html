@@ -39,9 +39,9 @@ type semver struct {
 	pre  []string
 }
 
-// prerelease reports whether the version s is a prerelease, such as
+// Prerelease reports whether the version s is a prerelease, such as
 // v1.2.3-rc.1.
-func prerelease(s string) bool {
+func Prerelease(s string) bool {
 	v, ok := parse(s)
 	return ok && len(v.pre) > 0
 }
