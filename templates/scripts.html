@@ -339,18 +339,21 @@
             return -1;
         }
 
-        // mapPage maps the page key of version index i to version
-        // index j: forward to the working tree by i's moves, then back
-        // by j's.
+        // mapPage returns the keys the page key of version index i may
+        // have in version index j, best first: it is mapped forward to
+        // the working tree by i's moves, then tried as it is, since j
+        // may have the page there, and then as each of j's pages that
+        // moved to it.
         function mapPage(m, i, j, key) {
             var moves = m.moves || {};
             var fwd = moves[m.versions[i].name] || {};
             if (Object.prototype.hasOwnProperty.call(fwd, key)) key = fwd[key];
+            var keys = [key];
             var back = moves[m.versions[j].name] || {};
             for (var old in back) {
-                if (back[old] === key) return old;
+                if (back[old] === key) keys.push(old);
             }
-            return key;
+            return keys;
         }
 
         function candidates(key) {
@@ -373,7 +376,10 @@
                 location.href = root.href;
                 return;
             }
-            var urls = candidates(mapPage(m, i, j, page)).map(function(c) { return new URL(c, root).href; });
+            var urls = [];
+            mapPage(m, i, j, page).forEach(function(k) {
+                candidates(k).forEach(function(c) { urls.push(new URL(c, root).href); });
+            });
             (function next(k) {
                 if (k >= urls.length) { location.href = root.href; return; }
                 exists(urls[k]).then(function(ok) {
