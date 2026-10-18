@@ -1,6 +1,7 @@
 package md2html
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -623,8 +624,12 @@ func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slo
 		return err
 	}
 	if def, ok := m.Lookup(m.Default); ok {
-		if err := writeRootStubs(outDir, def, m); err != nil {
+		kept, err := writeRootStubs(outDir, def, m)
+		if err != nil {
 			return err
+		}
+		if len(kept) > 0 {
+			logger.Warn("root pages left in place of redirects into the default version; remove them to redirect", "count", len(kept), "first", kept[0])
 		}
 	}
 	return errors.Join(errs...)
@@ -1008,10 +1013,11 @@ func writeMoveStubs(dir string, layout pageLayout, moved map[string]string) erro
 
 // writeRootStubs writes, at the site root, a redirect to each page of
 // the default version def, so that the URLs the site had before it was
-// versioned, and the root itself, open the default version. A file
-// already at a stub's path, such as a page of an earlier build that was
-// not versioned or a stub for an earlier default, is replaced.
-func writeRootStubs(outDir string, def docversions.Version, m *docversions.Manifest) error {
+// versioned, and the root itself, open the default version. A redirect
+// md2html wrote already at a stub's path, for an earlier default, is
+// replaced; any other file is left alone, and its path, relative to
+// outDir, returned.
+func writeRootStubs(outDir string, def docversions.Version, m *docversions.Manifest) (kept []string, err error) {
 	reserved := make(map[string]bool)
 	for _, v := range m.Versions {
 		reserved[v.Name] = true
@@ -1020,7 +1026,7 @@ func writeRootStubs(outDir string, def docversions.Version, m *docversions.Manif
 		reserved[a] = true
 	}
 	src := filepath.Join(outDir, def.Name)
-	return filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".html") {
 			return err
 		}
@@ -1038,13 +1044,18 @@ func writeRootStubs(outDir string, def docversions.Version, m *docversions.Manif
 			target = strings.TrimSuffix(target, "index.html")
 		}
 		stub := filepath.Join(outDir, filepath.FromSlash(rel))
-		if info, err := os.Lstat(stub); err == nil && info.Mode().IsRegular() {
+		if _, err := os.Lstat(stub); err == nil {
+			if !isRedirect(stub) {
+				kept = append(kept, rel)
+				return nil
+			}
 			if err := os.Remove(stub); err != nil {
 				return err
 			}
 		}
 		return writeRedirect(stub, relativeURL(rel, target))
 	})
+	return kept, err
 }
 
 // relativeURL returns the URL of target, relative to the site root, as
@@ -1071,6 +1082,16 @@ func relativeURL(from, target string) string {
 
 // writeRedirect writes a page at file that sends the reader to target.
 // An existing file is left alone.
+// redirectMark marks the redirects md2html writes, so that it can tell
+// them from pages it must not replace.
+const redirectMark = `<meta name="generator" content="md2html redirect">`
+
+// isRedirect reports whether file is a redirect md2html wrote.
+func isRedirect(file string) bool {
+	data, err := os.ReadFile(file)
+	return err == nil && bytes.Contains(data, []byte(redirectMark))
+}
+
 func writeRedirect(file, target string) error {
 	if _, err := os.Stat(file); err == nil {
 		return nil
@@ -1089,6 +1110,7 @@ func writeRedirect(file, target string) error {
 <meta charset="utf-8">
 <title>Redirecting</title>
 <meta name="robots" content="noindex">
+` + redirectMark + `
 <link rel="canonical" href="` + attr + `">
 <meta http-equiv="refresh" content="0; url=` + attr + `">
 <script>location.replace(` + string(js) + ` + location.search + location.hash)</script>

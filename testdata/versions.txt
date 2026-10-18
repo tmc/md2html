@@ -47,12 +47,16 @@ grep '// v0.1.10' aliased/stable/guide.html
 ! md2html -html bad -versions -versions-only v9.9.9 docs
 stderr 'no version v9.9.9'
 
-# A build into a directory holding an earlier one replaces its pages
-# at the root with redirects.
-mkdir stale
-cp docs/guide.md stale/guide.html
+# A build into a directory holding an earlier one replaces the root
+# redirects it wrote, as when the default changes, but leaves other
+# pages at the root alone and says so.
+md2html -html stale -versions -version-pattern 'v*' -version-default v0.1.10 -include-root . docs
+grep 'url=v0.1.10/guide.html' stale/guide.html
+cp docs/index.md stale/index.html
 md2html -html stale -versions -version-pattern 'v*' -include-root . docs
 grep 'url=latest/guide.html' stale/guide.html
+grep '# Home' stale/index.html
+stderr 'root pages left in place'
 
 # Names md2html gives directories at the root name no version.
 git tag versions
