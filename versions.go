@@ -956,7 +956,9 @@ func writeMoveStubs(dir string, layout pageLayout, moved map[string]string) erro
 
 // writeRootStubs writes, at the site root, a redirect to each page of
 // the default version def, so that the URLs the site had before it was
-// versioned, and the root itself, open the default version.
+// versioned, and the root itself, open the default version. A file
+// already at a stub's path, such as a page of an earlier build that was
+// not versioned or a stub for an earlier default, is replaced.
 func writeRootStubs(outDir string, def docversions.Version, m *docversions.Manifest) error {
 	reserved := map[string]bool{"versions": true, sharedDirName: true}
 	for _, v := range m.Versions {
@@ -983,7 +985,13 @@ func writeRootStubs(outDir string, def docversions.Version, m *docversions.Manif
 		if path.Base(rel) == "index.html" {
 			target = strings.TrimSuffix(target, "index.html")
 		}
-		return writeRedirect(filepath.Join(outDir, filepath.FromSlash(rel)), relativeURL(rel, target))
+		stub := filepath.Join(outDir, filepath.FromSlash(rel))
+		if info, err := os.Lstat(stub); err == nil && info.Mode().IsRegular() {
+			if err := os.Remove(stub); err != nil {
+				return err
+			}
+		}
+		return writeRedirect(stub, relativeURL(rel, target))
 	})
 }
 

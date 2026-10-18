@@ -47,6 +47,13 @@ grep '// v0.1.10' aliased/stable/guide.html
 ! md2html -html bad -versions -versions-only v9.9.9 docs
 stderr 'no version v9.9.9'
 
+# A build into a directory holding an earlier one replaces its pages
+# at the root with redirects.
+mkdir stale
+cp docs/guide.md stale/guide.html
+md2html -html stale -versions -version-pattern 'v*' -include-root . docs
+grep 'url=latest/guide.html' stale/guide.html
+
 # since: in versions.yaml publishes no tag older than it, and no
 # prerelease.
 cp policy/versions.yaml docs/versions.yaml
