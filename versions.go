@@ -408,8 +408,8 @@ func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slo
 			}
 			logger.Info("building version", "version", v.Name, "ref", "working tree")
 			latest := *site
+			latest.config = versionConfig(cfg, v.Name)
 			latest.config.HTML = dir
-			latest.config.SiteURL = versionSiteURL(cfg.SiteURL, v.Name)
 			latest.version = pv(v.Name)
 			latest.shared = newSharedAssets(sharedDir)
 			err = latest.generateStaticHTML(ctx, logger)
@@ -489,13 +489,19 @@ func searchIndexName(dir string) string {
 	return filepath.Base(matches[0])
 }
 
-// versionSiteURL returns the canonical base URL of the version name of
-// a site whose base URL is siteURL.
-func versionSiteURL(siteURL, name string) string {
-	if siteURL == "" {
-		return ""
+// versionConfig returns cfg as it is for building the version name:
+// its pages are under the version's own directory of the site, while
+// a relative -og-image still names a file relative to the site root.
+func versionConfig(cfg Config, name string) Config {
+	if cfg.SiteURL == "" {
+		return cfg
 	}
-	return strings.TrimSuffix(siteURL, "/") + "/" + name
+	root := strings.TrimSuffix(cfg.SiteURL, "/")
+	if cfg.OGImage != "" {
+		cfg.OGImage = absoluteURL(root+"/", cfg.OGImage)
+	}
+	cfg.SiteURL = root + "/" + name
+	return cfg
 }
 
 // parseVersionsOnly parses -versions-only. A nil map builds every
@@ -606,8 +612,8 @@ func (site *preparedSite) buildRef(ctx context.Context, logger *slog.Logger, pla
 	}
 	defer plan.repo.RemoveWorktree(context.WithoutCancel(ctx), wt)
 
+	cfg = versionConfig(cfg, pv.name)
 	cfg.HTML = dir
-	cfg.SiteURL = versionSiteURL(cfg.SiteURL, pv.name)
 	vsite, err := site.refSite(cfg, plan, wt, pv, logger)
 	if errors.Is(err, errNoSource) {
 		logger.Warn("version has no source directory", "version", ref.Name, "dir", plan.rel)

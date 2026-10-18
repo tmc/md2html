@@ -82,6 +82,7 @@ func TestVersionedStaticBuild(t *testing.T) {
 		VersionPattern: "v*",
 		VersionAlias:   "stable=newest-tag",
 		SiteURL:        "https://example.com/docs",
+		OGImage:        "../img/card.png",
 		Search:         true,
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -163,6 +164,15 @@ func TestVersionedStaticBuild(t *testing.T) {
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("v0.1.9/agents/agents.html does not contain %s", want)
+		}
+	}
+
+	// A relative -og-image names a file relative to the site root, as
+	// it does when the site is not versioned.
+	for _, f := range []string{"latest/guide.html", "v0.1.9/guide.html"} {
+		const want = `<meta property="og:image" content="https://example.com/img/card.png">`
+		if got := readFile(t, filepath.Join(out, f)); !strings.Contains(got, want) {
+			t.Errorf("%s does not contain %s", f, want)
 		}
 	}
 
