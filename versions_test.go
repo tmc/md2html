@@ -355,6 +355,7 @@ func TestVersionMoves(t *testing.T) {
 	git("tag", "v0.3.0")
 	git("tag", "v0.4.0-rc.1")
 	git("update-ref", "refs/remotes/origin/next", "HEAD")
+	git("update-ref", "refs/remotes/origin/v0.2.0", "HEAD") // the tag wins
 	git("mv", "docs/b.md", "docs/c.md")
 	git("mv", "docs/d.md", "docs/e.md")
 	// An alias for a path no version had still redirects.

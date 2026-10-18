@@ -151,7 +151,17 @@ func (s *preparedSite) planVersions(ctx context.Context) (*versionPlan, error) {
 		if err != nil {
 			return nil, fmt.Errorf("listing branches: %w", err)
 		}
-		refs = branches
+		// A release branch often has its release's name; the tag is
+		// the version.
+		tagged := make(map[string]bool, len(tags))
+		for _, t := range tags {
+			tagged[t.Name] = true
+		}
+		for _, b := range branches {
+			if !tagged[b.Name] {
+				refs = append(refs, b)
+			}
+		}
 	}
 	refs = append(refs, tags...)
 	archived := make(map[string]bool)
