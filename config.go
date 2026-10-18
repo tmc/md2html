@@ -230,7 +230,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	fs.Bool("versions", false, "enable versioned documentation using git tags/refs")
 	fs.String("version-pattern", "*", "git tag pattern to match for versions (e.g., 'v*', 'release-*')")
 	fs.Bool("version-branches", false, "include branches as versions alongside tags")
-	fs.String("version-default", "", "version the site root opens (default: latest, the working tree)")
+	fs.String("version-default", "", "version the root of a static build opens (default: latest, the working tree)")
 	fs.String("version-config", "", "version policy file (default: versions.yaml in the source directory)")
 	fs.String("versions-only", "", "comma-separated versions to build; others come from -version-cache or are left out")
 	fs.String("version-cache", "", "directory for version worktrees and finished builds, reused when a version is unchanged")

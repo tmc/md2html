@@ -421,6 +421,7 @@ func TestVersionedServer(t *testing.T) {
 			Nav:            true,
 			EditURL:        "https://example.com/edit/docs/{path}",
 			Index:          "docs/index.md",
+			VersionDefault: "v0.1.10",
 		}
 		done <- Run(ctx, cfg, discardLogger(), io.Discard, nil)
 	}()
@@ -460,6 +461,7 @@ func TestVersionedServer(t *testing.T) {
 		{"/search-index.js", 200, "Replaces the old page"},
 		{"/versions.json", 200, `"path": "v/v0.1.9/"`},
 		{"/versions.json", 200, `"search": "search-index.js"`},
+		{"/versions.json", 200, `"default": "latest"`}, // not -version-default
 		{"/versions/", 200, `href="../v/v0.1.10/"`},
 		{"/v/v9.9.9/guide", 404, ""},
 		{"/old", 200, "Replaces the old page"}, // through the redirect an alias makes
