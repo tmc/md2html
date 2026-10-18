@@ -339,18 +339,16 @@
             return -1;
         }
 
-        // mapPage follows the moves from version index i to index j.
+        // mapPage maps the page key of version index i to version
+        // index j: forward to the working tree by i's moves, then back
+        // by j's.
         function mapPage(m, i, j, key) {
             var moves = m.moves || {};
-            for (; i > j; i--) {
-                var fwd = moves[m.versions[i].name] || {};
-                if (Object.prototype.hasOwnProperty.call(fwd, key)) key = fwd[key];
-            }
-            for (; i < j; i++) {
-                var back = moves[m.versions[i + 1].name] || {};
-                for (var old in back) {
-                    if (back[old] === key) { key = old; break; }
-                }
+            var fwd = moves[m.versions[i].name] || {};
+            if (Object.prototype.hasOwnProperty.call(fwd, key)) key = fwd[key];
+            var back = moves[m.versions[j].name] || {};
+            for (var old in back) {
+                if (back[old] === key) return old;
             }
             return key;
         }

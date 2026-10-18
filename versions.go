@@ -133,14 +133,17 @@ func (s *preparedSite) planVersions(ctx context.Context) (*versionPlan, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listing tags: %w", err)
 	}
-	refs := tags
+	// Branches are under development, so they come before the tags,
+	// keeping the list newest first.
+	var refs []docversions.Ref
 	if cfg.VersionBranches {
 		branches, err := repo.Branches(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("listing branches: %w", err)
 		}
-		refs = append(refs, branches...)
+		refs = branches
 	}
+	refs = append(refs, tags...)
 	archived := make(map[string]bool)
 	for _, a := range vcfg.Archive {
 		archived[a.Name] = true
@@ -224,40 +227,76 @@ func (p *versionPlan) ref(name string) (docversions.Ref, bool) {
 	return docversions.Ref{}, false
 }
 
-// moves returns the source pages that moved between each pair of
-// adjacent git-backed versions in m, keyed by the older version's name
-// and mapping old source paths to new ones. Pages in the working tree
-// that list aliases add moves from the newest release to it.
-func (p *versionPlan) moves(ctx context.Context, m *docversions.Manifest, aliases map[string]string) map[string]map[string]string {
+// moves returns, for each published ref, the source pages that moved
+// between it and the working tree, mapping each page's path in the
+// ref to its path now. For tags, git rename detection runs between
+// each tag and the next newer one, and between the newest and the
+// working tree, and the steps are composed: neighbouring releases
+// differ little, so a page that moved and was then rewritten over many
+// releases is still followed. A branch is compared with the working
+// tree directly. A page that is no page now and that a page of the
+// working tree lists in its aliases moves to that page.
+func (p *versionPlan) moves(ctx context.Context, aliases map[string]string, have map[string]bool) map[string]map[string]string {
 	moves := make(map[string]map[string]string)
-	var prev *docversions.Version
-	for i := range m.Versions {
-		v := &m.Versions[i]
-		if v.Archive {
-			break
+	follow := func(r docversions.Ref, steps []map[string]string) {
+		pages, err := p.repo.Pages(ctx, r.Commit, p.rel)
+		if err != nil {
+			return
 		}
-		if prev != nil {
-			to := prev.Commit
-			if prev.Name == latestVersion {
-				to = "" // the working tree
-			}
-			if found, err := p.repo.Renames(ctx, v.Commit, to, p.rel); err == nil && len(found) > 0 {
-				moves[v.Name] = found
-			}
-			if prev.Name == latestVersion && len(aliases) > 0 {
-				if moves[v.Name] == nil {
-					moves[v.Name] = make(map[string]string)
-				}
-				for old, cur := range aliases {
-					if _, ok := moves[v.Name][old]; !ok {
-						moves[v.Name][old] = cur
-					}
+		moved := make(map[string]string)
+		for _, page := range pages {
+			cur := page
+			for _, step := range steps {
+				if to, ok := step[cur]; ok {
+					cur = to
 				}
 			}
+			if to, ok := aliases[cur]; ok && !have[cur] {
+				cur = to
+			}
+			if cur != page {
+				moved[page] = cur
+			}
 		}
-		prev = v
+		if len(moved) > 0 {
+			moves[r.Name] = moved
+		}
+	}
+	var tags []docversions.Ref
+	for _, r := range p.refs {
+		if r.IsTag {
+			tags = append(tags, r)
+			continue
+		}
+		step, _ := p.repo.Renames(ctx, r.Commit, "", p.rel)
+		follow(r, []map[string]string{step})
+	}
+	// steps[i] holds the renames from tags[i] to the next newer tag,
+	// or to the working tree from the newest.
+	steps := make([]map[string]string, len(tags))
+	for i, t := range tags {
+		to := ""
+		if i > 0 {
+			to = tags[i-1].Commit
+		}
+		steps[i], _ = p.repo.Renames(ctx, t.Commit, to, p.rel)
+	}
+	for i, t := range tags {
+		chain := slices.Clone(steps[:i+1])
+		slices.Reverse(chain)
+		follow(t, chain)
 	}
 	return moves
+}
+
+// newestTag returns the newest published tag.
+func (p *versionPlan) newestTag() (docversions.Ref, bool) {
+	for _, r := range p.refs {
+		if r.IsTag {
+			return r, true
+		}
+	}
+	return docversions.Ref{}, false
 }
 
 // pageAliases returns the aliases the pages under sourceDir list in
@@ -299,8 +338,8 @@ type versionedSite struct {
 	// moves holds the source pages that moved, as [versionPlan.moves]
 	// returns them.
 	moves map[string]map[string]string
-	// files lists the pages of the working tree.
-	files    []markdownFile
+	// have holds the source paths of the working tree's pages.
+	have     map[string]bool
 	versions []GitVersion
 	// edits holds each version's [pageVersion.edit], when the site
 	// has edit links.
@@ -331,7 +370,11 @@ func (site *preparedSite) newVersionedSite(ctx context.Context, versionPath func
 	if err != nil {
 		return nil, fmt.Errorf("finding markdown files: %w", err)
 	}
-	moves := plan.moves(ctx, m, pageAliases(sourceDir, files))
+	have := make(map[string]bool, len(files))
+	for _, f := range files {
+		have[filepath.ToSlash(f.RelPath)] = true
+	}
+	moves := plan.moves(ctx, pageAliases(sourceDir, files), have)
 	layout := cfg.layout()
 	for name, moved := range moves {
 		keys := make(map[string]string, len(moved))
@@ -344,7 +387,7 @@ func (site *preparedSite) newVersionedSite(ctx context.Context, versionPath func
 		m.Moves[name] = keys
 	}
 
-	vs := &versionedSite{plan: plan, manifest: m, moves: moves, files: files}
+	vs := &versionedSite{plan: plan, manifest: m, moves: moves, have: have}
 	for _, v := range m.Versions {
 		vs.versions = append(vs.versions, GitVersion{Name: v.Name, Ref: v.Ref, IsTag: strings.HasPrefix(v.Ref, "refs/tags/"), Commit: v.Commit})
 	}
@@ -358,37 +401,29 @@ func (site *preparedSite) newVersionedSite(ctx context.Context, versionPath func
 
 // editPaths returns, for each version but the working tree, the pages
 // of the version an edit link must not name by their own path: those
-// that moved, by the moves between the version and the working tree,
-// mapped to their path now, and those since removed, mapped to "".
+// that moved, mapped to their path now, and those since removed,
+// mapped to "".
 func (vs *versionedSite) editPaths(ctx context.Context) (map[string]map[string]string, error) {
-	m := vs.manifest
-	if len(m.Versions) == 0 || m.Versions[0].Name != latestVersion {
-		return nil, nil
-	}
-	have := make(map[string]bool, len(vs.files))
-	for _, f := range vs.files {
-		have[filepath.ToSlash(f.RelPath)] = true
-	}
 	edits := make(map[string]map[string]string)
-	for i := 1; i < len(m.Versions) && !m.Versions[i].Archive; i++ {
-		v := m.Versions[i]
+	for _, v := range vs.manifest.Versions {
+		if v.Name == latestVersion || v.Archive {
+			continue
+		}
 		pages, err := vs.plan.repo.Pages(ctx, v.Commit, vs.plan.rel)
 		if err != nil {
 			return nil, fmt.Errorf("version %s: %w", v.Name, err)
 		}
 		edit := make(map[string]string)
 		for _, page := range pages {
-			p := page
-			for j := i; j > 0; j-- {
-				if to, ok := vs.moves[m.Versions[j].Name][p]; ok {
-					p = to
-				}
+			cur, ok := vs.moves[v.Name][page]
+			if !ok {
+				cur = page
 			}
 			switch {
-			case !have[p]:
+			case !vs.have[cur]:
 				edit[page] = ""
-			case p != page:
-				edit[page] = p
+			case cur != page:
+				edit[page] = cur
 			}
 		}
 		edits[v.Name] = edit
@@ -407,17 +442,13 @@ func (vs *versionedSite) pageVersion(name, manifest string) *pageVersion {
 // Only moves whose old path is no page now and whose new path is one
 // are kept: the ones a reader following an old link needs.
 func (vs *versionedSite) latestMoves() map[string]string {
-	m := vs.manifest
-	if len(m.Versions) < 2 || m.Versions[0].Name != latestVersion || m.Versions[1].Archive {
+	newest, ok := vs.plan.newestTag()
+	if !ok {
 		return nil
 	}
-	have := make(map[string]bool, len(vs.files))
-	for _, f := range vs.files {
-		have[filepath.ToSlash(f.RelPath)] = true
-	}
 	moves := make(map[string]string)
-	for from, to := range vs.moves[m.Versions[1].Name] {
-		if !have[from] && have[to] {
+	for from, to := range vs.moves[newest.Name] {
+		if !vs.have[from] && vs.have[to] {
 			moves[from] = to
 		}
 	}

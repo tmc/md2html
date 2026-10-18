@@ -21,8 +21,8 @@ type Manifest struct {
 	// development version at the top.
 	Versions []Version `json:"versions"`
 	// Moves maps a version name to the pages that moved between it and
-	// the next newer version: each key is a page's path in that
-	// version and each value its path in the newer one. Paths are
+	// the development version: each key is a page's path in that
+	// version and each value its path in the development one. Paths are
 	// relative to the version root, with no extension and no trailing
 	// index, so "guide/" and "guide.html" are both "guide".
 	Moves map[string]map[string]string `json:"moves,omitempty"`

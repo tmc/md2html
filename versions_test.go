@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -319,6 +321,81 @@ func TestRelativeURL(t *testing.T) {
 		if got := relativeURL(tt.from, tt.target); got != tt.want {
 			t.Errorf("relativeURL(%q, %q) = %q, want %q", tt.from, tt.target, got, tt.want)
 		}
+	}
+}
+
+// TestVersionMoves checks that each version's moves lead to the page
+// as it is in the working tree, however many releases it moved across
+// and whichever versions are built.
+func TestVersionMoves(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) { writeTestFile(t, dir, name, body) }
+	git := func(args ...string) { runGit(t, dir, args...) }
+	git("init", "-q")
+	git("config", "user.email", "test@example.com")
+	git("config", "user.name", "Test User")
+	body := "# Page\n\n" + strings.Repeat("A line the page keeps from release to release.\n", 5)
+	write("docs/index.md", "# Home\n")
+	write("docs/a.md", body)
+	git("add", ".")
+	git("commit", "-q", "-m", "v0.1.0")
+	git("tag", "v0.1.0")
+	git("mv", "docs/a.md", "docs/b.md")
+	git("commit", "-q", "-m", "v0.2.0")
+	git("tag", "v0.2.0")
+	// Rewritten in place: by the working tree, a.md is too unlike the
+	// page to be found as a rename of it directly.
+	write("docs/b.md", "# Page\n\n"+strings.Repeat("Text written for the next release instead.\n", 5))
+	git("commit", "-q", "-am", "v0.3.0")
+	git("tag", "v0.3.0")
+	git("update-ref", "refs/remotes/origin/next", "HEAD")
+	git("mv", "docs/b.md", "docs/c.md")
+	git("commit", "-q", "-m", "move")
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	build := func(only string) *docversions.Manifest {
+		t.Helper()
+		out := filepath.Join(t.TempDir(), "out")
+		cfg := Config{
+			Chdir:           dir,
+			Source:          "docs",
+			HTML:            out,
+			Versions:        true,
+			VersionPattern:  "v*",
+			VersionBranches: true,
+			VersionsOnly:    only,
+		}
+		if err := Run(context.Background(), cfg, logger, io.Discard, nil); err != nil {
+			t.Fatal(err)
+		}
+		return readManifest(t, out)
+	}
+
+	m := build("")
+	var got []string
+	for _, v := range m.Versions {
+		got = append(got, v.Name)
+	}
+	// Newest first: the working tree, branches, then tags.
+	want := []string{"latest", "next", "v0.3.0", "v0.2.0", "v0.1.0"}
+	if !slices.Equal(got, want) {
+		t.Errorf("versions = %v, want %v", got, want)
+	}
+	for v, want := range map[string]map[string]string{
+		"v0.1.0": {"a": "c"},
+		"v0.2.0": {"b": "c"},
+		"v0.3.0": {"b": "c"},
+		"next":   {"b": "c"},
+	} {
+		if got := m.Moves[v]; !maps.Equal(got, want) {
+			t.Errorf("moves[%s] = %v, want %v", v, got, want)
+		}
+	}
+
+	// Building only the oldest release leaves its moves as they were.
+	m = build("v0.1.0")
+	if got, want := m.Moves["v0.1.0"], map[string]string{"a": "c"}; !maps.Equal(got, want) {
+		t.Errorf("with -versions-only v0.1.0: moves[v0.1.0] = %v, want %v", got, want)
 	}
 }
 
