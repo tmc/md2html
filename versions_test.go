@@ -420,6 +420,7 @@ func TestVersionedServer(t *testing.T) {
 			Search:         true,
 			Nav:            true,
 			EditURL:        "https://example.com/edit/docs/{path}",
+			Index:          "docs/index.md",
 		}
 		done <- Run(ctx, cfg, discardLogger(), io.Discard, nil)
 	}()
@@ -444,6 +445,9 @@ func TestVersionedServer(t *testing.T) {
 		want string
 	}{
 		{"/guide", 200, "// main"},
+		// The -index page is read from the version's own tree.
+		{"/", 200, `See <a href="docs/agents">`},
+		{"/v/v0.1.9/", 200, `See <a href="docs/agents/agents">`},
 		{"/guide", 200, `data-versions="./versions.json"`},
 		{"/v/v0.1.9/guide", 200, "// v0.1.9"},
 		{"/v/v0.1.10/guide", 200, "// v0.1.10"},

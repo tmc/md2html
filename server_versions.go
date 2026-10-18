@@ -212,6 +212,9 @@ func (vm *versionMounts) start(ctx context.Context, name string, m *versionMount
 		return err
 	}
 	m.server = newServer(ctx, vsite, vm.logger)
+	// The server finds the -index page relative to its base, which
+	// for a version is the same directory in the version's worktree.
+	m.server.base = vm.vs.plan.remap(vm.site.base, wt)
 	m.handler = m.server.contentMux()
 	return nil
 }
