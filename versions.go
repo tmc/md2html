@@ -27,6 +27,16 @@ const latestVersion = "latest"
 // site holding the content-named files its versions share.
 const sharedDirName = "_shared"
 
+// versionsPageDir is the directory at the root of a versioned site
+// holding the page that lists its versions.
+const versionsPageDir = "versions"
+
+// reservedName reports whether name is used at the root of a versioned
+// site for something other than a version.
+func reservedName(name string) bool {
+	return name == latestVersion || name == versionsPageDir || name == sharedDirName
+}
+
 // versionConfigName is the version policy file read from the source
 // directory when -version-config names none.
 const versionConfigName = "versions.yaml"
@@ -146,11 +156,14 @@ func (s *preparedSite) planVersions(ctx context.Context) (*versionPlan, error) {
 	refs = append(refs, tags...)
 	archived := make(map[string]bool)
 	for _, a := range vcfg.Archive {
+		if reservedName(a.Name) {
+			return nil, fmt.Errorf("%s: archive name %q is reserved", file, a.Name)
+		}
 		archived[a.Name] = true
 	}
 	for _, r := range refs {
 		switch {
-		case r.Name == latestVersion || r.Name == sharedDirName || archived[r.Name] || docversions.CheckName(r.Name) != nil:
+		case reservedName(r.Name) || archived[r.Name] || docversions.CheckName(r.Name) != nil:
 			continue
 		case r.IsTag && !vcfg.Publishes(r.Name):
 			continue
@@ -570,7 +583,7 @@ func (site *preparedSite) generateVersionedHTML(ctx context.Context, logger *slo
 	if err := m.WriteFile(filepath.Join(outDir, docversions.ManifestName)); err != nil {
 		return err
 	}
-	if err := writeVersionsPage(filepath.Join(outDir, "versions", "index.html"), m, cfg.Title); err != nil {
+	if err := writeVersionsPage(filepath.Join(outDir, versionsPageDir, "index.html"), m, cfg.Title); err != nil {
 		return err
 	}
 	if def, ok := m.Lookup(m.Default); ok {
@@ -643,7 +656,7 @@ func parseVersionAliases(list string, m *docversions.Manifest, plan *versionPlan
 		if err := docversions.CheckName(name); err != nil {
 			return nil, fmt.Errorf("-version-alias: %w", err)
 		}
-		if _, clash := m.Lookup(name); clash || name == "versions" || name == sharedDirName {
+		if _, clash := m.Lookup(name); clash || reservedName(name) {
 			return nil, fmt.Errorf("-version-alias: %s is already a version", name)
 		}
 		if target == "newest-tag" {
@@ -960,7 +973,7 @@ func writeMoveStubs(dir string, layout pageLayout, moved map[string]string) erro
 // already at a stub's path, such as a page of an earlier build that was
 // not versioned or a stub for an earlier default, is replaced.
 func writeRootStubs(outDir string, def docversions.Version, m *docversions.Manifest) error {
-	reserved := map[string]bool{"versions": true, sharedDirName: true}
+	reserved := map[string]bool{versionsPageDir: true, sharedDirName: true}
 	for _, v := range m.Versions {
 		reserved[v.Name] = true
 	}

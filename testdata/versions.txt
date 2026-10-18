@@ -54,6 +54,17 @@ cp docs/guide.md stale/guide.html
 md2html -html stale -versions -version-pattern 'v*' -include-root . docs
 grep 'url=latest/guide.html' stale/guide.html
 
+# Names md2html gives directories at the root name no version.
+git tag versions
+md2html -html reserved -versions -version-pattern 'v*' -include-root . docs
+! grep '"name": "versions"' reserved/versions.json
+grep 'href="../latest/"' reserved/versions/index.html
+git tag -d versions
+cp policy/reserved.yaml docs/versions.yaml
+! md2html -html reserved2 -versions -version-pattern 'v*' -include-root . docs
+stderr 'archive name "latest" is reserved'
+rm docs/versions.yaml
+
 # since: in versions.yaml publishes no tag older than it, and no
 # prerelease.
 cp policy/versions.yaml docs/versions.yaml
@@ -112,6 +123,10 @@ package main // v0.1.10
 package main // main
 -- policy/versions.yaml --
 since: v0.1.10
+-- policy/reserved.yaml --
+archive:
+  - name: latest
+    path: archive
 -- next/docs/index.md --
 # Home
 
