@@ -430,6 +430,48 @@ func TestVersionMoves(t *testing.T) {
 	}
 }
 
+// TestVersionedServerIndex checks that a version's -index page comes
+// from that version even when the server's base, which -index is
+// relative to, is above the repository.
+func TestVersionedServerIndex(t *testing.T) {
+	repo := versionedRepo(t)
+	addr := freeAddr(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	name := filepath.Base(repo)
+	go func() {
+		cfg := Config{
+			Chdir:          filepath.Dir(repo),
+			Source:         filepath.Join(name, "docs"),
+			HTTP:           addr,
+			Watch:          "false",
+			IncludeRoot:    name,
+			Versions:       true,
+			VersionPattern: "v*",
+			Index:          filepath.Join(name, "docs", "index.md"),
+		}
+		done <- Run(ctx, cfg, discardLogger(), io.Discard, nil)
+	}()
+	waitServing(t, addr)
+	resp, err := http.Get("http://" + addr + "/v/v0.1.9/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), `agents/agents`) {
+		t.Errorf("GET /v/v0.1.9/ is not v0.1.9's index page:\n%s", body)
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestVersionedServer(t *testing.T) {
 	repo := versionedRepo(t)
 	addr := freeAddr(t)

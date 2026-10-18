@@ -118,7 +118,10 @@ type server struct {
 	// base is the directory the configuration's relative paths were
 	// resolved against. Requests resolve against it too, so serving does
 	// not depend on the process working directory.
-	base       string
+	base string
+	// indexPath is the file the -index page is read from, when it is
+	// not the one -index names relative to base.
+	indexPath  string
 	prepared   *preparedSite
 	logger     *slog.Logger
 	mu         sync.RWMutex
@@ -476,7 +479,10 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	filePath := strings.TrimPrefix(r.URL.Path, "/")
 
 	if (filePath == "" || filePath == "/") && s.config.Index != "" {
-		indexPath := resolveAgainst(s.base, s.config.Index)
+		indexPath := s.indexPath
+		if indexPath == "" {
+			indexPath = resolveAgainst(s.base, s.config.Index)
+		}
 		fileContent, err := os.ReadFile(indexPath)
 		if err == nil {
 			_ = s.watchOpenedPath(indexPath)
