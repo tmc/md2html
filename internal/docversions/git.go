@@ -67,7 +67,8 @@ func (r Repo) Commit(ctx context.Context, rev string) (string, error) {
 // Tags returns the tags matching the glob pattern, newest first by
 // [Compare]. An empty pattern matches every tag.
 func (r Repo) Tags(ctx context.Context, pattern string) ([]Ref, error) {
-	args := []string{"for-each-ref", "--format=%(refname:short)%00%(objectname)%00%(*objectname)", "refs/tags/"}
+	// refname:short would say tags/v2 for a tag v2 with a branch v2.
+	args := []string{"for-each-ref", "--format=%(refname:lstrip=2)%00%(objectname)%00%(*objectname)", "refs/tags/"}
 	out, err := r.git(ctx, args...)
 	if err != nil {
 		return nil, err
@@ -96,7 +97,7 @@ func (r Repo) Tags(ctx context.Context, pattern string) ([]Ref, error) {
 // Branches returns the remote-tracking branches, named without their
 // remote, in reverse alphabetical order.
 func (r Repo) Branches(ctx context.Context) ([]Ref, error) {
-	out, err := r.git(ctx, "for-each-ref", "--format=%(refname:short)%00%(refname)%00%(objectname)", "refs/remotes/")
+	out, err := r.git(ctx, "for-each-ref", "--format=%(refname:lstrip=2)%00%(refname)%00%(objectname)", "refs/remotes/")
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +143,9 @@ func (r Repo) RemoveWorktree(ctx context.Context, dir string) error {
 // relative to the repository root, as of commit. Paths are relative to
 // dir.
 func (r Repo) Pages(ctx context.Context, commit, dir string) ([]string, error) {
-	args := []string{"ls-tree", "-r", "--name-only", "--full-tree", commit}
+	// -z prints names as they are, not quoted as core.quotePath has
+	// git do for names outside ASCII.
+	args := []string{"ls-tree", "-r", "-z", "--name-only", "--full-tree", commit}
 	if dir != "" && dir != "." {
 		args = append(args, "--", dir+"/")
 	}
@@ -151,8 +154,8 @@ func (r Repo) Pages(ctx context.Context, commit, dir string) ([]string, error) {
 		return nil, err
 	}
 	var pages []string
-	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
-		if rel, ok := under(dir, line); ok && markdownfile.Is(rel) {
+	for name := range strings.SplitSeq(string(out), "\x00") {
+		if rel, ok := under(dir, name); ok && markdownfile.Is(rel) {
 			pages = append(pages, rel)
 		}
 	}
@@ -164,7 +167,7 @@ func (r Repo) Pages(ctx context.Context, commit, dir string) ([]string, error) {
 // path to its new one. An empty to compares against the working tree.
 // Paths are relative to dir.
 func (r Repo) Renames(ctx context.Context, from, to, dir string) (map[string]string, error) {
-	args := []string{"diff", "-M", "--name-status", "--no-color", from}
+	args := []string{"diff", "-M", "-z", "--name-status", "--no-color", from}
 	if to != "" {
 		args = append(args, to)
 	}
@@ -178,20 +181,30 @@ func (r Repo) Renames(ctx context.Context, from, to, dir string) (map[string]str
 	return parseRenames(out, dir), nil
 }
 
-// parseRenames parses git diff --name-status output into a map of
-// renamed Markdown pages under dir.
+// parseRenames parses git diff -z --name-status output into a map of
+// renamed Markdown pages under dir. Each entry is a status followed by
+// one path, or by two for a rename or copy, all NUL-terminated.
 func parseRenames(out []byte, dir string) map[string]string {
 	moves := make(map[string]string)
-	for line := range strings.SplitSeq(string(out), "\n") {
-		fields := strings.Split(line, "\t")
-		if len(fields) != 3 || !strings.HasPrefix(fields[0], "R") {
+	fields := strings.Split(string(out), "\x00")
+	for i := 0; i < len(fields); {
+		status := fields[i]
+		if status == "" {
+			break
+		}
+		if status[0] != 'R' && status[0] != 'C' {
+			i += 2
 			continue
 		}
-		oldPath, ok1 := under(dir, fields[1])
-		newPath, ok2 := under(dir, fields[2])
-		if ok1 && ok2 && markdownfile.Is(oldPath) && markdownfile.Is(newPath) {
+		if i+2 >= len(fields) {
+			break
+		}
+		oldPath, ok1 := under(dir, fields[i+1])
+		newPath, ok2 := under(dir, fields[i+2])
+		if status[0] == 'R' && ok1 && ok2 && markdownfile.Is(oldPath) && markdownfile.Is(newPath) {
 			moves[oldPath] = newPath
 		}
+		i += 3
 	}
 	return moves
 }

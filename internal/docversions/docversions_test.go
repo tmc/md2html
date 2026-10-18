@@ -11,14 +11,16 @@ import (
 )
 
 func TestParseRenames(t *testing.T) {
-	out := []byte("R100\tdocs/agents/agents.md\tdocs/agents.md\n" +
-		"R087\tdocs/a.md\tdocs/b.mdx\n" +
-		"R100\tdocs/img.png\tdocs/img2.png\n" +
-		"R100\tother/x.md\tdocs/x.md\n" +
-		"M\tdocs/c.md\n" +
-		"D\tdocs/d.md\n")
+	out := []byte("R100\x00docs/agents/agents.md\x00docs/agents.md\x00" +
+		"M\x00docs/c.md\x00" +
+		"R087\x00docs/a.md\x00docs/b.mdx\x00" +
+		"C075\x00docs/e.md\x00docs/f.md\x00" +
+		"R100\x00docs/img.png\x00docs/img2.png\x00" +
+		"R100\x00other/x.md\x00docs/x.md\x00" +
+		"R100\x00docs/caf\u00e9.md\x00docs/tab\tname.md\x00" +
+		"D\x00docs/d.md\x00")
 	got := parseRenames(out, "docs")
-	want := map[string]string{"agents/agents.md": "agents.md", "a.md": "b.mdx"}
+	want := map[string]string{"agents/agents.md": "agents.md", "a.md": "b.mdx", "caf\u00e9.md": "tab\tname.md"}
 	if !maps.Equal(got, want) {
 		t.Errorf("parseRenames = %v, want %v", got, want)
 	}
@@ -219,15 +221,19 @@ func TestRepo(t *testing.T) {
 	git(t, dir, "config", "user.name", "T")
 	write("docs/agents/agents.md", "# Agents\n\nA long enough body that rename detection matches it.\n")
 	write("docs/index.md", "# Home\n")
+	write("docs/caf\u00e9.md", "# Caf\u00e9\n\nA page whose name git quotes unless told not to.\n")
 	write("README.md", "# Repo\n")
 	git(t, dir, "add", ".")
 	git(t, dir, "commit", "-q", "-m", "one")
 	git(t, dir, "tag", "v0.1.9")
 	git(t, dir, "tag", "-a", "-m", "annotated", "v0.1.10")
 	git(t, dir, "mv", "docs/agents/agents.md", "docs/agents.md")
+	git(t, dir, "mv", "docs/caf\u00e9.md", "docs/menu.md")
 	git(t, dir, "commit", "-q", "-m", "two")
 	git(t, dir, "tag", "v0.2.0")
 	git(t, dir, "tag", "other")
+	// A branch with a tag's name must not hide the tag.
+	git(t, dir, "branch", "v0.2.0")
 
 	ctx := context.Background()
 	r := Repo{Dir: filepath.Join(dir, "docs")}
@@ -256,14 +262,14 @@ func TestRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := map[string]string{"agents/agents.md": "agents.md"}; !maps.Equal(moves, want) {
+	if want := map[string]string{"agents/agents.md": "agents.md", "caf\u00e9.md": "menu.md"}; !maps.Equal(moves, want) {
 		t.Errorf("Renames = %v, want %v", moves, want)
 	}
 	pages, err := r.Pages(ctx, "v0.1.9", "docs")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"agents/agents.md", "index.md"}; !slices.Equal(pages, want) {
+	if want := []string{"agents/agents.md", "caf\u00e9.md", "index.md"}; !slices.Equal(pages, want) {
 		t.Errorf("Pages = %v, want %v", pages, want)
 	}
 
