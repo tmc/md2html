@@ -308,7 +308,7 @@ func (site *preparedSite) generateStaticHTML(ctx context.Context, logger *slog.L
 			SiteTitle:   cfg.Title,
 			Data:        jsonData,
 			FilePath:    relPath,
-			EditURL:     editURL(cfg.EditURL, relPath),
+			EditURL:     editURL(cfg.EditURL, site.version.editPath(relPath)),
 			LastUpdated: lastUpdated[filepath.ToSlash(relPath)],
 			Assets:      assets,
 			Accent:      sInfo.Accent,

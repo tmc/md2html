@@ -39,6 +39,10 @@ type pageVersion struct {
 	// root.
 	manifest string
 	versions []GitVersion
+	// edit maps the source path of each page of the version whose
+	// path in the working tree differs to that path, or to "" if the
+	// page is no longer there.
+	edit map[string]string
 }
 
 // apply sets the version fields of opts. A nil pageVersion leaves them
@@ -50,6 +54,20 @@ func (v *pageVersion) apply(opts *RenderOptions) {
 	opts.Version = v.name
 	opts.Versions = v.versions
 	opts.VersionsURL = v.manifest
+}
+
+// editPath returns the source path the page relPath of the version is
+// edited at, the page's path in the working tree, or "" if it is no
+// longer there. Pages of a site that is not versioned, and of its
+// working tree, are edited where they are.
+func (v *pageVersion) editPath(relPath string) string {
+	if v == nil {
+		return relPath
+	}
+	if p, ok := v.edit[filepath.ToSlash(relPath)]; ok {
+		return p
+	}
+	return relPath
 }
 
 // options returns opts with the version fields set.
@@ -284,6 +302,9 @@ type versionedSite struct {
 	// files lists the pages of the working tree.
 	files    []markdownFile
 	versions []GitVersion
+	// edits holds each version's [pageVersion.edit], when the site
+	// has edit links.
+	edits map[string]map[string]string
 }
 
 // newVersionedSite plans the site's versions and builds their manifest.
@@ -327,13 +348,58 @@ func (site *preparedSite) newVersionedSite(ctx context.Context, versionPath func
 	for _, v := range m.Versions {
 		vs.versions = append(vs.versions, GitVersion{Name: v.Name, Ref: v.Ref, IsTag: strings.HasPrefix(v.Ref, "refs/tags/"), Commit: v.Commit})
 	}
+	if cfg.EditURL != "" {
+		if vs.edits, err = vs.editPaths(ctx); err != nil {
+			return nil, err
+		}
+	}
 	return vs, nil
+}
+
+// editPaths returns, for each version but the working tree, the pages
+// of the version an edit link must not name by their own path: those
+// that moved, by the moves between the version and the working tree,
+// mapped to their path now, and those since removed, mapped to "".
+func (vs *versionedSite) editPaths(ctx context.Context) (map[string]map[string]string, error) {
+	m := vs.manifest
+	if len(m.Versions) == 0 || m.Versions[0].Name != latestVersion {
+		return nil, nil
+	}
+	have := make(map[string]bool, len(vs.files))
+	for _, f := range vs.files {
+		have[filepath.ToSlash(f.RelPath)] = true
+	}
+	edits := make(map[string]map[string]string)
+	for i := 1; i < len(m.Versions) && !m.Versions[i].Archive; i++ {
+		v := m.Versions[i]
+		pages, err := vs.plan.repo.Pages(ctx, v.Commit, vs.plan.rel)
+		if err != nil {
+			return nil, fmt.Errorf("version %s: %w", v.Name, err)
+		}
+		edit := make(map[string]string)
+		for _, page := range pages {
+			p := page
+			for j := i; j > 0; j-- {
+				if to, ok := vs.moves[m.Versions[j].Name][p]; ok {
+					p = to
+				}
+			}
+			switch {
+			case !have[p]:
+				edit[page] = ""
+			case p != page:
+				edit[page] = p
+			}
+		}
+		edits[v.Name] = edit
+	}
+	return edits, nil
 }
 
 // pageVersion returns what the pages of version name know about it.
 // manifest is the manifest's URL relative to the version root.
 func (vs *versionedSite) pageVersion(name, manifest string) *pageVersion {
-	return &pageVersion{name: name, manifest: manifest, versions: vs.versions}
+	return &pageVersion{name: name, manifest: manifest, versions: vs.versions, edit: vs.edits[name]}
 }
 
 // latestMoves returns the pages that moved between the newest release
@@ -579,7 +645,7 @@ func (site *preparedSite) buildRef(ctx context.Context, logger *slog.Logger, pla
 	cfg := site.config
 	var cached string
 	if cfg.VersionCache != "" {
-		key, err := site.versionCacheKey(ref, pv.name)
+		key, err := site.versionCacheKey(ref, pv)
 		if err != nil {
 			return false, err
 		}
@@ -685,11 +751,16 @@ func shortCommit(c string) string {
 }
 
 // versionCacheKey returns the key a build of ref is cached under: a
-// hash of the commit, the md2html binary, the files that make up the
-// site's chrome, and the configuration.
-func (site *preparedSite) versionCacheKey(ref docversions.Ref, name string) (string, error) {
+// hash of the commit, where its pages are edited, the md2html binary,
+// the files that make up the site's chrome, and the configuration.
+func (site *preparedSite) versionCacheKey(ref docversions.Ref, pv *pageVersion) (string, error) {
 	h := sha256.New()
-	fmt.Fprintf(h, "md2html version cache 2\x00%s\x00%s\x00", ref.Commit, name)
+	fmt.Fprintf(h, "md2html version cache 2\x00%s\x00%s\x00", ref.Commit, pv.name)
+	// Edit links name pages as they are in the working tree, which
+	// changes without the version changing.
+	if err := json.NewEncoder(h).Encode(pv.edit); err != nil {
+		return "", err
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("version cache: %w", err)

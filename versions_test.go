@@ -33,6 +33,7 @@ func versionedRepo(t *testing.T) string {
 	write("docs/agents/agents.md", "# Agents\n\nAgents call tools in a loop until the task is done.\n")
 	write("docs/guide.md", "# Guide\n\n<Code src=\"/examples/hello.go\" />\n")
 	write("docs/old.md", "# Old\n\nA page that later goes away.\n")
+	write("docs/gone.md", "# Gone\n\nA page removed with nothing in its place.\n")
 	write("examples/hello.go", "package main // v0.1.9\n")
 	runGit(t, dir, "add", ".")
 	runGit(t, dir, "commit", "-q", "-m", "v0.1.9")
@@ -41,7 +42,7 @@ func versionedRepo(t *testing.T) string {
 	runGit(t, dir, "commit", "-q", "-am", "v0.1.10")
 	runGit(t, dir, "tag", "v0.1.10")
 	runGit(t, dir, "mv", "docs/agents/agents.md", "docs/agents.md")
-	runGit(t, dir, "rm", "-q", "docs/old.md")
+	runGit(t, dir, "rm", "-q", "docs/old.md", "docs/gone.md")
 	write("docs/index.md", "# Home\n\nSee [agents](agents.md).\n")
 	write("docs/new.md", "---\ntitle: New\naliases: [old]\n---\n\nReplaces the old page.\n")
 	write("examples/hello.go", "package main // main\n")
@@ -83,6 +84,7 @@ func TestVersionedStaticBuild(t *testing.T) {
 		VersionAlias:   "stable=newest-tag",
 		SiteURL:        "https://example.com/docs",
 		OGImage:        "../img/card.png",
+		EditURL:        "https://example.com/edit/docs/{path}",
 		Search:         true,
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -173,6 +175,26 @@ func TestVersionedStaticBuild(t *testing.T) {
 		const want = `<meta property="og:image" content="https://example.com/img/card.png">`
 		if got := readFile(t, filepath.Join(out, f)); !strings.Contains(got, want) {
 			t.Errorf("%s does not contain %s", f, want)
+		}
+	}
+
+	// Edit links name pages as they are now: an old version's page
+	// where it moved to, and none for a page since removed.
+	for f, want := range map[string]string{
+		"latest/guide.html":         "docs/guide.md",
+		"v0.1.9/guide.html":         "docs/guide.md",
+		"v0.1.9/agents/agents.html": "docs/agents.md",
+		"v0.1.9/old.html":           "docs/new.md",
+		"v0.1.10/gone.html":         "",
+	} {
+		page := readFile(t, filepath.Join(out, f))
+		_, link, ok := strings.Cut(page, `class="edit-link" href="https://example.com/edit/`)
+		link, _, _ = strings.Cut(link, `"`)
+		if want == "" && ok {
+			t.Errorf("%s has an edit link to %s, want none", f, link)
+		}
+		if want != "" && link != want {
+			t.Errorf("%s has an edit link to %q, want %q", f, link, want)
 		}
 	}
 
@@ -317,6 +339,7 @@ func TestVersionedServer(t *testing.T) {
 			VersionPattern: "v*",
 			Search:         true,
 			Nav:            true,
+			EditURL:        "https://example.com/edit/docs/{path}",
 		}
 		done <- Run(ctx, cfg, discardLogger(), io.Discard, nil)
 	}()
@@ -346,6 +369,9 @@ func TestVersionedServer(t *testing.T) {
 		{"/v/v0.1.10/guide", 200, "// v0.1.10"},
 		{"/v/v0.1.9/guide", 200, `../../versions.json"`},
 		{"/v/v0.1.9/agents/agents", 200, "Agents"},
+		{"/guide", 200, `href="https://example.com/edit/docs/guide.md"`},
+		{"/v/v0.1.9/agents/agents", 200, `href="https://example.com/edit/docs/agents.md"`},
+		{"/v/v0.1.9/old", 200, `href="https://example.com/edit/docs/new.md"`},
 		{"/v/v0.1.9/search-index.js", 200, "Old"},
 		{"/search-index.js", 200, "Replaces the old page"},
 		{"/versions.json", 200, `"path": "v/v0.1.9/"`},
@@ -358,6 +384,10 @@ func TestVersionedServer(t *testing.T) {
 		if code != tt.code || !strings.Contains(body, tt.want) {
 			t.Errorf("GET %s = %d, want %d containing %q", tt.path, code, tt.code, tt.want)
 		}
+	}
+	// A page removed since its version has no edit link.
+	if code, body := get("/v/v0.1.10/gone"); code != 200 || strings.Contains(body, `class="edit-link"`) {
+		t.Errorf("GET /v/v0.1.10/gone = %d, want 200 with no edit link", code)
 	}
 	// A page moved since the newest release redirects to where it went.
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}

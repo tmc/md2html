@@ -698,7 +698,7 @@ func (s *server) renderPage(ctx context.Context, doc DocumentData, title, custom
 		Data:        s.jsonData,
 		FilePath:    filePath,
 		Description: llmsSummary(doc),
-		EditURL:     editURL(s.config.EditURL, filePath),
+		EditURL:     editURL(s.config.EditURL, s.prepared.version.editPath(filePath)),
 	}
 	opts.LastUpdated = s.lastUpdatedFor(ctx, filePath)
 	if nav != nil {
