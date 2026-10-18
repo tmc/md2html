@@ -337,26 +337,36 @@ func TestVersionMoves(t *testing.T) {
 	body := "# Page\n\n" + strings.Repeat("A line the page keeps from release to release.\n", 5)
 	write("docs/index.md", "# Home\n")
 	write("docs/a.md", body)
+	write("docs/d.md", "# Dropped\n\nA page deleted in the next release.\n")
 	git("add", ".")
 	git("commit", "-q", "-m", "v0.1.0")
 	git("tag", "v0.1.0")
 	git("mv", "docs/a.md", "docs/b.md")
+	git("rm", "-q", "docs/d.md")
 	git("commit", "-q", "-m", "v0.2.0")
 	git("tag", "v0.2.0")
 	// Rewritten in place: by the working tree, a.md is too unlike the
 	// page to be found as a rename of it directly.
 	write("docs/b.md", "# Page\n\n"+strings.Repeat("Text written for the next release instead.\n", 5))
-	git("commit", "-q", "-am", "v0.3.0")
+	// A new page where the deleted one was is not that page.
+	write("docs/d.md", "# Different\n\n"+strings.Repeat("Another page that happens to reuse the name.\n", 5))
+	git("add", ".")
+	git("commit", "-q", "-m", "v0.3.0")
 	git("tag", "v0.3.0")
 	git("tag", "v0.4.0-rc.1")
 	git("update-ref", "refs/remotes/origin/next", "HEAD")
 	git("mv", "docs/b.md", "docs/c.md")
+	git("mv", "docs/d.md", "docs/e.md")
+	// An alias for a path no version had still redirects.
+	write("docs/f.md", "---\naliases: [never]\n---\n\n# F\n")
+	git("add", ".")
 	git("commit", "-q", "-m", "move")
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	var out string
 	build := func(only string) *docversions.Manifest {
 		t.Helper()
-		out := filepath.Join(t.TempDir(), "out")
+		out = filepath.Join(t.TempDir(), "out")
 		cfg := Config{
 			Chdir:           dir,
 			Source:          "docs",
@@ -365,6 +375,7 @@ func TestVersionMoves(t *testing.T) {
 			VersionPattern:  "v*",
 			VersionBranches: true,
 			VersionsOnly:    only,
+			EditURL:         "https://example.com/edit/{path}",
 		}
 		if err := Run(context.Background(), cfg, logger, io.Discard, nil); err != nil {
 			t.Fatal(err)
@@ -386,12 +397,28 @@ func TestVersionMoves(t *testing.T) {
 	for v, want := range map[string]map[string]string{
 		"v0.1.0":      {"a": "c"},
 		"v0.2.0":      {"b": "c"},
-		"v0.3.0":      {"b": "c"},
-		"v0.4.0-rc.1": {"b": "c"},
-		"next":        {"b": "c"},
+		"v0.3.0":      {"b": "c", "d": "e"},
+		"v0.4.0-rc.1": {"b": "c", "d": "e"},
+		"next":        {"b": "c", "d": "e"},
 	} {
 		if got := m.Moves[v]; !maps.Equal(got, want) {
 			t.Errorf("moves[%s] = %v, want %v", v, got, want)
+		}
+	}
+
+	// The deleted page has no edit link; the page now at its old path
+	// is no relation.
+	if page := readFile(t, filepath.Join(out, "v0.1.0", "d.html")); strings.Contains(page, `class="edit-link"`) {
+		t.Errorf("v0.1.0/d.html has an edit link, want none")
+	}
+	if page := readFile(t, filepath.Join(out, "v0.3.0", "d.html")); !strings.Contains(page, `href="https://example.com/edit/e.md"`) {
+		t.Errorf("v0.3.0/d.html does not link to editing e.md")
+	}
+	// Latest redirects every old path a reader may follow: moves of any
+	// version, and aliases.
+	for stub, want := range map[string]string{"a.html": "c.html", "b.html": "c.html", "d.html": "e.html", "never.html": "f.html"} {
+		if page := readFile(t, filepath.Join(out, "latest", stub)); !strings.Contains(page, "url="+want) {
+			t.Errorf("latest/%s does not redirect to %s:\n%s", stub, want, page)
 		}
 	}
 

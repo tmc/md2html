@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestParseRenames(t *testing.T) {
+func TestParseChanges(t *testing.T) {
 	out := []byte("R100\x00docs/agents/agents.md\x00docs/agents.md\x00" +
 		"M\x00docs/c.md\x00" +
 		"R087\x00docs/a.md\x00docs/b.mdx\x00" +
@@ -19,10 +19,13 @@ func TestParseRenames(t *testing.T) {
 		"R100\x00other/x.md\x00docs/x.md\x00" +
 		"R100\x00docs/caf\u00e9.md\x00docs/tab\tname.md\x00" +
 		"D\x00docs/d.md\x00")
-	got := parseRenames(out, "docs")
+	got, deleted := parseChanges(out, "docs")
 	want := map[string]string{"agents/agents.md": "agents.md", "a.md": "b.mdx", "caf\u00e9.md": "tab\tname.md"}
 	if !maps.Equal(got, want) {
-		t.Errorf("parseRenames = %v, want %v", got, want)
+		t.Errorf("parseChanges renamed = %v, want %v", got, want)
+	}
+	if want := map[string]bool{"d.md": true}; !maps.Equal(deleted, want) {
+		t.Errorf("parseChanges deleted = %v, want %v", deleted, want)
 	}
 }
 

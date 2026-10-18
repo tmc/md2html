@@ -167,6 +167,13 @@ func (r Repo) Pages(ctx context.Context, commit, dir string) ([]string, error) {
 // path to its new one. An empty to compares against the working tree.
 // Paths are relative to dir.
 func (r Repo) Renames(ctx context.Context, from, to, dir string) (map[string]string, error) {
+	renamed, _, err := r.Changes(ctx, from, to, dir)
+	return renamed, err
+}
+
+// Changes is like [Repo.Renames] but also returns the Markdown pages
+// deleted between from and to.
+func (r Repo) Changes(ctx context.Context, from, to, dir string) (renamed map[string]string, deleted map[string]bool, err error) {
 	args := []string{"diff", "-M", "-z", "--name-status", "--no-color", from}
 	if to != "" {
 		args = append(args, to)
@@ -176,16 +183,19 @@ func (r Repo) Renames(ctx context.Context, from, to, dir string) (map[string]str
 	}
 	out, err := r.git(ctx, args...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return parseRenames(out, dir), nil
+	renamed, deleted = parseChanges(out, dir)
+	return renamed, deleted, nil
 }
 
-// parseRenames parses git diff -z --name-status output into a map of
-// renamed Markdown pages under dir. Each entry is a status followed by
-// one path, or by two for a rename or copy, all NUL-terminated.
-func parseRenames(out []byte, dir string) map[string]string {
+// parseChanges parses git diff -z --name-status output into the
+// renamed and the deleted Markdown pages under dir. Each entry is a
+// status followed by one path, or by two for a rename or copy, all
+// NUL-terminated.
+func parseChanges(out []byte, dir string) (map[string]string, map[string]bool) {
 	moves := make(map[string]string)
+	deleted := make(map[string]bool)
 	fields := strings.Split(string(out), "\x00")
 	for i := 0; i < len(fields); {
 		status := fields[i]
@@ -193,6 +203,11 @@ func parseRenames(out []byte, dir string) map[string]string {
 			break
 		}
 		if status[0] != 'R' && status[0] != 'C' {
+			if i+1 < len(fields) && status[0] == 'D' {
+				if p, ok := under(dir, fields[i+1]); ok && markdownfile.Is(p) {
+					deleted[p] = true
+				}
+			}
 			i += 2
 			continue
 		}
@@ -206,7 +221,7 @@ func parseRenames(out []byte, dir string) map[string]string {
 		}
 		i += 3
 	}
-	return moves
+	return moves, deleted
 }
 
 // under returns name relative to dir, if it is inside it.
