@@ -47,11 +47,16 @@ grep '// v0.1.10' aliased/stable/guide.html
 ! md2html -html bad -versions -versions-only v9.9.9 docs
 stderr 'no version v9.9.9'
 
-# since: in versions.yaml publishes no tag older than it.
+# since: in versions.yaml publishes no tag older than it, and no
+# prerelease.
 cp policy/versions.yaml docs/versions.yaml
+git tag v0.1.11-pre.0
 md2html -html floor -versions -version-pattern 'v*' -include-root . docs
 exists floor/v0.1.10
 ! exists floor/v0.1.9
+! exists floor/v0.1.11-pre.0
+! grep 'v0.1.11-pre.0' floor/versions.json
+git tag -d v0.1.11-pre.0
 rm docs/versions.yaml
 
 # With -search, the manifest names each version's own index, which

@@ -18,7 +18,7 @@ import (
 // A typical versions.yaml:
 //
 //	since: v0.1.17
-//	exclude: ["*-rc*"]
+//	exclude: ["v0.1.19"]
 //	collapse: minor
 //	labels:
 //	  v0.2.0: "v0.2.0 (LTS)"
@@ -32,7 +32,9 @@ import (
 type Config struct {
 	// Since is the oldest version to publish. Tags below it by
 	// semantic version, including its own prereleases, and tags that
-	// are not semantic versions are not published.
+	// are not semantic versions are not published. Nor are
+	// prereleases, unless Since is one or an Include glob naming
+	// prereleases, one containing "-" such as "v1.0.0-rc.*", matches.
 	Since string `yaml:"since"`
 	// Include lists the tag globs to publish. Empty publishes every tag
 	// the tag pattern matches.
@@ -137,13 +139,30 @@ func CheckName(name string) error {
 
 // Publishes reports whether the tag name is published.
 func (c *Config) Publishes(name string) bool {
-	if c.Since != "" && Compare(name, c.Since) < 0 {
-		return false
+	if c.Since != "" {
+		if Compare(name, c.Since) < 0 {
+			return false
+		}
+		if prerelease(name) && !prerelease(c.Since) && !matchAny(prereleaseGlobs(c.Include), name) {
+			return false
+		}
 	}
 	if len(c.Include) > 0 && !matchAny(c.Include, name) {
 		return false
 	}
 	return !matchAny(c.Exclude, name)
+}
+
+// prereleaseGlobs returns the globs that name prereleases: those
+// containing "-", as a prerelease's name does.
+func prereleaseGlobs(globs []string) []string {
+	var pre []string
+	for _, g := range globs {
+		if strings.Contains(g, "-") {
+			pre = append(pre, g)
+		}
+	}
+	return pre
 }
 
 func matchAny(globs []string, name string) bool {

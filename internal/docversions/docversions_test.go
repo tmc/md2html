@@ -95,23 +95,53 @@ banner:
 		t.Errorf("Archive = %+v", cfg.Archive)
 	}
 
-	if err := os.WriteFile(file, []byte("since: v0.1.17\nexclude: [\"*-*\"]\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if cfg, err = LoadConfig(file); err != nil {
-		t.Fatal(err)
-	}
-	for name, want := range map[string]bool{
-		"v0.1.16":     false,
-		"v0.1.17-rc1": false,
-		"v0.1.17":     true,
-		"v0.1.100":    true,
-		"v1.0.0":      true,
-		"v1.0.0-rc.1": false,
-		"release-x":   false,
+	for _, tt := range []struct {
+		config string
+		want   map[string]bool
+	}{
+		{"since: v0.1.17\n", map[string]bool{
+			"v0.1.16":       false,
+			"v0.1.17-rc1":   false,
+			"v0.1.17":       true,
+			"v0.1.18-pre.0": false,
+			"v0.1.100":      true,
+			"v1.0.0":        true,
+			"v1.0.0-rc.1":   false,
+			"release-x":     false,
+		}},
+		{"since: v0.1.17\ninclude: ['v*']\n", map[string]bool{
+			"v0.1.18":       true,
+			"v0.1.18-pre.0": false,
+		}},
+		{"since: v0.1.17\ninclude: ['v0.*', 'v1.0.0-rc.*']\n", map[string]bool{
+			"v0.1.18":       true,
+			"v0.1.18-pre.0": false,
+			"v1.0.0-rc.1":   true,
+			"v1.0.0-beta.1": false,
+			"v1.0.0":        false,
+		}},
+		{"since: v1.0.0-rc.1\n", map[string]bool{
+			"v1.0.0-beta.1": false,
+			"v1.0.0-rc.1":   true,
+			"v1.0.0-rc.2":   true,
+			"v1.0.0":        true,
+		}},
+		{"exclude: ['*-rc*']\n", map[string]bool{
+			"v0.1.18-pre.0": true,
+			"v1.0.0-rc.1":   false,
+		}},
 	} {
-		if got := cfg.Publishes(name); got != want {
-			t.Errorf("since v0.1.17: Publishes(%q) = %v, want %v", name, got, want)
+		if err := os.WriteFile(file, []byte(tt.config), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := LoadConfig(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for name, want := range tt.want {
+			if got := cfg.Publishes(name); got != want {
+				t.Errorf("%q: Publishes(%q) = %v, want %v", tt.config, name, got, want)
+			}
 		}
 	}
 

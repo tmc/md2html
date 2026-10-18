@@ -46,8 +46,8 @@
 // label them, and lists archived versions built by other tools, which
 // are copied in verbatim:
 //
-//	since: v0.1.17     # publish no tag older than this
-//	exclude: ["*-rc*"] # nor these
+//	since: v0.1.17     # publish no older tag, nor prereleases
+//	exclude: ["v0.1.19"] # nor these
 //	collapse: minor # list only the newest patch of each minor version
 //	labels:
 //	  latest: main
