@@ -1,13 +1,13 @@
 // Command mdvet runs vet-style checks on Markdown files.
 //
-// Usage:
+// # Usage
 //
 //	mdvet [flags] path...
 //
 // Each path may be a Markdown file or a directory; directories are
 // walked recursively for .md, .markdown, and .mdx files.
 //
-// Available checks:
+// # Checks
 //
 //	nav                SUMMARY.md lists every page that is not a draft
 //	frontmatter        frontmatter is well formed and the page has a title
@@ -26,21 +26,28 @@
 //	icons              icon names exist in the selected icon set
 //	gitignored         link targets are carried by the repository
 //
-// Flags:
+// # Flags
 //
-//	-c list      comma-separated list of checks to run (default: all)
+//	-c list
+//	-checks list
+//	             comma-separated list of checks to run (default: all)
 //	-list        print the available checks and exit
 //	-components dir
 //	             directory of component definitions, as passed to md2html
 //	-base path   URL path prefix the tree is served under (e.g. /docs)
 //	-include-root dir
 //	             directory files included with <Code src> must be
-//	             inside, as passed to md2html
+//	             inside, as passed to md2html (default: the directory
+//	             being vetted)
 //	-versions    also vet the directory as of each published git tag
 //	-version-pattern glob
 //	             git tags to vet with -versions, as passed to md2html
+//	             (default: "*")
 //	-version-config file
 //	             version policy file, as passed to md2html
+//	             (default: versions.yaml in the directory)
+//
+// # Base paths
 //
 // Docs written for a hosted site link to each other by rendered URL:
 // "/docs/churl#exit-status" rather than "churl.md#exit-status". Such a
@@ -48,6 +55,8 @@
 // its anchor can be checked. With it, mdvet maps the URL back to the
 // source file that renders it. A rooted link inside the prefix that
 // resolves to no page is then reported as broken.
+//
+// # Versioned sites
 //
 // With -versions, mdvet vets a versioned site as md2html -versions
 // publishes it: the directory as it is in the working tree, then as it
@@ -59,6 +68,8 @@
 //	                 exists in some version
 //	version-removed  a page in the newest release still exists, or was
 //	                 moved by a rename git detects or an alias
+//
+// # Exit status
 //
 // mdvet exits with status 1 when one or more diagnostics are reported,
 // 2 on a usage or I/O error, and 0 otherwise.
