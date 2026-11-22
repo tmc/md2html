@@ -10,29 +10,51 @@ import (
 	"github.com/tmc/md2html/internal/markdown/jsonspec"
 )
 
+// Config configures [Run] for single-file rendering, HTTP serving, or
+// static site generation.
 type Config struct {
 	// Chdir is the directory relative paths resolve against, like
 	// go -C or make -C: the source, output, css, and configuration
-	// files. Unlike those commands, Run resolves against it rather
+	// files. Unlike those commands, [Run] resolves against it rather
 	// than changing the process working directory, so an embedding
 	// caller keeps its own. It is validated even when every named
 	// path is absolute.
-	Chdir             string
-	Source            string // file, directory, or "-" for stdin
-	HTTP              string
-	HTML              string
-	Open              bool
-	Verbose           bool
-	Title             string
-	CSS               string
-	Depth             int // directory traversal depth; values below 1 mean 2
-	TOC               bool
-	AllowUnsafe       bool
-	TemplateDir       string
-	DataJSON          string
+	Chdir string
+	// Source is the input Markdown file, directory, or "-" for stdin.
+	Source string
+	// HTTP is the bind address for server mode (for example, ":8080").
+	HTTP string
+	// HTML is the output directory for static HTML generation. When
+	// non-empty, it disables server mode.
+	HTML string
+	// Open opens the served URL in a browser when server mode starts.
+	Open bool
+	// Verbose enables debug-level logging to stderr.
+	Verbose bool
+	// Title is the default HTML document title.
+	Title string
+	// CSS is the path to a custom CSS file.
+	CSS string
+	// Depth is the directory traversal depth for listings; values below 1 mean 2.
+	Depth int
+	// TOC enables table-of-contents generation.
+	TOC bool
+	// AllowUnsafe permits raw HTML in Markdown and enables attribute
+	// syntax and local link rewriting inside HTML blocks.
+	AllowUnsafe bool
+	// TemplateDir is a directory of custom templates overriding the
+	// embedded templates.
+	TemplateDir string
+	// DataJSON is the path to a JSON file loaded as template data (.Data).
+	DataJSON string
+	// RenderFrontmatter renders YAML frontmatter as part of the document body.
 	RenderFrontmatter bool
-	Index             string
-	HTMLExt           string
+	// Index is the default file served for directory paths (for example,
+	// "README.md" or "index.md").
+	Index string
+	// HTMLExt is the file extension for generated HTML files (for example,
+	// "html"). Empty defaults to "html" in static builds.
+	HTMLExt string
 	// HTMLLayout is how a static build lays out its pages: "file", the
 	// default, writes guide.md as guide.html, and "dir" writes it as
 	// guide/index.html so that it is served as guide/.
@@ -47,10 +69,14 @@ type Config struct {
 	// VersionPattern, and each branch with VersionBranches, alongside
 	// the working tree as "latest". A static build writes each version
 	// to its own directory; the server serves each under /v/<name>/.
-	Versions        bool
-	VersionPattern  string
+	Versions bool
+	// VersionPattern is the git tag glob matched when Versions is true (default "*").
+	VersionPattern string
+	// VersionBranches includes git branches alongside tags when Versions is true.
 	VersionBranches bool
-	VersionDefault  string
+	// VersionDefault names the version opened at the root of a versioned
+	// static build (default "latest", the working tree).
+	VersionDefault string
 	// VersionConfig is the version policy file. Empty means
 	// versions.yaml in the source directory, if there is one.
 	VersionConfig string
@@ -66,16 +92,25 @@ type Config struct {
 	// publishing a copy of version target under name, such as
 	// stable=newest-tag.
 	VersionAlias string
-	Search       bool
-	LLMS         bool
-	SiteURL      string
+	// Search enables client-side search.
+	Search bool
+	// LLMS emits llms.txt, llms-full.txt, and raw Markdown copies in static output.
+	LLMS bool
+	// SiteURL is the canonical base URL for generated pages.
+	SiteURL string
 	// OGImage is the social card image used by pages whose frontmatter
 	// names none. A relative value resolves against SiteURL, so a site
 	// served from a subdirectory still advertises an absolute URL.
 	OGImage string
+	// EditURL is the URL template for edit links, with "{path}" replaced
+	// by the source path.
 	EditURL string
-	Nav     bool
-	Watch   string
+	// Nav renders documentation navigation from SUMMARY.md, docs.json,
+	// or the Markdown tree.
+	Nav bool
+	// Watch controls live-reload file watching in server mode: "auto",
+	// "true", or "false".
+	Watch string
 	// Base is the URL path prefix the served tree is published under,
 	// such as "/docs". It lets root-absolute links written for the
 	// published site resolve when previewing a subtree. Server mode only.
@@ -256,7 +291,7 @@ func NewFlagSet(name string) *flag.FlagSet {
 	return fs
 }
 
-// ConfigFromFlags creates a Config from an initialized FlagSet.
+// ConfigFromFlags creates a [Config] from a [flag.FlagSet] initialized by [NewFlagSet].
 func ConfigFromFlags(fs *flag.FlagSet) Config {
 	return Config{
 		Chdir:             flagString(fs, "C"),

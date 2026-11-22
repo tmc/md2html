@@ -26,7 +26,8 @@ type Loader struct {
 	htmlExt string // Extension for HTML files (e.g., ".html" or "")
 }
 
-// NewLoader creates a new data loader rooted at baseDir.
+// NewLoader returns a [Loader] rooted at baseDir. htmlExt is applied
+// when rewriting Markdown links (for example, ".html" or "").
 func NewLoader(baseDir, htmlExt string) *Loader {
 	return &Loader{
 		baseDir: baseDir,
@@ -116,7 +117,7 @@ type ListItem struct {
 	Children []ListItem // Nested list items
 }
 
-// LoadMD loads and parses a markdown file into structured data.
+// LoadMD loads and parses a Markdown file into a [MarkdownDoc].
 func (l *Loader) LoadMD(path string) (*MarkdownDoc, error) {
 	content, err := l.readFile(path)
 	if err != nil {
@@ -126,7 +127,7 @@ func (l *Loader) LoadMD(path string) (*MarkdownDoc, error) {
 	return l.ParseMD(string(content))
 }
 
-// ParseMD parses markdown content into a MarkdownDoc.
+// ParseMD parses Markdown content into a [MarkdownDoc].
 func (l *Loader) ParseMD(content string) (*MarkdownDoc, error) {
 	doc := &MarkdownDoc{
 		Content:     content,
@@ -284,7 +285,8 @@ func (l *Loader) readFile(path string) ([]byte, error) {
 	return os.ReadFile(fullPath)
 }
 
-// TemplateFuncs returns template functions for data loading.
+// TemplateFuncs returns a [template.FuncMap] exposing load, loadJSON,
+// loadYAML, and loadMD.
 func (l *Loader) TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"load":     l.Load,

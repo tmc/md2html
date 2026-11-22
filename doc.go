@@ -2,16 +2,15 @@
 //
 // The package provides three main entry points:
 //
-//	RenderFragment renders a single Markdown string.
-//	NewLoader parses Markdown into headings, links, lists, and frontmatter.
-//	Run drives the server and static-site modes used by the md2html command.
+//   - [RenderFragment] renders a single Markdown string to an HTML fragment.
+//   - [NewLoader] and [Loader] load and parse JSON, YAML, and Markdown files into structured data.
+//   - [Run] drives the single-file, HTTP server, and static-site modes used by the md2html command.
 //
 // Rendering uses Goldmark with GFM extensions, syntax highlighting,
-// admonitions, MDX-style layout components,
-// optional table-of-contents generation, and relative-link rewriting for Markdown
-// source trees.
+// admonitions, MDX-style layout components, optional table-of-contents
+// generation, and relative-link rewriting for Markdown source trees.
 //
-// For small in-process rendering, use RenderFragment:
+// For small in-process rendering, use [RenderFragment]:
 //
 //	frag, err := md2html.RenderFragment("# Hello\n", "", md2html.FragmentOptions{})
 //	if err != nil {
@@ -19,7 +18,8 @@
 //	}
 //	_ = frag.HTML
 //
-// For command-style integration, build a Config and call Run:
+// For command-style integration, build a [Config] with [NewFlagSet] and
+// [ConfigFromFlags], then call [Run]:
 //
 //	fs := md2html.NewFlagSet("md2html")
 //	if err := fs.Parse([]string{"-http", ":8080", "README.md"}); err != nil {
@@ -28,9 +28,10 @@
 //	cfg := md2html.ConfigFromFlags(fs)
 //	err := md2html.Run(context.Background(), cfg, slog.Default(), os.Stdout, fs.Args())
 //
-// For navigation and structured parsing, use ParseSummary and Loader.
+// For navigation and structured parsing, use [ParseSummary],
+// [LoadNavigationOrAutoFromDir], and [Loader].
 //
-// Run is a library call: it neither changes the process working
+// [Run] is a library call: it neither changes the process working
 // directory nor installs signal handlers. [Config.Chdir] names the
 // directory the configuration's relative paths resolve against, so two
 // configurations can be rendered at once, and cancelling the context

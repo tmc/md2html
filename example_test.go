@@ -107,3 +107,20 @@ func ExampleLoadNavigationOrAutoFromDir() {
 	fmt.Println(len(nav.Flat) > 0)
 	// Output: true
 }
+
+// ForPage resolves the current page, previous/next links, and ancestor
+// breadcrumb for a path in the navigation tree.
+func ExampleNavigation_ForPage() {
+	nav, err := md2html.ParseSummary("# Summary\n\n- [Intro](intro.md)\n- [Guide](guide.md)\n- [Reference](ref.md)\n", ".html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	ctx := nav.ForPage("guide.md")
+	fmt.Println("current:", ctx.Current.Title)
+	fmt.Println("prev:", ctx.Prev.Title)
+	fmt.Println("next:", ctx.Next.Title)
+	// Output:
+	// current: Guide
+	// prev: Intro
+	// next: Reference
+}

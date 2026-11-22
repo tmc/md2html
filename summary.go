@@ -50,7 +50,8 @@ type NavContext struct {
 // linkPattern matches markdown links: [Title](path.md)
 var linkPattern = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
 
-// LoadSummary loads and parses SUMMARY.md from a directory.
+// LoadSummary loads and parses a SUMMARY.md file relative to the loader's
+// base directory into a [Navigation] tree.
 func (l *Loader) LoadSummary(path string) (*Navigation, error) {
 	content, err := l.readFile(path)
 	if err != nil {
@@ -59,7 +60,7 @@ func (l *Loader) LoadSummary(path string) (*Navigation, error) {
 	return ParseSummary(string(content), l.htmlExt)
 }
 
-// ParseSummary parses SUMMARY.md content into a Navigation structure.
+// ParseSummary parses SUMMARY.md content into a [Navigation] tree.
 func ParseSummary(content, htmlExt string) (*Navigation, error) {
 	nav := &Navigation{
 		ByPath: make(map[string]*NavItem),
@@ -215,7 +216,8 @@ func (n *Navigation) buildIndexes() {
 	walk(n.Items)
 }
 
-// ForPage returns navigation context for a specific page path.
+// ForPage returns the [NavContext] for currentPath, or an empty context
+// when n is nil.
 func (n *Navigation) ForPage(currentPath string) *NavContext {
 	if n == nil {
 		return &NavContext{HasNav: false}
@@ -284,7 +286,8 @@ func normalizePath(path string) string {
 	return path
 }
 
-// LoadNavigationFromDir loads SUMMARY.md from a directory if it exists.
+// LoadNavigationFromDir loads SUMMARY.md from dir if it exists, or
+// returns nil.
 func LoadNavigationFromDir(dir, htmlExt string) *Navigation {
 	summaryPath := filepath.Join(dir, "SUMMARY.md")
 	if _, err := os.Stat(summaryPath); os.IsNotExist(err) {
@@ -299,14 +302,15 @@ func LoadNavigationFromDir(dir, htmlExt string) *Navigation {
 	return nav
 }
 
-// AutoNavigationFromDir builds navigation from markdown files when no
-// SUMMARY.md is available.
+// AutoNavigationFromDir builds a [Navigation] tree from the Markdown
+// files in sourceDir.
 func AutoNavigationFromDir(sourceDir string) (*Navigation, error) {
 	return autoNavigationFromDir(sourceDir, "")
 }
 
-// LoadNavigationOrAutoFromDir loads SUMMARY.md when present, otherwise builds
-// navigation from the markdown tree.
+// LoadNavigationOrAutoFromDir loads navigation from SUMMARY.md or
+// docs.json when present, otherwise builds a [Navigation] tree from the
+// Markdown files in sourceDir.
 func LoadNavigationOrAutoFromDir(sourceDir, htmlExt string) (*Navigation, error) {
 	nav, _, err := navigationForDir(sourceDir, htmlExt)
 	return nav, err

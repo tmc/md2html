@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// FragmentOptions configures fragment rendering.
+// FragmentOptions configures [RenderFragment].
 type FragmentOptions struct {
 	// AllowUnsafe permits raw HTML in rendered Markdown.
 	AllowUnsafe bool
@@ -22,7 +22,7 @@ type FragmentOptions struct {
 	Frontmatter map[string]any
 }
 
-// Fragment contains rendered markdown plus enhancement metadata for clients.
+// Fragment contains rendered Markdown and client enhancement metadata.
 type Fragment struct {
 	// HTML is the rendered Markdown fragment.
 	HTML template.HTML
@@ -58,13 +58,14 @@ func pageHasMath(htmlContent string) bool {
 }
 
 // RenderFragment renders Markdown using the md2html pipeline and returns
-// client enhancement metadata for MathJax and Mermaid.
+// a [Fragment] with client enhancement metadata for MathJax and Mermaid.
 //
-// An invalid Format is not an error: it is treated as ordinary Markdown,
-// since a presentation profile the caller misspelled should not stop the
-// page from rendering. A renderer that fails is an error, and the
-// returned Fragment then holds no HTML; reporting it is what tells the
-// caller the blank page is a failure rather than an empty document.
+// An invalid [FragmentOptions.Format] is not an error: it is treated as
+// ordinary Markdown, since a presentation profile the caller misspelled
+// should not stop the page from rendering. A renderer that fails is an
+// error, and the returned [Fragment] then holds no HTML; reporting it is
+// what tells the caller the blank page is a failure rather than an empty
+// document.
 func RenderFragment(markdown, filePath string, opts FragmentOptions) (Fragment, error) {
 	if validateFormat(opts.Format) != nil {
 		opts.Format = ""
@@ -91,7 +92,7 @@ func RenderFragment(markdown, filePath string, opts FragmentOptions) (Fragment, 
 	}, nil
 }
 
-// FragmentStyles returns shared CSS for rendered markdown fragments.
+// FragmentStyles returns the shared CSS expected by HTML from [RenderFragment].
 func FragmentStyles() template.CSS {
 	const mermaidCSS = `
 .mermaid {
