@@ -1,134 +1,98 @@
 # md2html
 
-Command md2html renders Markdown as HTML.
+`md2html` renders Markdown as HTML: a single file to standard output, a
+live-reloading HTTP server, or a static HTML site. The repository also provides
+`mdvet`, a vet-style checker for Markdown trees, and package
+`github.com/tmc/md2html` for in-process rendering and navigation parsing.
 
-It can:
+## Install
 
-  - render a single Markdown file to stdout
-  - serve a Markdown tree over HTTP with live reload
-  - generate a static HTML tree
+```sh
+go install github.com/tmc/md2html/cmd/md2html@latest
+go install github.com/tmc/md2html/cmd/mdvet@latest
+```
 
-Basic usage:
+## Usage
 
-	md2html README.md
+Render a single Markdown file to standard output:
 
-Serve the current tree:
+```sh
+md2html README.md
+```
 
-	md2html -http :8080
+Serve the current directory over HTTP with live reload (use `-watch=false` to
+disable file watching, or `-base /docs` to preview under a URL prefix):
 
-Disable live-reload file watching:
+```sh
+md2html -http :8080
+```
 
-	md2html -watch=false -http :8080
+Build a static HTML site with docs navigation (add `-search` for client-side
+search, `-llms` for `llms.txt` output, or `-versions` to publish git tags
+alongside the working tree):
 
-Generate static output:
+```sh
+md2html -nav -html _site .
+```
 
-	md2html -html _site .
+Run checks on a Markdown tree (use `-list` to see the available checks):
 
-Generate static output with docs navigation:
+```sh
+mdvet .
+mdvet -list
+```
 
-	md2html -nav -html _site .
+## Features
 
-`-nav` takes navigation from `SUMMARY.md`, then from a Mintlify `docs.json` covering the tree, then from the shape of the tree itself. A `docs.json` is looked for in the source directory and its parents, since it sits at the root of the published site while the Markdown often lives in a subdirectory; its page paths are resolved against that root, and pages outside the directory being served are skipped. Its `name` becomes the site title unless `-title` says otherwise. A `SUMMARY.md` link to another site, such as `[API](https://pkg.go.dev/example.com/x)`, is shown in the sidebar and left out of the previous and next links.
+- **Markdown rendering**: GitHub Flavored Markdown with syntax highlighting,
+  footnotes, GitHub alerts, fenced admonitions, tabs, audio/video embeds,
+  Mermaid diagrams, and MathJax. Raw HTML is dropped by default
+  (`-allow-unsafe` passes it through).
+- **Navigation and icons**: Builds sidebar navigation from `SUMMARY.md`, a
+  Mintlify `docs.json`, or the directory tree (`-nav`). Embeds Font Awesome
+  Free, Lucide, and Tabler Outline icon sets; override with `-icons dir` or
+  disable with `-no-icons`.
+- **Components and code includes**: Built-in MDX-style layout components
+  (`Card`, `CardGroup`, `Steps`, `Accordion`, `Frame`), custom template-backed
+  components (`-components dir`), and `<Code src="..." />` file and region
+  includes (`-include-root dir`).
+- **Static output and metadata**: Client-side search (`-search`), `llms.txt`
+  and `llms-full.txt` (`-llms`), Open Graph and Twitter card metadata
+  (`-site-url`, `-og-image`), directory-style URLs (`-html-layout dir`),
+  allowlisted static assets, and `.md2htmlignore` / `.mintignore` exclusions.
+- **Versioned documentation**: Builds one output directory per matching git tag
+  or branch alongside the working tree (`-versions`, `-version-pattern`,
+  `versions.yaml`), with rename tracking, build caching (`-version-cache`), and
+  aliases (`-version-alias`).
+- **Custom templates**: Override any embedded `html/template` definition with
+  `-templates dir`; see [examples/README.md](examples/README.md).
 
-`-favicon file` names the site icon, which is copied to the root of the output and linked from every page. Without the flag the icon is the `favicon` that `docs.json` names.
+## Library
 
-A static build writes `guide.md` as `guide.html`. With `-html-layout dir` it writes `guide/index.html` instead and links to it as `guide/`, for hosts that serve files as they are; references to images and other files beside a page are adjusted to match.
+Import `github.com/tmc/md2html` to render Markdown fragments, parse navigation,
+or embed the server and static builder:
 
-Files named `.md`, `.markdown`, and `.mdx` are pages. Links to them become links to the rendered pages. A static build also rewrites root-absolute links to pages in the tree, such as `/docs/quickstart`, relative to each page, so the output works when hosted under a prefix. Those paths are resolved from the directory holding `docs.json`, or from the source directory if there is none. Links that name no page are left alone.
+```go
+frag, err := md2html.RenderFragment("# Hello\n", "", md2html.FragmentOptions{})
+if err != nil {
+	log.Fatal(err)
+}
+fmt.Println(frag.HTML)
+```
 
-Navigation and component icons work without installation. md2html embeds pinned Font Awesome Free, Lucide, and Tabler Outline sets and follows `docs.json`'s `icons.library`; the Mintlify default is Font Awesome. Font Awesome's `iconType` supports the free `solid`, `regular`, and `brands` styles. An unavailable icon is left blank and reported once.
+See [pkg.go.dev/github.com/tmc/md2html](https://pkg.go.dev/github.com/tmc/md2html)
+for the full API (`RenderFragment`, `NewLoader`, `ParseSummary`, and `Run`).
 
-Use `-icons dir` to replace the selected library with a directory of SVG files named for the icons that request them, or `-no-icons` to disable icons. A project-local `icons` directory is also a complete replacement. md2html does not consult a user-global icon directory or fetch icons while rendering, so the same source tree renders identically on different machines.
+## Documentation
 
-`-github-stars` shows the star count of the repository named in `docs.json` beside the repository link. The count is fetched at build time and refreshed in the browser, so a deployed page does not show the number frozen at the build; the fetch is cached for five minutes per reader. Without the flag no page makes any request.
+Full command flags, configuration formats (`docs.json`, `versions.yaml`,
+`components.json`, `jsonspec.json`), and Markdown dialect details are in the
+package docs:
 
-`-jsonspec dir` labels JSON examples with the schema they follow. A fenced `json` block whose `"type"` value starts with one of the prefixes in `dir/jsonspec.json` gets a badge naming its type, and the fields of the matching `dir/<type>.schema.json` show their descriptions on hover:
+```sh
+go doc github.com/tmc/md2html/cmd/md2html
+go doc github.com/tmc/md2html/cmd/mdvet
+go doc github.com/tmc/md2html
+```
 
-	{"prefixes": ["acme/"], "badge_url": "schemas.html#%s", "badge_label": "%s schema"}
-
-With that file, a block containing `"type": "acme/order"` is labeled "order schema", links to `schemas.html#order`, and takes its field descriptions from `order.schema.json`. The server also serves the loaded schemas at `/_jsonspec/schemas.json`.
-
-Pages a repository keeps out of its site are listed in a `.md2htmlignore`, in gitignore syntax, at or above the directory being served; a `.mintignore` is read under the same rules, so a tree that already declares its exclusions does not have to repeat them.
-
-Generate static output with agent-readable summaries:
-
-	md2html -html _site -llms .
-
-Generate versioned static output, one directory per release tag plus the working tree as `latest`:
-
-	md2html -html _site -versions -version-pattern 'v*' -nav docs
-
-Each version is built from its own commit, checked out into a git worktree, so its pages, navigation, included code, and search index are those of the release. The output root holds `versions.json`, which every page's version switcher reads when it is viewed, a `versions/` page listing them, redirects from the unversioned URLs to the default version, and `_shared/`, holding the scripts versions share once each. A `versions.yaml` file in the source directory, read from the working tree only, chooses which tags to publish and how to label them, and lists archived versions built by other tools, which are copied in verbatim:
-
-	since: v0.1.17     # publish no older tag, nor prereleases
-	exclude: ["v0.1.19"] # nor these
-	collapse: minor # list only the newest patch of each minor version
-	labels:
-	  latest: main
-	archive:
-	  - name: v0.1.16
-	    label: v0.1.16 and earlier
-	    path: archive/v0.1.16 # directory, or URL of a .tar.gz
-	banner:
-	  old: "You are reading docs for {version}. The latest is {latest}."
-
-When a page moves, git rename detection, or an `aliases` list in the moved page's frontmatter, lets the switcher follow it between versions, and the latest version keeps a redirect at the old path. An old version's `-edit-url` link names the page where it is now, and is left off a page since removed. With `-version-cache`, a version whose commit and chrome are unchanged is copied from the cache rather than rebuilt; `-versions-only` builds a subset; `-version-alias stable=newest-tag` publishes a copy of the newest release as `stable/`. With `-http`, the working tree is served at the root, whatever `-version-default` says, and each other version under `/v/<name>/`, from a worktree of its commit made when it is first requested.
-
-Markdown supports GitHub-style alerts such as "> \[!NOTE]" and fenced admonitions such as "!!!note". Image syntax pointing at audio or video files, for example "!\[demo](demo.mp4)", renders as media controls.
-
-Rendering follows GFM, so a single newline is a space and paragraphs reflow to the viewport. Subscript ("H\~2\~O"), superscript ("X^2^"), and definition lists are not supported. Raw HTML is dropped by default; `-allow-unsafe` passes it through, along with attribute syntax and link rewriting inside HTML blocks.
-
-Docs that link to themselves with root-absolute paths, such as `/docs/quickstart`, only resolve when the tree is served under the prefix those links assume. Use `-base` to preview such a subtree:
-
-	cd docs && md2html -http :8080 -base /docs
-
-Pages are then served under `/docs/`, and a request outside the prefix redirects into it. Serving the parent directory instead works whenever the directory name already matches the prefix.
-
-Pages take their title from the frontmatter `title`, then the first heading, then the file name. A directory URL serves that directory's index file (`index.md` or `README.md`, or the file named by `-index`) and otherwise a listing of the Markdown files beneath it, to `-depth` levels. A static build chooses the root `index.html` the same way.
-
-Static output carries the files pages point at, keeping their paths: images, media, fonts, stylesheets and scripts, PDFs, and what a host asks for by name such as `robots.txt`, `favicon.ico`, and a web app manifest. The set is an allowlist rather than everything that is not Markdown, because a docs tree usually sits inside a repository holding source and configuration that has no business on a web host. Dot files, the output directory, and anything the ignore file excludes stay out. The development server serves whatever it finds, so a page that renders locally now deploys the same way.
-
-Every page carries the metadata a link preview is built from: `description`, `rel=canonical`, `og:title`, `og:description`, `og:type` (`website` at the site root, `article` elsewhere), `og:site_name`, `og:url`, and `twitter:card`. Set `-site-url` so the canonical URL and `og:url` are absolute; a crawler has no document to resolve a relative one against. A page names its card image with frontmatter `og_image` (or `image`) and describes it with `og_image_alt`, and `-og-image` supplies one for every page that names none. A page image resolves against the page URL and the `-og-image` default against the site root, so both are emitted absolute. Pages with an image advertise `summary_large_image`, the large card X and Slack draw from a 1200×630 image; pages without advertise `summary`.
-
-Mermaid diagrams and TeX math are rendered in the browser by scripts loaded from a CDN, so those pages need network access on first view. When a script fails to load the page says so rather than leaving the block unrendered.
-
-MDX-style layout components are supported for `Card`, `CardGroup` (also spelled `Columns`), `Steps`/`Step`, `Accordion`/`AccordionGroup` (`Expandable` is the same disclosure), and `Frame`:
-
-	<CardGroup cols={2}>
-
-	<Card title="Install" href="/install">
-	Run `go install` to get started.
-	</Card>
-
-	</CardGroup>
-
-A tag must stand alone on its line, and its body is ordinary Markdown. This is not MDX: there is no JavaScript, so `import` and `export` are unsupported and brace expressions accept only JSON scalars. Unknown component names, unknown attributes, and missing required attributes are reported as warnings and left unrendered.
-
-Define your own with `-components dir`, where `dir` holds a `components.json` naming each component's attributes and its `html/template` file:
-
-	{
-	  "components": {
-	    "Note": {
-	      "attrs": ["title"],
-	      "required": ["title"],
-	      "template": "note.html"
-	    }
-	  }
-	}
-
-Each template must reference `{{.Content}}` exactly once, where the Markdown body goes, and reaches attribute values through `{{.Attrs.title}}`. Templates are configuration and may emit any markup; attribute values come from Markdown and are always escaped. A definition may reuse a built-in name to replace it. Pass the same directory to `mdvet -components` so it agrees about which components exist.
-
-`Code` shows a file as a code block, so a page cannot drift from the program it documents:
-
-	<Code src="../examples/hello/main.go" />
-	<Code src="/examples/hello/main.go" region="greet" title="Greeting" link />
-
-`src` is relative to the page, or to the include root when it begins with a slash. `lang` sets the fence language, which otherwise comes from the file name. `region` shows only the lines between comments reading `region NAME` and `endregion NAME`, without the indentation they share; those comments are never shown. `title` captions the block, and `link` makes the caption a link to the file, at the lines shown, in the GitHub repository that `docs.json` names in `navbar.primary`, at the branch, tag, or commit in its `ref` (by default the repository's default branch).
-
-A file must be inside the include root, which is the source directory unless `-include-root dir` names another, such as the repository root. Hidden files, files the ignore file excludes, and files a symbolic link would reach outside the root are refused. A tag that cannot be expanded fails a static build, and the server shows the reason in the page; `mdvet` reports the same errors, given the same `-include-root`, except that it does not check that a `link` has a repository to point at. The server reloads a page when a file it includes changes. `llms-full.txt`, the search index, and the Markdown copies written by `-llms` contain the code, not the tag.
-
-Any fenced block that names a language can carry a caption the same way: `` ```go {title="main.go"} ``.
-
-Use `-format=okf` when rendering an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) bundle. It rewrites OKF root-relative Markdown links such as `/tables/orders.md` for the rendered site. It is presentation support only; validate bundles with an OKF-aware tool such as `specmd validate`.
-
-The command is a thin wrapper around package github.com/tmc/md2html.
+Template override examples are in [examples/README.md](examples/README.md).
